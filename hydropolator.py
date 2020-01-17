@@ -41,6 +41,7 @@ parser.add_argument('-pointfile',
 parser.add_argument('-filetype',
                     choices=['csv', 'shp'],
                     type=str,
+                    default='csv',
                     help='specify filetype of input')
 parser.add_argument('-delimiter',
                     metavar=' ',
@@ -64,6 +65,11 @@ elif args.project:
 
 if args.pointfile:
     print('> inserting points from file')
+    if args.pointfile == 'surveyData':
+        projectObject.load_pointfile(surveyData, args.filetype, args.delimiter)
+    else:
+        projectObject.load_pointfile(args.pointfile, args.filetype, args.delimiter)
+    projectObject.summarize_project()
 # parser.add_argument('-dft', action='store_true',
 #                     help='get db credentials from default file')
 # parser.add_argument('-db', default=None, type=str, help='database name')
