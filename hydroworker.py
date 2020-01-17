@@ -115,8 +115,9 @@ class Hydropolator:
         if os.path.exists(projectDir):
             self.projectName = projectName
             self.load_metafile()
+            return True
         else:
-            return '> project does not exist, load another or initialise a new project with -init'
+            print('> project does not exist, load another or initialise a new project with -init')
 
     def summarize_project(self):
         print('initialisation: {}'.format(self.initDate))

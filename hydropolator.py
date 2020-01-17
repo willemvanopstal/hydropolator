@@ -32,6 +32,7 @@ parser.add_argument('-project',
                     type=str,
                     default=None,
                     help='open an existing project')
+
 parser.add_argument('-pointfile',
                     metavar='input_point_file.csv',
                     type=str,
@@ -55,14 +56,14 @@ if args.init:
     print('> initializing new project')
     projectObject = Hydropolator()
     print(projectObject.init_project(args.init))
-
-if args.project:
+elif args.project:
     print('> opening existing project')
     projectObject = Hydropolator()
-    projectObject.load_project(args.project)
-    projectObject.summarize_project()
+    if projectObject.load_project(args.project) == True:
+        projectObject.summarize_project()
 
-
+if args.pointfile:
+    print('> inserting points from file')
 # parser.add_argument('-dft', action='store_true',
 #                     help='get db credentials from default file')
 # parser.add_argument('-db', default=None, type=str, help='database name')
