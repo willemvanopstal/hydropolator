@@ -161,6 +161,17 @@ class Hydropolator:
         triPoly.append([vertices[vertex_list[0]][0], vertices[vertex_list[0]][1]])
         return [triPoly]
 
+    def polystats_from_triangle(self, vertex_list):
+        vertices = self.triangulation.all_vertices()
+        triPoly = []
+        elevations = []
+        for vId in vertex_list:
+            triPoly.append([vertices[vId][0], vertices[vId][1]])
+            elevations.append(vertices[vId][2])
+        triPoly.append([vertices[vertex_list[0]][0], vertices[vertex_list[0]][1]])
+
+        return [triPoly], min(elevations), max(elevations), sum(elevations)/3
+
     def minmaxavg_from_triangle(self, vertex_list):
         vertices = self.triangulation.all_vertices()
         elevations = []
@@ -177,7 +188,6 @@ class Hydropolator:
         with shapefile.Writer(pointShpFile) as wp:
             wp.field('depth', 'F', decimal=4)
             for point in self.triangulation.all_vertices()[1:]:
-                print(point)
                 wp.point(point[0], point[1])
                 wp.record(point[2])
 
@@ -186,6 +196,8 @@ class Hydropolator:
             wt.field('max_depth', 'F', decimal=4)
             wt.field('avg_depth', 'F', decimal=4)
             for triangle in self.triangulation.all_triangles():
-                wt.poly(self.poly_from_triangle(triangle))
-                min, max, avg = self.minmaxavg_from_triangle(triangle)
+                geom, min, max, avg = self.polystats_from_triangle(triangle)
+                # wt.poly(self.poly_from_triangle(triangle))
+                # min, max, avg = 10, 10, 10  # self.minmaxavg_from_triangle(triangle)
+                wt.poly(geom)
                 wt.record(min, max, avg)
