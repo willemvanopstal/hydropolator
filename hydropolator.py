@@ -1,26 +1,15 @@
 from hydroworker import Hydropolator
+from hydroasci import cli_description
 import argparse
-import textwrap
 import os
+
 
 # ======================== #
 surveyData = '../Data/operatorimplications/simulated_surface_points.txt'
 # ======================== #
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
-                                 description=textwrap.dedent('''\
-                                  _    _           _                       _       _
-                                 | |  | |         | |                     | |     | |
-                                 | |__| |_   _  __| |_ __ ___  _ __   ___ | | __ _| |_ ___  _ __
-                                 |  __  | | | |/ _` | '__/ _ \| '_ \ / _ \| |/ _` | __/ _ \| '__|
-                                 | |  | | |_| | (_| | | | (_) | |_) | (_) | | (_| | || (_) | |
-                                 |_|  |_|\__, |\__,_|_|  \___/| .__/ \___/|_|\__,_|\__\___/|_|
-                                          __/ |               | |
-                                         |___/                |_|
-                                 for interacting with hydrographic depth measurements
-                                 to create safe navigational isobaths.
-                                 ----------------------------------------------------
-                                 '''))
+                                 description=cli_description())
 
 parser.add_argument('-init',
                     metavar='project_name',
@@ -49,6 +38,12 @@ parser.add_argument('-delimiter',
                     type=str,
                     help='specify delimiter fro csv files')
 
+parser.add_argument('-exportshp',
+                    metavar='output_file_name',
+                    type=str,
+                    default='output_file',
+                    help='name for output file')
+
 args = parser.parse_args()
 cwd = os.getcwd()
 projectDir = os.path.join(cwd, 'projects')
@@ -70,6 +65,12 @@ if args.pointfile:
     else:
         projectObject.load_pointfile(args.pointfile, args.filetype, args.delimiter)
     projectObject.summarize_project()
+
+if args.exportshp:
+    print('> exporting shapefiles')
+    projectObject.summarize_project()
+    projectObject.export_shapefile(args.exportshp)
+
 # parser.add_argument('-dft', action='store_true',
 #                     help='get db credentials from default file')
 # parser.add_argument('-db', default=None, type=str, help='database name')

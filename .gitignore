@@ -1,11 +1,12 @@
 # Ignore Mac system files
 .DS_store
 
-# Ignore node_modules folder
+# Ignore folders
 node_modules
 __pycache__
+projects
 
-# Ignore all text files
+# Ignore all files of type
 default_db
 notes
 *.txt
