@@ -46,12 +46,9 @@ def adjacent_triangles(triangle):
             break
         else:
             for incidentTriangle in t.incident_triangles_to_vertex(vId):
-                if len(set(triangle).intersection(incidentTriangle)) == 2:
-                    # print(incidentTriangle)
-                    # print(set(triangle).intersection(incidentTriangle))
-                    if set(incidentTriangle).difference(triangle) not in addedVertices:
-                        adjacentTriangles.append(incidentTriangle)
-                        addedVertices.append(set(incidentTriangle).difference(triangle))
+                if len(set(triangle).intersection(incidentTriangle)) == 2 and set(incidentTriangle).difference(triangle) not in addedVertices:
+                    adjacentTriangles.append(incidentTriangle)
+                    addedVertices.append(set(incidentTriangle).difference(triangle))
     return adjacentTriangles
 
 

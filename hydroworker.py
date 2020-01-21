@@ -31,6 +31,7 @@ class Hydropolator:
     standardSeries = [0, 1, 2, 5, 8, 10, 15, 20, 25, 30, 35, 40, 45, 50, 100, 200]
     meterSeries = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
                    15, 16, 17, 18, 19, 20, 25, 30, 35, 40, 45, 50, 100, 200]
+    hdSeries = range(0, 100)
     isobathValues = []
     regions = []
     triangleRegions = []
@@ -170,11 +171,11 @@ class Hydropolator:
         print('vertices: {}'.format(self.vertexCount))
 
     def poly_from_triangle(self, vertex_list):
-        #vertices = self.triangulation.all_vertices()
+        # vertices = self.triangulation.all_vertices()
         # vertices = self.vertices
         triPoly = []
         for vId in vertex_list:
-            #triPoly.append([vertices[vId][0], vertices[vId][1]])
+            # triPoly.append([vertices[vId][0], vertices[vId][1]])
             triPoly.append([self.triangulation.get_point(vId)[0],
                             self.triangulation.get_point(vId)[1]])
         triPoly.append([self.triangulation.get_point(vertex_list[0])[0],
@@ -182,7 +183,7 @@ class Hydropolator:
         return triPoly
 
     def polystats_from_triangle(self, vertex_list):
-        #vertices = self.triangulation.all_vertices()
+        # vertices = self.triangulation.all_vertices()
         triPoly = []
         elevations = []
         for vId in vertex_list:
@@ -192,34 +193,50 @@ class Hydropolator:
         triPoly.append([self.triangulation.get_point(vertex_list[0])[0],
                         self.triangulation.get_point(vertex_list[0])[1]])
 
-        return triPoly, min(elevations), max(elevations), sum(elevations)/3
+        return triPoly, min(elevations), max(elevations), sum(elevations) / 3
 
     def minmaxavg_from_triangle(self, vertex_list):
-        #vertices = self.triangulation.all_vertices()
+        # vertices = self.triangulation.all_vertices()
         # vertices = self.vertices
         elevations = []
         for vId in vertex_list:
             elevations.append(self.triangulation.get_point(vId)[2])
-        return min(elevations), max(elevations), sum(elevations)/3
+        return min(elevations), max(elevations), sum(elevations) / 3
 
     def minmax_from_triangle(self, vertex_list):
-        #vertices = self.triangulation.all_vertices()
+        # vertices = self.triangulation.all_vertices()
         # vertices = self.vertices
         elevations = []
         for vId in vertex_list:
             elevations.append(self.triangulation.get_point(vId)[2])
         return min(elevations), max(elevations)
 
+    def adjacent_triangles(self, triangle):
+        adjacentTriangles = []
+        addedVertices = []
+        for vId in triangle:
+            if len(addedVertices) == 3:
+                break
+            else:
+                for incidentTriangle in self.triangulation.incident_triangles_to_vertex(vId):
+                    if len(set(triangle).intersection(incidentTriangle)) == 2 and set(incidentTriangle).difference(triangle) not in addedVertices:
+                        adjacentTriangles.append(incidentTriangle)
+                        addedVertices.append(set(incidentTriangle).difference(triangle))
+
+        return adjacentTriangles
+
     def generate_regions(self, isobathSeries):
         if isobathSeries == 'standard':
             isobathValues = self.standardSeries
         elif isobathSeries == 'meter':
             isobathValues = self.meterSeries
+        elif isobathSeries == 'hd':
+            isobathValues = self.hdSeries
 
         regions = []
         regions.append([-1e9, isobathValues[0]])
         for i in range(len(isobathValues))[1:]:
-            regions.append([isobathValues[i-1], isobathValues[i]])
+            regions.append([isobathValues[i - 1], isobathValues[i]])
         regions.append([isobathValues[-1], 1e9])
 
         self.isobathValues = isobathValues
@@ -233,7 +250,7 @@ class Hydropolator:
         for triangle in self.triangles:
             min, max = self.minmax_from_triangle(triangle)
             print(min, max)
-            for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_left(self.isobathValues, max)+1):
+            for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_left(self.isobathValues, max) + 1):
                 print(self.regions[index])
                 self.triangleRegions[index].append(triangle)
         # print(self.triangleRegions)
