@@ -28,8 +28,9 @@ class Hydropolator:
     triangles = []
 
     # isobaths
-    standardSeries = [0, 1, 2, 5, 8, 10, 15, 20, 30, 40, 50, 100]
-    meterSeries = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+    standardSeries = [0, 1, 2, 5, 8, 10, 15, 20, 25, 30, 35, 40, 45, 50, 100, 200]
+    meterSeries = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+                   15, 16, 17, 18, 19, 20, 25, 30, 35, 40, 45, 50, 100, 200]
     isobathValues = []
     regions = []
     triangleRegions = []
@@ -47,7 +48,7 @@ class Hydropolator:
 
         if fileType == 'csv':
             with open(pointFile) as fi:
-                for line in fi.readlines()[:50]:
+                for line in fi.readlines():
                     point = line.split(delimiter)
                     if flip:
                         point = [float(point[0]), float(point[1]), -1*float(point[2])+18]
@@ -170,39 +171,43 @@ class Hydropolator:
 
     def poly_from_triangle(self, vertex_list):
         #vertices = self.triangulation.all_vertices()
-        vertices = self.vertices
+        # vertices = self.vertices
         triPoly = []
         for vId in vertex_list:
-            triPoly.append([vertices[vId][0], vertices[vId][1]])
-        triPoly.append([vertices[vertex_list[0]][0], vertices[vertex_list[0]][1]])
+            #triPoly.append([vertices[vId][0], vertices[vId][1]])
+            triPoly.append([self.triangulation.get_point(vId)[0],
+                            self.triangulation.get_point(vId)[1]])
+        triPoly.append([self.triangulation.get_point(vertex_list[0])[0],
+                        self.triangulation.get_point(vertex_list[0])[1]])
         return triPoly
 
     def polystats_from_triangle(self, vertex_list):
         #vertices = self.triangulation.all_vertices()
-        vertices = self.vertices
         triPoly = []
         elevations = []
         for vId in vertex_list:
-            triPoly.append([vertices[vId][0], vertices[vId][1]])
-            elevations.append(vertices[vId][2])
-        triPoly.append([vertices[vertex_list[0]][0], vertices[vertex_list[0]][1]])
+            vertex = self.triangulation.get_point(vId)
+            triPoly.append([vertex[0], vertex[1]])
+            elevations.append(vertex[2])
+        triPoly.append([self.triangulation.get_point(vertex_list[0])[0],
+                        self.triangulation.get_point(vertex_list[0])[1]])
 
         return triPoly, min(elevations), max(elevations), sum(elevations)/3
 
     def minmaxavg_from_triangle(self, vertex_list):
         #vertices = self.triangulation.all_vertices()
-        vertices = self.vertices
+        # vertices = self.vertices
         elevations = []
         for vId in vertex_list:
-            elevations.append(vertices[vId][2])
+            elevations.append(self.triangulation.get_point(vId)[2])
         return min(elevations), max(elevations), sum(elevations)/3
 
     def minmax_from_triangle(self, vertex_list):
         #vertices = self.triangulation.all_vertices()
-        vertices = self.vertices
+        # vertices = self.vertices
         elevations = []
         for vId in vertex_list:
-            elevations.append(vertices[vId][2])
+            elevations.append(self.triangulation.get_point(vId)[2])
         return min(elevations), max(elevations)
 
     def generate_regions(self, isobathSeries):
@@ -222,7 +227,7 @@ class Hydropolator:
         for i in range(len(regions)):
             self.triangleRegions.append([])
 
-        print(self.triangleRegions, regions, isobathValues)
+        # print(self.triangleRegions, regions, isobathValues)
 
     def index_region_triangles(self):
         for triangle in self.triangles:
@@ -246,8 +251,6 @@ class Hydropolator:
                         geom.append(self.poly_from_triangle(triangle))
                     wt.poly(geom)
                     wt.record(i)
-
-        return
 
     def export_shapefile(self, shpName):
         pointShpName = 'points_{}_{}.shp'.format(shpName, self.now())

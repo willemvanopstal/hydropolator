@@ -1,4 +1,6 @@
+import itertools
 import startin
+from datetime import datetime
 
 print(help(startin.DT))
 
@@ -24,5 +26,54 @@ t.insert(pts)
 
 print(t.number_of_vertices(), t.number_of_triangles())
 print(t.locate(1.01, 0.87))
+
+print(datetime.now())
 for vId in t.locate(1, 0.87):
     print(t.all_vertices()[vId])
+print(datetime.now())
+
+print(datetime.now())
+for vId in t.locate(1, 0.87):
+    print(t.get_point(vId))
+print(datetime.now())
+
+
+def adjacent_triangles(triangle):
+    adjacentTriangles = []
+    addedVertices = []
+    for vId in triangle:
+        if len(addedVertices) == 3:
+            break
+        else:
+            for incidentTriangle in t.incident_triangles_to_vertex(vId):
+                if len(set(triangle).intersection(incidentTriangle)) == 2:
+                    # print(incidentTriangle)
+                    # print(set(triangle).intersection(incidentTriangle))
+                    if set(incidentTriangle).difference(triangle) not in addedVertices:
+                        adjacentTriangles.append(incidentTriangle)
+                        addedVertices.append(set(incidentTriangle).difference(triangle))
+    return adjacentTriangles
+
+
+for tri in t.all_triangles():
+    print(tri, adjacent_triangles(tri))
+    for neighbor in adjacent_triangles(tri):
+        print(t.is_triangle(neighbor))
+
+# for triangle in t.all_triangles():
+#     print('----------------')
+#     print('tri: ', triangle)
+#     adjacentTriangles = []
+#     addedVertices = []
+#     for vId in triangle:
+#         if len(addedVertices) == 3:
+#             break
+#         else:
+#             for incidentTriangle in t.incident_triangles_to_vertex(vId):
+#                 if len(set(triangle).intersection(incidentTriangle)) == 2:
+#                     # print(incidentTriangle)
+#                     # print(set(triangle).intersection(incidentTriangle))
+#                     if set(incidentTriangle).difference(triangle) not in addedVertices:
+#                         adjacentTriangles.append(incidentTriangle)
+#                         addedVertices.append(set(incidentTriangle).difference(triangle))
+#     print('adj: ', adjacentTriangles)
