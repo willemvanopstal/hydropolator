@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 import shapefile
+import bisect
 import startin
 
 # from CGAL.CGAL_Kernel import Point_2, Point_3
@@ -23,6 +24,12 @@ class Hydropolator:
     # triangulation = Delaunay_triangulation_2()
     triangulation = startin.DT()
     vertexCount = 0
+    vertices = []
+    triangles = []
+
+    # isobaths
+    standardSeries = [0, 1, 2, 5, 8, 10, 15, 20, 30, 40, 50, 100]
+    meterSeries = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
 
     projectName = None
     initDate = None
@@ -31,15 +38,18 @@ class Hydropolator:
     def __init__(self):
         return
 
-    def load_pointfile(self, pointFile, fileType, delimiter):
+    def load_pointfile(self, pointFile, fileType, delimiter, flip=False):
         pointFilePath = os.path.normpath(os.path.join(os.getcwd(), pointFile))
         print(pointFilePath)
 
         if fileType == 'csv':
             with open(pointFile) as fi:
-                for line in fi.readlines()[:5000]:
+                for line in fi.readlines()[:500]:
                     point = line.split(delimiter)
-                    point = [float(point[0]), float(point[1]), float(point[2])]
+                    if flip:
+                        point = [float(point[0]), float(point[1]), -1*float(point[2])]
+                    elif not flip:
+                        point = [float(point[0]), float(point[1]), float(point[2])]
 
                     self.check_minmax(point)
                     # self.pointQueue.append(Point_2(point[0], point[1]))
@@ -57,6 +67,8 @@ class Hydropolator:
     def triangulation_insert(self):
         self.triangulation.insert(self.pointQueue)
         self.vertexCount = self.triangulation.number_of_vertices()
+        self.vertices = self.triangulation.all_vertices()
+        self.triangles = self.triangulation.all_triangles()
         self.pointQueue = []
 
         # for v in self.triangulation.finite_vertices():
@@ -154,7 +166,8 @@ class Hydropolator:
         print('vertices: {}'.format(self.vertexCount))
 
     def poly_from_triangle(self, vertex_list):
-        vertices = self.triangulation.all_vertices()
+        #vertices = self.triangulation.all_vertices()
+        vertices = self.vertices
         triPoly = []
         for vId in vertex_list:
             triPoly.append([vertices[vId][0], vertices[vId][1]])
@@ -162,7 +175,8 @@ class Hydropolator:
         return [triPoly]
 
     def polystats_from_triangle(self, vertex_list):
-        vertices = self.triangulation.all_vertices()
+        #vertices = self.triangulation.all_vertices()
+        vertices = self.vertices
         triPoly = []
         elevations = []
         for vId in vertex_list:
@@ -173,11 +187,55 @@ class Hydropolator:
         return [triPoly], min(elevations), max(elevations), sum(elevations)/3
 
     def minmaxavg_from_triangle(self, vertex_list):
-        vertices = self.triangulation.all_vertices()
+        #vertices = self.triangulation.all_vertices()
+        vertices = self.vertices
         elevations = []
         for vId in vertex_list:
             elevations.append(vertices[vId][2])
         return min(elevations), max(elevations), sum(elevations)/3
+
+    def minmax_from_triangle(self, vertex_list):
+        #vertices = self.triangulation.all_vertices()
+        vertices = self.vertices
+        elevations = []
+        for vId in vertex_list:
+            elevations.append(vertices[vId][2])
+        return min(elevations), max(elevations)
+
+    def generate_regions(self, isobathSeries):
+        if isobathSeries == 'standard':
+            isobathValues = self.standardSeries
+        elif isobathSeries == 'meter':
+            isobathValues = self.meterSeries
+
+        regions = []
+        regions.append([-1e9, isobathValues[0]])
+        for i in range(len(isobathValues))[1:]:
+            regions.append([isobathValues[i-1], isobathValues[i]])
+        regions.append([isobathValues[-1], 1e9])
+
+        for triangle in self.triangles:
+            min, max = self.minmax_from_triangle(triangle)
+            print(min, max)
+            for index in range(bisect.bisect_left(isobathValues, min), bisect.bisect_left(isobathValues, max)+1):
+                print(regions[index])
+
+    def export_region_triangles(self, shpName, sortedTriangles, regions):
+        triangleShpName = 'selected_triangles_{}_{}.shp'.format(shpName, self.now())
+        triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
+
+        with shapefile.Writer(triangleShpFile) as wt:
+            wt.field('min_depth', 'F', decimal=4)
+            wt.field('max_depth', 'F', decimal=4)
+            wt.field('avg_depth', 'F', decimal=4)
+            for triangle in triangles:
+                geom, min, max, avg = self.polystats_from_triangle(triangle)
+                # wt.poly(self.poly_from_triangle(triangle))
+                # min, max, avg = 10, 10, 10  # self.minmaxavg_from_triangle(triangle)
+                wt.poly(geom)
+                wt.record(min, max, avg)
+
+        return
 
     def export_shapefile(self, shpName):
         pointShpName = 'points_{}_{}.shp'.format(shpName, self.now())
@@ -187,7 +245,8 @@ class Hydropolator:
 
         with shapefile.Writer(pointShpFile) as wp:
             wp.field('depth', 'F', decimal=4)
-            for point in self.triangulation.all_vertices()[1:]:
+            # for point in self.triangulation.all_vertices()[1:]:
+            for point in self.vertices[1:]:  # remove the infinite vertex in startTIN
                 wp.point(point[0], point[1])
                 wp.record(point[2])
 
@@ -195,7 +254,7 @@ class Hydropolator:
             wt.field('min_depth', 'F', decimal=4)
             wt.field('max_depth', 'F', decimal=4)
             wt.field('avg_depth', 'F', decimal=4)
-            for triangle in self.triangulation.all_triangles():
+            for triangle in self.triangles:
                 geom, min, max, avg = self.polystats_from_triangle(triangle)
                 # wt.poly(self.poly_from_triangle(triangle))
                 # min, max, avg = 10, 10, 10  # self.minmaxavg_from_triangle(triangle)

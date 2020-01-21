@@ -37,12 +37,22 @@ parser.add_argument('-delimiter',
                     default=' ',
                     type=str,
                     help='specify delimiter fro csv files')
+parser.add_argument('-flip',
+                    metavar='False',
+                    default='False',
+                    type=str,
+                    help='flip unit positive negative (heights/depths)')
 
 parser.add_argument('-exportshp',
                     metavar='output_file_name',
                     type=str,
                     default='output_file',
                     help='name for output file')
+parser.add_argument('-regions',
+                    metavar='isobath series',
+                    type=str,
+                    default='standard',
+                    help='creates triangle regions')
 
 args = parser.parse_args()
 cwd = os.getcwd()
@@ -58,18 +68,28 @@ elif args.project:
     if projectObject.load_project(args.project) == True:
         projectObject.summarize_project()
 
+if args.flip:
+    flip = True
+else:
+    flip = False
+
 if args.pointfile:
     print('> inserting points from file')
     if args.pointfile == 'surveyData':
-        projectObject.load_pointfile(surveyData, args.filetype, args.delimiter)
+        projectObject.load_pointfile(surveyData, args.filetype, args.delimiter, flip)
     else:
-        projectObject.load_pointfile(args.pointfile, args.filetype, args.delimiter)
+        projectObject.load_pointfile(args.pointfile, args.filetype, args.delimiter, flip)
     projectObject.summarize_project()
 
 if args.exportshp:
     print('> exporting shapefiles')
     projectObject.summarize_project()
     projectObject.export_shapefile(args.exportshp)
+
+if args.regions:
+    print('> generating regions')
+    projectObject.summarize_project()
+    projectObject.generate_regions(args.regions)
 
 # parser.add_argument('-dft', action='store_true',
 #                     help='get db credentials from default file')
