@@ -46,12 +46,12 @@ parser.add_argument('-flip',
 parser.add_argument('-exportshp',
                     metavar='output_file_name',
                     type=str,
-                    default='output_file',
+                    default=None,
                     help='name for output file')
 parser.add_argument('-regions',
                     metavar='isobath series',
                     type=str,
-                    default='standard',
+                    default=None,
                     help='creates triangle regions')
 
 args = parser.parse_args()
@@ -90,6 +90,8 @@ if args.regions:
     print('> generating regions')
     projectObject.summarize_project()
     projectObject.generate_regions(args.regions)
+    projectObject.index_region_triangles()
+    projectObject.export_region_triangles()
 
 # parser.add_argument('-dft', action='store_true',
 #                     help='get db credentials from default file')

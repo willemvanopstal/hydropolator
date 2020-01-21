@@ -4,6 +4,7 @@
 # Ignore folders
 node_modules
 __pycache__
+projects
 
 # Ignore all files of type
 default_db

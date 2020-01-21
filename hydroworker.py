@@ -30,6 +30,9 @@ class Hydropolator:
     # isobaths
     standardSeries = [0, 1, 2, 5, 8, 10, 15, 20, 30, 40, 50, 100]
     meterSeries = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+    isobathValues = []
+    regions = []
+    triangleRegions = []
 
     projectName = None
     initDate = None
@@ -44,12 +47,12 @@ class Hydropolator:
 
         if fileType == 'csv':
             with open(pointFile) as fi:
-                for line in fi.readlines()[:500]:
+                for line in fi.readlines()[:50]:
                     point = line.split(delimiter)
                     if flip:
-                        point = [float(point[0]), float(point[1]), -1*float(point[2])]
+                        point = [float(point[0]), float(point[1]), -1*float(point[2])+18]
                     elif not flip:
-                        point = [float(point[0]), float(point[1]), float(point[2])]
+                        point = [float(point[0]), float(point[1]), float(point[2])+18]
 
                     self.check_minmax(point)
                     # self.pointQueue.append(Point_2(point[0], point[1]))
@@ -172,7 +175,7 @@ class Hydropolator:
         for vId in vertex_list:
             triPoly.append([vertices[vId][0], vertices[vId][1]])
         triPoly.append([vertices[vertex_list[0]][0], vertices[vertex_list[0]][1]])
-        return [triPoly]
+        return triPoly
 
     def polystats_from_triangle(self, vertex_list):
         #vertices = self.triangulation.all_vertices()
@@ -184,7 +187,7 @@ class Hydropolator:
             elevations.append(vertices[vId][2])
         triPoly.append([vertices[vertex_list[0]][0], vertices[vertex_list[0]][1]])
 
-        return [triPoly], min(elevations), max(elevations), sum(elevations)/3
+        return triPoly, min(elevations), max(elevations), sum(elevations)/3
 
     def minmaxavg_from_triangle(self, vertex_list):
         #vertices = self.triangulation.all_vertices()
@@ -214,26 +217,35 @@ class Hydropolator:
             regions.append([isobathValues[i-1], isobathValues[i]])
         regions.append([isobathValues[-1], 1e9])
 
+        self.isobathValues = isobathValues
+        self.regions = regions
+        for i in range(len(regions)):
+            self.triangleRegions.append([])
+
+        print(self.triangleRegions, regions, isobathValues)
+
+    def index_region_triangles(self):
         for triangle in self.triangles:
             min, max = self.minmax_from_triangle(triangle)
             print(min, max)
-            for index in range(bisect.bisect_left(isobathValues, min), bisect.bisect_left(isobathValues, max)+1):
-                print(regions[index])
+            for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_left(self.isobathValues, max)+1):
+                print(self.regions[index])
+                self.triangleRegions[index].append(triangle)
+        # print(self.triangleRegions)
 
-    def export_region_triangles(self, shpName, sortedTriangles, regions):
-        triangleShpName = 'selected_triangles_{}_{}.shp'.format(shpName, self.now())
+    def export_region_triangles(self):
+        triangleShpName = 'region_triangles_{}.shp'.format(self.now())
         triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
 
         with shapefile.Writer(triangleShpFile) as wt:
-            wt.field('min_depth', 'F', decimal=4)
-            wt.field('max_depth', 'F', decimal=4)
-            wt.field('avg_depth', 'F', decimal=4)
-            for triangle in triangles:
-                geom, min, max, avg = self.polystats_from_triangle(triangle)
-                # wt.poly(self.poly_from_triangle(triangle))
-                # min, max, avg = 10, 10, 10  # self.minmaxavg_from_triangle(triangle)
-                wt.poly(geom)
-                wt.record(min, max, avg)
+            wt.field('region', 'N')
+            for i, region in enumerate(self.triangleRegions):
+                if len(region):
+                    geom = []
+                    for triangle in region:
+                        geom.append(self.poly_from_triangle(triangle))
+                    wt.poly(geom)
+                    wt.record(i)
 
         return
 
@@ -258,5 +270,5 @@ class Hydropolator:
                 geom, min, max, avg = self.polystats_from_triangle(triangle)
                 # wt.poly(self.poly_from_triangle(triangle))
                 # min, max, avg = 10, 10, 10  # self.minmaxavg_from_triangle(triangle)
-                wt.poly(geom)
+                wt.poly([geom])
                 wt.record(min, max, avg)
