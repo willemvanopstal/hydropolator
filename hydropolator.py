@@ -402,10 +402,22 @@ class Hydropolator:
         # self.graph['nodes'][str(self.nrNodes)] = {'region': tuple(interval), 'triangles': {
         #     tuple(self.pseudo_triangle(triangle))}, 'edges': set()}
         nodeId = str(self.nrNodes)
-        self.graph['nodes'][nodeId] = {'region': interval, 'triangles': {
-            tuple(self.pseudo_triangle(triangle))}, 'edges': set()}
+        self.graph['nodes'][nodeId] = {'region': interval, 'triangles': {tuple(self.pseudo_triangle(
+            triangle))}, 'edges': set(), 'currentQueue': set(), 'shallowQueue': set(), 'deepQueue': set()}
         self.nrNodes += 1
         return nodeId
+
+    def add_triangle_to_queue(self, triangle, nodeId, type):
+        queueType = type + 'Queue'
+        self.graph['nodes'][nodeId][queueType].add(tuple(self.pseudo_triangle(triangle)))
+
+    def remove_triangle_from_queue(self, triangle, nodeId, type):
+        queueType = type + 'Queue'
+        self.graph['nodes'][nodeId][queueType].remove(tuple(self.pseudo_triangle(triangle)))
+
+    def get_queue(self, nodeId, type):
+        queueType = type + 'Queue'
+        return self.graph['nodes'][nodeId][queueType]
 
     def triangle_in_node(self, triangle, nodeId):
         if tuple(self.pseudo_triangle(triangle)) in self.graph['nodes'][nodeId]['triangles']:
@@ -428,14 +440,30 @@ class Hydropolator:
             print(edgeId, self.graph['edges'][edgeId])
 
     def generate_walker_graph(self, triangle, interval, nodeId):
+        # NOT IN USE ANYMORE: Max recursion limit
         for neighbor in self.adjacent_triangles(triangle):
             if interval in self.find_intervals(neighbor) and not self.triangle_in_node(neighbor, nodeId):
                 # print(neighbor)
                 self.add_triangle_to_node(neighbor, nodeId)
                 self.generate_walker_graph(neighbor, interval, nodeId)
 
+    def iterative_generator(self, triangle, interval, nodeId):
+        print('--itergenerator--', interval)
+        for neighbor in self.adjacent_triangles(triangle):
+            neighborIntervals = self.find_intervals(neighbor)
+            print(neighbor, neighborIntervals)
+            if interval in neighborIntervals and not self.triangle_in_node(neighbor, nodeId):
+                self.add_triangle_to_queue(neighbor, nodeId, 'current')
+                print('current')
+            if interval+1 in neighborIntervals:
+                self.add_triangle_to_queue(neighbor, nodeId, 'deep')
+                print('deep')
+            if interval-1 in neighborIntervals:
+                self.add_triangle_to_queue(neighbor, nodeId, 'shallow')
+                print('shallow')
+
     def build_graph(self):
-        startingTriangle = self.triangles[0]
+        startingTriangle = self.triangles[23]
         # print(startingTriangle)
 
         print('\n=======starter=======')
@@ -445,7 +473,13 @@ class Hydropolator:
 
         for interval in self.find_intervals(startingTriangle):
             currentNodeId = self.add_triangle_to_new_node(interval, startingTriangle)
-            self.generate_walker_graph(startingTriangle, interval, currentNodeId)
+            # self.generate_walker_graph(startingTriangle, interval, currentNodeId)
+            self.iterative_generator(startingTriangle, interval, currentNodeId)
+            while len(self.get_queue(currentNodeId, 'current')):
+                for triangle in self.get_queue(currentNodeId, 'current').copy():
+                    self.add_triangle_to_node(list(triangle), currentNodeId)
+                    self.remove_triangle_from_queue(list(triangle), currentNodeId, 'current')
+                    self.iterative_generator(triangle, interval, currentNodeId)
 
         # print('----neighbors----')
         # for neighbor in self.adjacent_triangles(startingTriangle):
