@@ -366,6 +366,12 @@ class Hydropolator:
                     wt.poly(geom)
                     wt.record(i)
 
+    def export_all_node_triangles(self):
+        nodeList = []
+        for node in self.graph['nodes'].keys():
+            nodeList.append(node)
+        self.export_node_triangles(nodeList)
+
     def export_node_triangles(self, nodeIds):
         triangleShpName = 'node_triangles_{}.shp'.format(self.now())
         triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
@@ -419,6 +425,9 @@ class Hydropolator:
         queueType = type + 'Queue'
         return self.graph['nodes'][nodeId][queueType]
 
+    def get_interval_from_node(self, nodeId):
+        return int(self.graph['nodes'][nodeId]['region'])
+
     def triangle_in_node(self, triangle, nodeId):
         if tuple(self.pseudo_triangle(triangle)) in self.graph['nodes'][nodeId]['triangles']:
             return True
@@ -434,7 +443,10 @@ class Hydropolator:
     def print_graph(self):
         print('\nNODES')
         for nodeId in self.graph['nodes'].keys():
-            print(nodeId, self.graph['nodes'][nodeId])
+            # print(nodeId, self.graph['nodes'][nodeId])
+            print('id: ', nodeId, 'triangles: ', len(self.graph['nodes'][nodeId]['triangles']), 'edges: ', self.graph['nodes'][nodeId]['edges'], 'current: ',
+                  len(self.graph['nodes'][nodeId]['currentQueue']), 'deep: ', len(
+                      self.graph['nodes'][nodeId]['deepQueue']), 'shallow: ', len(self.graph['nodes'][nodeId]['shallowQueue']))
         print('EDGES')
         for edgeId in self.graph['edges'].keys():
             print(edgeId, self.graph['edges'][edgeId])
@@ -462,24 +474,45 @@ class Hydropolator:
                 self.add_triangle_to_queue(neighbor, nodeId, 'shallow')
                 print('shallow')
 
+    def expand_node(self, nodeId, interval):
+        while len(self.get_queue(nodeId, 'current')):
+            for triangle in self.get_queue(nodeId, 'current').copy():
+                self.add_triangle_to_node(list(triangle), nodeId)
+                self.remove_triangle_from_queue(list(triangle), nodeId, 'current')
+                self.iterative_generator(triangle, interval, nodeId)
+
     def build_graph(self):
-        startingTriangle = self.triangles[23]
-        # print(startingTriangle)
+        # startingTriangle = self.triangles[23]
+        startingTriangle = self.triangles[0]
 
         print('\n=======starter=======')
         # print(self.minmax_from_triangle(startingTriangle))
         print(startingTriangle)
         print(self.find_intervals(startingTriangle))
 
-        for interval in self.find_intervals(startingTriangle):
-            currentNodeId = self.add_triangle_to_new_node(interval, startingTriangle)
-            # self.generate_walker_graph(startingTriangle, interval, currentNodeId)
-            self.iterative_generator(startingTriangle, interval, currentNodeId)
-            while len(self.get_queue(currentNodeId, 'current')):
-                for triangle in self.get_queue(currentNodeId, 'current').copy():
-                    self.add_triangle_to_node(list(triangle), currentNodeId)
-                    self.remove_triangle_from_queue(list(triangle), currentNodeId, 'current')
-                    self.iterative_generator(triangle, interval, currentNodeId)
+        intervalStart = self.find_intervals(startingTriangle)[0]
+        currentNodeId = self.add_triangle_to_new_node(intervalStart, startingTriangle)
+        interval = self.get_interval_from_node(currentNodeId)
+        # self.generate_walker_graph(startingTriangle, interval, currentNodeId)
+        self.iterative_generator(startingTriangle, interval, currentNodeId)
+
+        self.expand_node(currentNodeId, interval)
+        for tri in self.get_queue(currentNodeId, 'deep'):
+            break
+        deeperNode = self.add_triangle_to_new_node(interval+1, tri)
+        deeperInterval = self.get_interval_from_node(deeperNode)
+        self.iterative_generator(tri, deeperInterval, deeperNode)
+        self.expand_node(deeperNode, deeperInterval)
+
+        # for interval in self.find_intervals(startingTriangle):
+        #     currentNodeId = self.add_triangle_to_new_node(interval, startingTriangle)
+        #     # self.generate_walker_graph(startingTriangle, interval, currentNodeId)
+        #     self.iterative_generator(startingTriangle, interval, currentNodeId)
+        #     while len(self.get_queue(currentNodeId, 'current')):
+        #         for triangle in self.get_queue(currentNodeId, 'current').copy():
+        #             self.add_triangle_to_node(list(triangle), currentNodeId)
+        #             self.remove_triangle_from_queue(list(triangle), currentNodeId, 'current')
+        #             self.iterative_generator(triangle, interval, currentNodeId)
 
         # print('----neighbors----')
         # for neighbor in self.adjacent_triangles(startingTriangle):
@@ -490,7 +523,8 @@ class Hydropolator:
         # self.add_new_edge(0, 1)
 
         self.print_graph()
-        self.export_node_triangles(['0'])
+        self.export_all_node_triangles()
+        # self.export_node_triangles(['0'])
 
     def export_shapefile(self, shpName):
         pointShpName = 'points_{}_{}.shp'.format(shpName, self.now())
