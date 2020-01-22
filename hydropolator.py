@@ -3,6 +3,7 @@ from datetime import datetime
 import shapefile
 import bisect
 import startin
+import pickle
 
 from TriangleRegionGraph import TriangleRegionGraph
 
@@ -27,6 +28,7 @@ class Hydropolator:
     triangulation = startin.DT()
     vertexCount = 0
     vertices = None
+    vertexDict = {}
     triangles = None
     insertions = []
 
@@ -58,9 +60,9 @@ class Hydropolator:
                 for line in fi.readlines()[:500]:
                     point = line.split(delimiter)
                     if flip:
-                        point = [float(point[0]), float(point[1]), -1*float(point[2])+18]
+                        point = [float(point[0]), float(point[1]), round(-1*float(point[2])+18, 4)]
                     elif not flip:
-                        point = [float(point[0]), float(point[1]), float(point[2])+18]
+                        point = [float(point[0]), float(point[1]), round(float(point[2])+18, 4)]
 
                     self.check_minmax(point)
                     self.pointQueue.append(point)
@@ -85,6 +87,10 @@ class Hydropolator:
         self.vertexCount = self.triangulation.number_of_vertices()
         self.vertices = self.triangulation.all_vertices()
         self.triangles = self.triangulation.all_triangles()
+
+        for vertex in self.vertices:
+            self.vertexDict[tuple(vertex)] = {'z': vertex[2]}
+
         self.pointQueue = []
         print('new insertionslist: ', self.insertions)
 
@@ -151,6 +157,8 @@ class Hydropolator:
         triFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'triangulationVertices')
         trackerFile = os.path.join(os.getcwd(), 'projects',
                                    self.projectName, 'triangulationTracker')
+        elevationFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'vertexElevations')
+
         with open(triFile, 'w') as tf:
             for vertex in self.vertices[1:]:
                 # print(vertex)
@@ -159,6 +167,8 @@ class Hydropolator:
             trf.write('totalVertices\t{}\n'.format(self.vertexCount))
             for insertion in self.insertions:
                 trf.write('{}\n'.format(insertion))
+        with open(elevationFile, 'wb') as ef:
+            pickle.dump(self.vertexDict, ef)
 
         print('> triangulation saved')
 
@@ -167,6 +177,7 @@ class Hydropolator:
         triFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'triangulationVertices')
         trackerFile = os.path.join(os.getcwd(), 'projects',
                                    self.projectName, 'triangulationTracker')
+        elevationFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'vertexElevations')
 
         tempInsertions = []
         with open(trackerFile) as trf:
@@ -184,6 +195,9 @@ class Hydropolator:
                     self.pointQueue.append(point)
                 self.triangulation_insert()
                 insertionTracker = insertion
+
+        with open(elevationFile) as ef:
+            self.vertexDict = pickle.load(ef)
 
     def init_project(self, projectName):
         cwd = os.getcwd()
@@ -221,6 +235,9 @@ class Hydropolator:
         print('vertices: {}'.format(self.vertexCount))
         print('isoType: {}'.format(self.isoType))
 
+    def get_z(self, vertex):
+        return self.vertexDict[tuple(vertex)]['z']
+
     def poly_from_triangle(self, vertex_list):
         # vertices = self.triangulation.all_vertices()
         # vertices = self.vertices
@@ -240,7 +257,8 @@ class Hydropolator:
         for vId in vertex_list:
             vertex = self.triangulation.get_point(vId)
             triPoly.append([vertex[0], vertex[1]])
-            elevations.append(vertex[2])
+            # elevations.append(vertex[2])
+            elevations.append(self.get_z(vertex))
         triPoly.append([self.triangulation.get_point(vertex_list[0])[0],
                         self.triangulation.get_point(vertex_list[0])[1]])
 
@@ -251,7 +269,7 @@ class Hydropolator:
         # vertices = self.vertices
         elevations = []
         for vId in vertex_list:
-            elevations.append(self.triangulation.get_point(vId)[2])
+            elevations.append(self.get_z(self.triangulation.get_point(vId)))
         return min(elevations), max(elevations), sum(elevations) / 3
 
     def minmax_from_triangle(self, vertex_list):
@@ -259,7 +277,11 @@ class Hydropolator:
         # vertices = self.vertices
         elevations = []
         for vId in vertex_list:
-            elevations.append(self.triangulation.get_point(vId)[2])
+            elevations.append(self.get_z(self.triangulation.get_point(vId)))
+            # elevations.append(self.triangulation.get_point(vId)[2])
+            # vertex = self.triangulation.get_point(vId)
+            # print('--')
+            # print(vertex[2], self.vertexDict[tuple(vertex)]['z'])
         return min(elevations), max(elevations)
 
     def adjacent_triangles(self, triangle):

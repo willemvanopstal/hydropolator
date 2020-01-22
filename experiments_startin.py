@@ -74,3 +74,13 @@ for tri in t.all_triangles():
 #                         adjacentTriangles.append(incidentTriangle)
 #                         addedVertices.append(set(incidentTriangle).difference(triangle))
 #     print('adj: ', adjacentTriangles)
+
+print('---')
+v = t.all_vertices()[3]
+print(t.all_vertices()[3])
+t.all_vertices()[3][2] = 25.9
+print(t.all_vertices()[3])
+
+dic = {}
+dic[tuple(v)] = 8.0
+print(dic)
