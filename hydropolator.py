@@ -26,12 +26,14 @@ class Hydropolator:
     # triangulation = Delaunay_triangulation_2()
     triangulation = startin.DT()
     vertexCount = 0
-    vertices = []
-    triangles = []
+    vertices = None
+    triangles = None
+    insertions = []
 
     trGraph = TriangleRegionGraph()
 
     # isobaths
+    isoType = None
     standardSeries = [0, 1, 2, 5, 8, 10, 15, 20, 25, 30, 35, 40, 45, 50, 100, 200]
     meterSeries = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
                    15, 16, 17, 18, 19, 20, 25, 30, 35, 40, 45, 50, 100, 200]
@@ -61,7 +63,6 @@ class Hydropolator:
                         point = [float(point[0]), float(point[1]), float(point[2])+18]
 
                     self.check_minmax(point)
-                    # self.pointQueue.append(Point_2(point[0], point[1]))
                     self.pointQueue.append(point)
                     self.pointCount += 1
 
@@ -74,14 +75,18 @@ class Hydropolator:
         self.write_metafile()
 
     def triangulation_insert(self):
+        prevVertexCount = self.triangulation.number_of_vertices()
         self.triangulation.insert(self.pointQueue)
+        # print('pqueue: ', len(self.pointQueue))
+        # print('nrvertices: ', self.triangulation.number_of_vertices())
+        # print('metaVertexCount: ', prevVertexCount)
+        # print('triangulated inserts: ', self.triangulation.number_of_vertices() - self.vertexCount)
+        self.insertions.append(self.triangulation.number_of_vertices() - prevVertexCount)
         self.vertexCount = self.triangulation.number_of_vertices()
         self.vertices = self.triangulation.all_vertices()
         self.triangles = self.triangulation.all_triangles()
         self.pointQueue = []
-
-        # for v in self.triangulation.finite_vertices():
-        #     print(v.point()
+        print('new insertionslist: ', self.insertions)
 
     def check_minmax(self, pointTuple):
         if pointTuple[0] > self.xMax:
@@ -110,7 +115,6 @@ class Hydropolator:
 
     def write_metafile(self):
         metaFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'metafile')
-        triFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'triangulationObject')
         # self.triangulation.write_to_file(triFile)
         with open(metaFile, 'w') as mf:
             mf.write('projectName\t{}\n'.format(self.projectName))
@@ -119,6 +123,7 @@ class Hydropolator:
             mf.write('pointCount\t{}\n'.format(self.pointCount))
             mf.write('bounds\t{}\n'.format(self.bounds()))
             mf.write('vertices\t{}\n'.format(self.vertexCount))
+            mf.write('isoType\t{}\n'.format(self.isoType))
 
     def load_metafile(self):
         metaFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'metafile')
@@ -136,9 +141,49 @@ class Hydropolator:
                     self.pointCount = int(line.split('\t')[1])
                 elif line.split('\t')[0] == 'vertices':
                     self.vertexCount = int(line.split('\t')[1].strip())
+                elif line.split('\t')[0] == 'isoType':
+                    self.isoType = line.split('\t')[1].strip()
                 elif line.split('\t')[0] == 'bounds':
                     self.xMin, self.xMax, self.yMin, self.yMax, self.zMin, self.zMax = self.parse_bounds(line.split('\t')[
                         1])
+
+    def save_triangulation(self):
+        triFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'triangulationVertices')
+        trackerFile = os.path.join(os.getcwd(), 'projects',
+                                   self.projectName, 'triangulationTracker')
+        with open(triFile, 'w') as tf:
+            for vertex in self.vertices[1:]:
+                # print(vertex)
+                tf.write('{};{};{}\n'.format(vertex[0], vertex[1], vertex[2]))
+        with open(trackerFile, 'w') as trf:
+            trf.write('totalVertices\t{}\n'.format(self.vertexCount))
+            for insertion in self.insertions:
+                trf.write('{}\n'.format(insertion))
+
+        print('> triangulation saved')
+
+    def load_triangulation(self):
+        print('> loading triangulation')
+        triFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'triangulationVertices')
+        trackerFile = os.path.join(os.getcwd(), 'projects',
+                                   self.projectName, 'triangulationTracker')
+
+        tempInsertions = []
+        with open(trackerFile) as trf:
+            for line in trf.readlines()[1:]:
+                tempInsertions.append(int(line))
+        print('tempInsertions: ', tempInsertions)
+
+        with open(triFile) as tf:
+            insertionTracker = 0
+            for insertion in tempInsertions:
+                print('insertion: ', insertion)
+                for line in tf.readlines()[insertionTracker:insertion]:
+                    point = [float(value) for value in line.split(';')]
+                    print(point)
+                    self.pointQueue.append(point)
+                self.triangulation_insert()
+                insertionTracker = insertion
 
     def init_project(self, projectName):
         cwd = os.getcwd()
@@ -150,7 +195,7 @@ class Hydropolator:
             self.projectName = projectName
             self.initDate = self.now()
             self.modifiedDate = self.now()
-            self.write_metafile()
+            # self.write_metafile()
             return '> new project created'
         else:
             return '> project already exists, choose another name or load the project with -project'
@@ -163,6 +208,7 @@ class Hydropolator:
         if os.path.exists(projectDir):
             self.projectName = projectName
             self.load_metafile()
+            self.load_triangulation()
             return True
         else:
             print('> project does not exist, load another or initialise a new project with -init')
@@ -173,6 +219,7 @@ class Hydropolator:
         print('pointCount: {}'.format(self.pointCount))
         print('bounds: {}'.format(self.bounds()))
         print('vertices: {}'.format(self.vertexCount))
+        print('isoType: {}'.format(self.isoType))
 
     def poly_from_triangle(self, vertex_list):
         # vertices = self.triangulation.all_vertices()
@@ -229,12 +276,13 @@ class Hydropolator:
 
         return adjacentTriangles
 
-    def generate_regions(self, isobathSeries):
-        if isobathSeries == 'standard':
+    def generate_regions(self):
+        # self.isoType = isobathSeries
+        if self.isoType == 'standard':
             isobathValues = self.standardSeries
-        elif isobathSeries == 'meter':
+        elif self.isoType == 'meter':
             isobathValues = self.meterSeries
-        elif isobathSeries == 'hd':
+        elif self.isoType == 'hd':
             isobathValues = self.hdSeries
 
         regions = []

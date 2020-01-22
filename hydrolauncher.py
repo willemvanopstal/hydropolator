@@ -46,17 +46,17 @@ parser.add_argument('-flip',
 parser.add_argument('-exportshp',
                     metavar='output_file_name',
                     type=str,
-                    default=None,
+                    default=False,
                     help='name for output file')
 parser.add_argument('-regions',
                     metavar='isobath series',
                     type=str,
-                    default=None,
+                    default=False,
                     help='creates triangle regions')
 parser.add_argument('-triangleregiongraph',
                     metavar=' ',
                     type=str,
-                    default=None,
+                    default=False,
                     help='creates triangle region graph')
 
 args = parser.parse_args()
@@ -72,6 +72,7 @@ elif args.project:
     projectObject = Hydropolator()
     if projectObject.load_project(args.project) == True:
         projectObject.summarize_project()
+        print(projectObject.insertions)
 
 if args.flip:
     flip = True
@@ -94,15 +95,21 @@ if args.exportshp:
 if args.regions:
     print('> generating regions')
     projectObject.summarize_project()
-    projectObject.generate_regions(args.regions)
+    projectObject.isoType = args.regions
+    projectObject.generate_regions()
     projectObject.index_region_triangles()
     projectObject.export_region_triangles()
+    projectObject.summarize_project()
 
 if args.triangleregiongraph:
     print('> generating triangle region graph')
     projectObject.summarize_project()
     projectObject.create_tr_graph()
 
+if projectObject:
+    projectObject.write_metafile()
+    if projectObject.vertexCount:
+        projectObject.save_triangulation()
 # parser.add_argument('-dft', action='store_true',
 #                     help='get db credentials from default file')
 # parser.add_argument('-db', default=None, type=str, help='database name')
