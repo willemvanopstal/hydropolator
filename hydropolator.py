@@ -6,6 +6,7 @@ import startin
 import pickle
 
 from TriangleRegionGraph import TriangleRegionGraph
+from ElevationDict import ElevationDict
 
 # from CGAL.CGAL_Kernel import Point_2, Point_3
 # from CGAL.CGAL_Triangulation_2 import Triangulation_2, Delaunay_triangulation_2
@@ -28,11 +29,15 @@ class Hydropolator:
     triangulation = startin.DT()
     vertexCount = 0
     vertices = None
-    vertexDict = {}
+    vertexDict = ElevationDict()
     triangles = None
     insertions = []
 
-    trGraph = TriangleRegionGraph()
+    # Graph
+    # trGraph = TriangleRegionGraph()
+    graph = {}
+    nrNodes = 0
+    nrEdges = 0
 
     # isobaths
     isoType = None
@@ -89,7 +94,8 @@ class Hydropolator:
         self.triangles = self.triangulation.all_triangles()
 
         for vertex in self.vertices:
-            self.vertexDict[tuple(vertex)] = {'z': vertex[2]}
+            # self.vertexDict[tuple(vertex)] = {'z': vertex[2]}
+            self.vertexDict.add_new(vertex)
 
         self.pointQueue = []
         print('new insertionslist: ', self.insertions)
@@ -168,7 +174,7 @@ class Hydropolator:
             for insertion in self.insertions:
                 trf.write('{}\n'.format(insertion))
         with open(elevationFile, 'wb') as ef:
-            pickle.dump(self.vertexDict, ef)
+            pickle.dump(self.vertexDict, ef, protocol=pickle.HIGHEST_PROTOCOL)
 
         print('> triangulation saved')
 
@@ -196,7 +202,7 @@ class Hydropolator:
                 self.triangulation_insert()
                 insertionTracker = insertion
 
-        with open(elevationFile) as ef:
+        with open(elevationFile, 'rb') as ef:
             self.vertexDict = pickle.load(ef)
 
     def init_project(self, projectName):
@@ -236,7 +242,8 @@ class Hydropolator:
         print('isoType: {}'.format(self.isoType))
 
     def get_z(self, vertex):
-        return self.vertexDict[tuple(vertex)]['z']
+        # return self.vertexDict[tuple(vertex)]['z']
+        return self.vertexDict.get_z(vertex)
 
     def poly_from_triangle(self, vertex_list):
         # vertices = self.triangulation.all_vertices()
@@ -314,12 +321,12 @@ class Hydropolator:
         regions.append([isobathValues[-1], 1e9])
 
         self.isobathValues = isobathValues
-        self.trGraph.isobathValues = isobathValues
+        # self.trGraph.isobathValues = isobathValues
         self.regions = regions
-        self.trGraph.regions = regions
+        # self.trGraph.regions = regions
         for i in range(len(regions)):
             self.triangleRegions.append([])
-        self.trGraph.triangleRegions = self.triangleRegions
+        # self.trGraph.triangleRegions = self.triangleRegions
 
         # print(self.triangleRegions, regions, isobathValues)
 
@@ -331,6 +338,16 @@ class Hydropolator:
                 # print(self.regions[index])
                 self.triangleRegions[index].append(triangle)
         # print(self.triangleRegions)
+
+    def find_intervals(self, triangle):
+        min, max = self.minmax_from_triangle(triangle)
+        # print(min, max)
+        intervals = []
+        for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_left(self.isobathValues, max) + 1):
+            # print(self.regions[index])
+            intervals.append(self.regions[index])
+            # self.triangleRegions[index].append(triangle)
+        return intervals
 
     def export_region_triangles(self):
         triangleShpName = 'region_triangles_{}.shp'.format(self.now())
@@ -346,10 +363,22 @@ class Hydropolator:
                     wt.poly(geom)
                     wt.record(i)
 
-    def create_tr_graph(self):
-        print(self.triangleRegions)
-        self.trGraph.initialize_graph(self.triangulation)
-        self.trGraph.build_graph()
+    # def create_tr_graph(self):
+    #     self.trGraph.initialize_graph(self.triangulation)
+    #     self.trGraph.vertexDict = self.vertexDict
+    #     self.trGraph.build_graph()
+
+    def build_graph(self):
+        startingTriangle = self.triangles[25]
+
+        print('=======starter=======')
+        print(self.minmax_from_triangle(startingTriangle))
+        print(self.find_intervals(startingTriangle))
+        print('----neighbors----')
+        for neighbor in self.adjacent_triangles(startingTriangle):
+            print(neighbor, self.find_intervals(neighbor))
+
+        pass
 
     def export_shapefile(self, shpName):
         pointShpName = 'points_{}_{}.shp'.format(shpName, self.now())

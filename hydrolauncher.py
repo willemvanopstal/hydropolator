@@ -104,7 +104,9 @@ if args.regions:
 if args.triangleregiongraph:
     print('> generating triangle region graph')
     projectObject.summarize_project()
-    projectObject.create_tr_graph()
+    projectObject.generate_regions()
+    # projectObject.create_tr_graph()
+    projectObject.build_graph()
 
 if projectObject:
     projectObject.write_metafile()

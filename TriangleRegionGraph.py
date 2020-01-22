@@ -16,15 +16,21 @@ class TriangleRegionGraph:
     triangulation = None
     vertices = []
     triangles = []
+    vertexDict = {}
     triangleRegions = []
 
     def __init__(self):
         return
 
+    def get_z(self, vertex):
+        # return self.vertexDict[tuple(vertex)]['z']
+        return self.vertexDict.get_z(vertex)
+
     def minmax_from_triangle(self, vertex_list):
         elevations = []
         for vId in vertex_list:
-            elevations.append(self.triangulation.get_point(vId)[2])
+            # elevations.append(self.triangulation.get_point(vId)[2])
+            elevations.append(self.get_z(self.triangulation.get_point(vId)))
         return min(elevations), max(elevations)
 
     def adjacent_triangles(self, triangle):
