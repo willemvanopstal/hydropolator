@@ -3,6 +3,7 @@ from hydroasci import cli_description
 import argparse
 import os
 
+print('\n\n')
 
 # ======================== #
 surveyData = '../Data/operatorimplications/simulated_surface_points.txt'

@@ -5,7 +5,7 @@ import bisect
 import startin
 import pickle
 
-from TriangleRegionGraph import TriangleRegionGraph
+# from TriangleRegionGraph import TriangleRegionGraph
 from ElevationDict import ElevationDict
 
 # from CGAL.CGAL_Kernel import Point_2, Point_3
@@ -35,12 +35,12 @@ class Hydropolator:
 
     # Graph
     # trGraph = TriangleRegionGraph()
-    graph = {}
+    graph = {'nodes': {}, 'edges': {}, 'shallowestNodes': set(), 'deepestNodes': set()}
     nrNodes = 0
     nrEdges = 0
 
     # isobaths
-    isoType = None
+    isoType = 'standard'
     standardSeries = [0, 1, 2, 5, 8, 10, 15, 20, 25, 30, 35, 40, 45, 50, 100, 200]
     meterSeries = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
                    15, 16, 17, 18, 19, 20, 25, 30, 35, 40, 45, 50, 100, 200]
@@ -62,7 +62,7 @@ class Hydropolator:
 
         if fileType == 'csv':
             with open(pointFile) as fi:
-                for line in fi.readlines()[:500]:
+                for line in fi.readlines():
                     point = line.split(delimiter)
                     if flip:
                         point = [float(point[0]), float(point[1]), round(-1*float(point[2])+18, 4)]
@@ -194,10 +194,10 @@ class Hydropolator:
         with open(triFile) as tf:
             insertionTracker = 0
             for insertion in tempInsertions:
-                print('insertion: ', insertion)
+                # print('insertion: ', insertion)
                 for line in tf.readlines()[insertionTracker:insertion]:
                     point = [float(value) for value in line.split(';')]
-                    print(point)
+                    # print(point)
                     self.pointQueue.append(point)
                 self.triangulation_insert()
                 insertionTracker = insertion
@@ -339,15 +339,18 @@ class Hydropolator:
                 self.triangleRegions[index].append(triangle)
         # print(self.triangleRegions)
 
-    def find_intervals(self, triangle):
+    def find_intervals(self, triangle, indexOnly=True):
         min, max = self.minmax_from_triangle(triangle)
-        # print(min, max)
         intervals = []
         for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_left(self.isobathValues, max) + 1):
-            # print(self.regions[index])
-            intervals.append(self.regions[index])
-            # self.triangleRegions[index].append(triangle)
-        return intervals
+            if indexOnly:
+                intervals.append(index)
+            else:
+                intervals.append(self.regions[index])
+        if indexOnly:
+            return intervals
+        else:
+            return intervals
 
     def export_region_triangles(self):
         triangleShpName = 'region_triangles_{}.shp'.format(self.now())
@@ -363,22 +366,97 @@ class Hydropolator:
                     wt.poly(geom)
                     wt.record(i)
 
+    def export_node_triangles(self, nodeIds):
+        triangleShpName = 'node_triangles_{}.shp'.format(self.now())
+        triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
+
+        with shapefile.Writer(triangleShpFile) as wt:
+            wt.field('node', 'N')
+            for node in nodeIds:
+                geom = []
+                for triangle in self.graph['nodes'][node]['triangles']:
+                    geom.append(self.poly_from_triangle(list(triangle)))
+                wt.poly(geom)
+                wt.record(int(node))
+
     # def create_tr_graph(self):
     #     self.trGraph.initialize_graph(self.triangulation)
     #     self.trGraph.vertexDict = self.vertexDict
     #     self.trGraph.build_graph()
 
+    def pseudo_triangle(self, triangle):
+        # rotates the triangle_list so the smallest index is in front
+        # so we can easily compare and not store duplicates
+        n = triangle.index(min(triangle))
+        if not n:
+            return triangle
+        else:
+            return triangle[n:] + triangle[:n]
+        # print(self.triangulation.is_triangle(pseudoTriangle))
+        # return pseudoTriangle
+
+    def add_triangle_to_node(self, triangle, nodeId):
+        self.graph['nodes'][nodeId]['triangles'].add(tuple(self.pseudo_triangle(triangle)))
+
+    def add_triangle_to_new_node(self, interval, triangle):
+        # self.graph['nodes'][str(self.nrNodes)] = {'region': tuple(interval), 'triangles': {
+        #     tuple(self.pseudo_triangle(triangle))}, 'edges': set()}
+        nodeId = str(self.nrNodes)
+        self.graph['nodes'][nodeId] = {'region': interval, 'triangles': {
+            tuple(self.pseudo_triangle(triangle))}, 'edges': set()}
+        self.nrNodes += 1
+        return nodeId
+
+    def triangle_in_node(self, triangle, nodeId):
+        if tuple(self.pseudo_triangle(triangle)) in self.graph['nodes'][nodeId]['triangles']:
+            return True
+        else:
+            return False
+
+    def add_new_edge(self, nodeOne, nodeTwo):
+        self.graph['edges'][str(self.nrEdges)] = [nodeOne, nodeTwo]
+        self.graph['nodes'][str(nodeOne)]['edges'].add(self.nrEdges)
+        self.graph['nodes'][str(nodeTwo)]['edges'].add(self.nrEdges)
+        self.nrEdges += 1
+
+    def print_graph(self):
+        print('\nNODES')
+        for nodeId in self.graph['nodes'].keys():
+            print(nodeId, self.graph['nodes'][nodeId])
+        print('EDGES')
+        for edgeId in self.graph['edges'].keys():
+            print(edgeId, self.graph['edges'][edgeId])
+
+    def generate_walker_graph(self, triangle, interval, nodeId):
+        for neighbor in self.adjacent_triangles(triangle):
+            if interval in self.find_intervals(neighbor) and not self.triangle_in_node(neighbor, nodeId):
+                # print(neighbor)
+                self.add_triangle_to_node(neighbor, nodeId)
+                self.generate_walker_graph(neighbor, interval, nodeId)
+
     def build_graph(self):
-        startingTriangle = self.triangles[25]
+        startingTriangle = self.triangles[0]
+        # print(startingTriangle)
 
-        print('=======starter=======')
-        print(self.minmax_from_triangle(startingTriangle))
+        print('\n=======starter=======')
+        # print(self.minmax_from_triangle(startingTriangle))
+        print(startingTriangle)
         print(self.find_intervals(startingTriangle))
-        print('----neighbors----')
-        for neighbor in self.adjacent_triangles(startingTriangle):
-            print(neighbor, self.find_intervals(neighbor))
 
-        pass
+        for interval in self.find_intervals(startingTriangle):
+            currentNodeId = self.add_triangle_to_new_node(interval, startingTriangle)
+            self.generate_walker_graph(startingTriangle, interval, currentNodeId)
+
+        # print('----neighbors----')
+        # for neighbor in self.adjacent_triangles(startingTriangle):
+        #     # print(neighbor, self.find_intervals(neighbor))
+        #     # print('pseudo: ', self.pseudo_triangle(neighbor))
+        #     print(self.pseudo_triangle(neighbor), self.find_intervals(self.pseudo_triangle(neighbor)))
+
+        # self.add_new_edge(0, 1)
+
+        self.print_graph()
+        self.export_node_triangles(['0'])
 
     def export_shapefile(self, shpName):
         pointShpName = 'points_{}_{}.shp'.format(shpName, self.now())
