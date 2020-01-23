@@ -145,6 +145,8 @@ class Hydropolator:
             mf.write('bounds\t{}\n'.format(self.bounds()))
             mf.write('vertices\t{}\n'.format(self.vertexCount))
             mf.write('isoType\t{}\n'.format(self.isoType))
+            mf.write('nrNodes\t{}\n'.format(self.nrNodes))
+            mf.write('nrEdges\t{}\n'.format(self.nrEdges))
 
     def load_metafile(self):
         metaFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'metafile')
@@ -160,6 +162,10 @@ class Hydropolator:
                     self.modifiedDate = line.split('\t')[1].strip()
                 elif line.split('\t')[0] == 'pointCount':
                     self.pointCount = int(line.split('\t')[1])
+                elif line.split('\t')[0] == 'nrNodes':
+                    self.nrNodes = int(line.split('\t')[1])
+                elif line.split('\t')[0] == 'nrEdges':
+                    self.nrEdges = int(line.split('\t')[1])
                 elif line.split('\t')[0] == 'vertices':
                     self.vertexCount = int(line.split('\t')[1].strip())
                 elif line.split('\t')[0] == 'isoType':
@@ -167,6 +173,21 @@ class Hydropolator:
                 elif line.split('\t')[0] == 'bounds':
                     self.xMin, self.xMax, self.yMin, self.yMax, self.zMin, self.zMax = self.parse_bounds(line.split('\t')[
                         1])
+
+    def save_trGraph(self):
+        graphFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'triangleRegionGraph')
+
+        with open(graphFile, 'wb') as gf:
+            pickle.dump(self.graph, gf, protocol=pickle.HIGHEST_PROTOCOL)
+
+        print('> triangle region graph saved')
+
+    def load_trGraph(self):
+        print('> loading region graph')
+        graphFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'triangleRegionGraph')
+
+        with open(graphFile, 'rb') as gf:
+            self.graph = pickle.load(gf)
 
     def save_triangulation(self):
         triFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'triangulationVertices')
@@ -237,7 +258,9 @@ class Hydropolator:
         if os.path.exists(projectDir):
             self.projectName = projectName
             self.load_metafile()
+            self.generate_regions()
             self.load_triangulation()
+            self.load_trGraph()
             return True
         else:
             print('> project does not exist, load another or initialise a new project with -init')
@@ -383,6 +406,20 @@ class Hydropolator:
             nodeList.append(node)
         self.export_node_triangles(nodeList)
 
+    def export_all_edge_triangles(self):
+        triangleShpName = 'edge_triangles_{}.shp'.format(self.now())
+        triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
+
+        with shapefile.Writer(triangleShpFile) as wt:
+            wt.field('value', 'N')
+            for edgeId in self.graph['edges'].keys():
+                geom = []
+                for triangle in self.get_edge_triangles(edgeId):
+                    geom.append(self.poly_from_triangle(triangle))
+                wt.poly(geom)
+                isoValue = self.get_edge_value(edgeId)
+                wt.record(isoValue)
+
     def export_node_triangles(self, nodeIds):
         triangleShpName = 'node_triangles_{}.shp'.format(self.now())
         triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
@@ -480,6 +517,25 @@ class Hydropolator:
         self.graph['nodes'][str(shallowNode)]['deepNeighbors'].add(deepNode)
         self.graph['nodes'][str(deepNode)]['shallowNeighbors'].add(shallowNode)
         self.nrEdges += 1
+
+    def get_edge_value(self, edgeId):
+        nodeList = self.graph['edges'][edgeId]
+        print(nodeList)
+        print(nodeList[0])
+        print('regions: ', self.regions)
+        print(self.get_interval_from_node(nodeList[0]))
+        regionsOne = self.regions[self.get_interval_from_node(nodeList[0])]
+        regionsTwo = self.regions[self.get_interval_from_node(nodeList[1])]
+        edgeValue = float(list(set(regionsOne).intersection(regionsTwo))[0])
+        print('EdgeValue: ', edgeValue)
+
+        return edgeValue
+
+    def get_edge_triangles(self, edgeId):
+        nodeList = self.graph['edges'][edgeId]
+        trianglesOne = self.get_triangles(nodeList[0])
+        trianglesTwo = self.get_triangles(nodeList[1])
+        return trianglesOne.intersection(trianglesTwo)
 
     def print_graph(self):
         print('\n======GRAPH======\nNODES')

@@ -74,6 +74,7 @@ elif args.project:
     if projectObject.load_project(args.project) == True:
         projectObject.summarize_project()
         print(projectObject.insertions)
+        projectObject.export_all_edge_triangles()
 
 if args.flip:
     flip = True
@@ -114,6 +115,8 @@ if projectObject:
     projectObject.write_metafile()
     if projectObject.vertexCount:
         projectObject.save_triangulation()
+    if projectObject.nrNodes:
+        projectObject.save_trGraph()
 # parser.add_argument('-dft', action='store_true',
 #                     help='get db credentials from default file')
 # parser.add_argument('-db', default=None, type=str, help='database name')
