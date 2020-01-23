@@ -84,3 +84,10 @@ print(t.all_vertices()[3])
 dic = {}
 dic[tuple(v)] = 8.0
 print(dic)
+
+setti = {'3', '5', '7'}
+print(setti)
+try:
+    setti.remove('4')
+except:
+    pass

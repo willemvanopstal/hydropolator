@@ -38,6 +38,8 @@ class Hydropolator:
     graph = {'nodes': {}, 'edges': {}, 'shallowestNodes': set(), 'deepestNodes': set()}
     nrNodes = 0
     nrEdges = 0
+    unfinishedDeep = set()
+    unfinishedShallow = set()
 
     # isobaths
     isoType = 'standard'
@@ -45,6 +47,7 @@ class Hydropolator:
     meterSeries = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
                    15, 16, 17, 18, 19, 20, 25, 30, 35, 40, 45, 50, 100, 200]
     hdSeries = range(0, 100)
+    testingSeries = [0, 2, 4, 6, 8, 10, 12, 15, 25, 50]
     isobathValues = []
     regions = []
     triangleRegions = []
@@ -68,6 +71,11 @@ class Hydropolator:
                         point = [float(point[0]), float(point[1]), round(-1*float(point[2])+18, 4)]
                     elif not flip:
                         point = [float(point[0]), float(point[1]), round(float(point[2])+18, 4)]
+
+                    if point[0] < 238 or point[0] > 380:
+                        continue
+                    if point[1] < 110 or point[1] > 193:
+                        continue
 
                     self.check_minmax(point)
                     self.pointQueue.append(point)
@@ -313,6 +321,8 @@ class Hydropolator:
             isobathValues = self.meterSeries
         elif self.isoType == 'hd':
             isobathValues = self.hdSeries
+        elif self.isoType == 'testing':
+            isobathValues = self.testingSeries
 
         regions = []
         regions.append([-1e9, isobathValues[0]])
@@ -409,7 +419,7 @@ class Hydropolator:
         #     tuple(self.pseudo_triangle(triangle))}, 'edges': set()}
         nodeId = str(self.nrNodes)
         self.graph['nodes'][nodeId] = {'region': interval, 'triangles': {tuple(self.pseudo_triangle(
-            triangle))}, 'edges': set(), 'currentQueue': set(), 'shallowQueue': set(), 'deepQueue': set()}
+            triangle))}, 'deepNeighbors': set(), 'shallowNeighbors': set(), 'currentQueue': set(), 'shallowQueue': set(), 'deepQueue': set()}
         self.nrNodes += 1
         return nodeId
 
@@ -419,6 +429,12 @@ class Hydropolator:
 
     def remove_triangle_from_queue(self, triangle, nodeId, type):
         queueType = type + 'Queue'
+        # try:
+        #     self.graph['nodes'][nodeId][queueType].remove(tuple(self.pseudo_triangle(triangle)))
+        # except:
+        #     print('couldnt remove triangle')
+        #     pass
+
         self.graph['nodes'][nodeId][queueType].remove(tuple(self.pseudo_triangle(triangle)))
 
     def get_queue(self, nodeId, type):
@@ -428,58 +444,229 @@ class Hydropolator:
     def get_interval_from_node(self, nodeId):
         return int(self.graph['nodes'][nodeId]['region'])
 
+    def get_neighboring_nodes(self, nodeId, type):
+        neighborType = type + 'Neighbors'
+        return self.graph['nodes'][nodeId][neighborType]
+
+    def get_triangles(self, nodeId):
+        return self.graph['nodes'][nodeId]['triangles']
+
     def triangle_in_node(self, triangle, nodeId):
         if tuple(self.pseudo_triangle(triangle)) in self.graph['nodes'][nodeId]['triangles']:
             return True
         else:
             return False
 
-    def add_new_edge(self, nodeOne, nodeTwo):
-        self.graph['edges'][str(self.nrEdges)] = [nodeOne, nodeTwo]
-        self.graph['nodes'][str(nodeOne)]['edges'].add(self.nrEdges)
-        self.graph['nodes'][str(nodeTwo)]['edges'].add(self.nrEdges)
+    def triangle_in_queue(self, triangle, nodeId, type):
+        queueType = type + 'Queue'
+        if tuple(self.pseudo_triangle(triangle)) in self.graph['nodes'][nodeId][queueType]:
+            return True
+        else:
+            return False
+
+    def add_new_edge(self, shallowNode, deepNode):
+        self.graph['edges'][str(self.nrEdges)] = [shallowNode, deepNode]
+        self.graph['nodes'][str(shallowNode)]['deepNeighbors'].add(deepNode)
+        self.graph['nodes'][str(deepNode)]['shallowNeighbors'].add(shallowNode)
         self.nrEdges += 1
 
     def print_graph(self):
         print('\nNODES')
         for nodeId in self.graph['nodes'].keys():
             # print(nodeId, self.graph['nodes'][nodeId])
-            print('id: ', nodeId, 'triangles: ', len(self.graph['nodes'][nodeId]['triangles']), 'edges: ', self.graph['nodes'][nodeId]['edges'], 'current: ',
+            print('id: ', nodeId, 'interval: ', self.graph['nodes'][nodeId]['region'], 'triangles: ', len(self.graph['nodes'][nodeId]['triangles']), 'deepNeighbors: ', self.graph['nodes'][nodeId]['deepNeighbors'], 'shallowNeighbors: ', self.graph['nodes'][nodeId]['shallowNeighbors'], '\ncurrent: ',
                   len(self.graph['nodes'][nodeId]['currentQueue']), 'deep: ', len(
                       self.graph['nodes'][nodeId]['deepQueue']), 'shallow: ', len(self.graph['nodes'][nodeId]['shallowQueue']))
         print('EDGES')
         for edgeId in self.graph['edges'].keys():
             print(edgeId, self.graph['edges'][edgeId])
 
-    def generate_walker_graph(self, triangle, interval, nodeId):
-        # NOT IN USE ANYMORE: Max recursion limit
-        for neighbor in self.adjacent_triangles(triangle):
-            if interval in self.find_intervals(neighbor) and not self.triangle_in_node(neighbor, nodeId):
-                # print(neighbor)
-                self.add_triangle_to_node(neighbor, nodeId)
-                self.generate_walker_graph(neighbor, interval, nodeId)
+    # def generate_walker_graph(self, triangle, interval, nodeId):
+    #     # NOT IN USE ANYMORE: Max recursion limit
+    #     for neighbor in self.adjacent_triangles(triangle):
+    #         if interval in self.find_intervals(neighbor) and not self.triangle_in_node(neighbor, nodeId):
+    #             # print(neighbor)
+    #             self.add_triangle_to_node(neighbor, nodeId)
+    #             self.generate_walker_graph(neighbor, interval, nodeId)
 
     def iterative_generator(self, triangle, interval, nodeId):
         print('--itergenerator--', interval)
         for neighbor in self.adjacent_triangles(triangle):
             neighborIntervals = self.find_intervals(neighbor)
             print(neighbor, neighborIntervals)
+
             if interval in neighborIntervals and not self.triangle_in_node(neighbor, nodeId):
                 self.add_triangle_to_queue(neighbor, nodeId, 'current')
                 print('current')
+
             if interval+1 in neighborIntervals:
-                self.add_triangle_to_queue(neighbor, nodeId, 'deep')
-                print('deep')
+                alreadyDeeper = False
+                for deeperNeighbor in self.get_neighboring_nodes(nodeId, 'deep'):
+                    if self.triangle_in_node(neighbor, nodeId):
+                        alreadyDeeper = True
+                        print('adeep')
+                        self.remove_triangle_from_queue(neighbor, deeperNeighbor, 'shallow')
+                        self.remove_triangle_from_queue(neighbor, nodeId, 'deep')
+                if not alreadyDeeper:
+                    self.add_triangle_to_queue(neighbor, nodeId, 'deep')
+                    print('deep')
+
             if interval-1 in neighborIntervals:
-                self.add_triangle_to_queue(neighbor, nodeId, 'shallow')
-                print('shallow')
+                alreadyShallower = False
+                for shallowerNeighbor in self.get_neighboring_nodes(nodeId, 'shallow'):
+                    if self.triangle_in_node(neighbor, nodeId):
+                        alreadyShallower = True
+                        print('ashallow')
+                        self.remove_triangle_from_queue(neighbor, shallowerNeighbor, 'deep')
+                        self.remove_triangle_from_queue(neighbor, nodeId, 'shallow')
+                if not alreadyShallower:
+                    self.add_triangle_to_queue(neighbor, nodeId, 'shallow')
+                    print('shallow')
+
+    def clean_queues(self, nodeId):
+        deeperNeighbors = self.get_neighboring_nodes(nodeId, 'deep')
+        shallowerNeighbors = self.get_neighboring_nodes(nodeId, 'shallow')
+        deepQueue = self.get_queue(nodeId, 'deep')
+        shallowQueue = self.get_queue(nodeId, 'shallow')
+
+        for deepNeighbor in deeperNeighbors:
+            deepNeighborShallowQueue = self.get_queue(deepNeighbor, 'shallow')
+            for triangle in deepQueue.copy():
+                if triangle in deepNeighborShallowQueue:
+                    self.remove_triangle_from_queue(triangle, deepNeighbor, 'shallow')
+                    self.remove_triangle_from_queue(triangle, nodeId, 'deep')
+        for shallowNeighbor in shallowerNeighbors:
+            shallowNeighborDeepQueue = self.get_queue(shallowNeighbor, 'deep')
+            for triangle in shallowQueue.copy():
+                if triangle in shallowNeighborDeepQueue:
+                    self.remove_triangle_from_queue(triangle, shallowNeighbor, 'deep')
+                    self.remove_triangle_from_queue(triangle, nodeId, 'shallow')
 
     def expand_node(self, nodeId, interval):
         while len(self.get_queue(nodeId, 'current')):
             for triangle in self.get_queue(nodeId, 'current').copy():
-                self.add_triangle_to_node(list(triangle), nodeId)
-                self.remove_triangle_from_queue(list(triangle), nodeId, 'current')
+                self.add_triangle_to_node(triangle, nodeId)
+                self.remove_triangle_from_queue(triangle, nodeId, 'current')
                 self.iterative_generator(triangle, interval, nodeId)
+
+        self.clean_queues(nodeId)
+
+    def go_deeper(self, nodeId, interval):
+        for tri in self.get_queue(nodeId, 'deep'):
+            break
+        deeperNode = self.add_triangle_to_new_node(interval+1, tri)
+        self.add_new_edge(nodeId, deeperNode)
+        deeperInterval = self.get_interval_from_node(deeperNode)
+
+        self.iterative_generator(tri, deeperInterval, deeperNode)
+        self.expand_node(deeperNode, deeperInterval)
+
+    def go_shallower(self, nodeId, interval):
+        for tri in self.get_queue(nodeId, 'shallow'):
+            break
+        shallowerNode = self.add_triangle_to_new_node(interval-1, tri)
+        self.add_new_edge(shallowerNode, nodeId)
+        shallowerInterval = self.get_interval_from_node(shallowerNode)
+
+        self.iterative_generator(tri, shallowerInterval, shallowerNode)
+        self.expand_node(shallowerNode, shallowerInterval)
+
+    def grow_node(self, nodeId):
+        nodeInterval = self.get_interval_from_node(nodeId)
+        print('nodeId: ', nodeId, 'nodeInterval: ', nodeInterval)
+        trianglesInNode = self.get_triangles(nodeId)
+
+        additions = True
+        visitedTriangles = set()
+        while additions:
+            addedTriangles = 0
+            for triangle in trianglesInNode.copy():
+                if triangle:  # not in visitedTriangles:
+                    for neighbor in self.adjacent_triangles(triangle):
+                        if 0 in neighbor:
+                            break
+                        if tuple(self.pseudo_triangle(neighbor)) not in visitedTriangles:
+                            visitedTriangles.add(tuple(self.pseudo_triangle(neighbor)))
+
+                            deepTracker = False
+                            shallowTracker = False
+
+                            # same interval
+                            if nodeInterval in self.find_intervals(neighbor) and not self.triangle_in_node(neighbor, nodeId):
+                                self.add_triangle_to_node(neighbor, nodeId)
+                                addedTriangles += 1
+
+                            # deeper interval
+                            # and not self.triangle_in_queue(neighbor, nodeId, 'deep'):
+                            if nodeInterval + 1 in self.find_intervals(neighbor):
+                                for deeperNode in self.get_neighboring_nodes(nodeId, 'deep'):
+                                    if self.triangle_in_queue(neighbor, deeperNode, 'shallow'):
+                                        self.remove_triangle_from_queue(
+                                            neighbor, deeperNode, 'shallow')
+                                        # self.remove_triangle_from_queue(neighbor, nodeId, 'deep')
+                                        deepTracker = True
+                                        # print('remove')
+                                if not deepTracker:
+                                    self.add_triangle_to_queue(neighbor, nodeId, 'deep')
+                                    self.unfinishedDeep.add(nodeId)
+                                    addedTriangles += 1
+                                    # print('not remove')
+
+                            # shallower interval
+                            # and not self.triangle_in_queue(neighbor, nodeId, 'shallow'):
+                            if nodeInterval - 1 in self.find_intervals(neighbor):
+                                for shallowerNode in self.get_neighboring_nodes(nodeId, 'shallow'):
+                                    if self.triangle_in_queue(neighbor, shallowerNode, 'deep'):
+                                        self.remove_triangle_from_queue(
+                                            neighbor, shallowerNode, 'deep')
+                                        # self.remove_triangle_from_queue(neighbor, nodeId, 'shallow')
+                                        shallowTracker = True
+                                        # print('remove')
+                                if not shallowTracker:
+                                    self.add_triangle_to_queue(neighbor, nodeId, 'shallow')
+                                    self.unfinishedShallow.add(nodeId)
+                                    addedTriangles += 1
+                                    # print('not remove')
+
+            if not addedTriangles:
+                additions = False
+            # print(addedTriangles)
+
+    def grow_deeper(self, nodeId):
+        for triangle in self.get_queue(nodeId, 'deep'):
+            break
+        currentInterval = self.get_interval_from_node(nodeId)
+        deeperInterval = currentInterval + 1
+
+        nodeTracker = False
+        neighbors = self.get_neighboring_nodes(nodeId, 'deep')
+        for neighbor in neighbors:
+            if self.triangle_in_node(triangle, neighbor):
+                nodeTracker = True
+        if not nodeTracker:
+            deeperNode = self.add_triangle_to_new_node(deeperInterval, triangle)
+            self.remove_triangle_from_queue(triangle, nodeId, 'deep')
+            self.add_new_edge(nodeId, deeperNode)
+
+            self.grow_node(deeperNode)
+
+    def grow_shallower(self, nodeId):
+        for triangle in self.get_queue(nodeId, 'shallow'):
+            break
+        currentInterval = self.get_interval_from_node(nodeId)
+        shallowerInterval = currentInterval - 1
+
+        nodeTracker = False
+        neighbors = self.get_neighboring_nodes(nodeId, 'shallow')
+        for neighbor in neighbors:
+            if self.triangle_in_node(triangle, neighbor):
+                nodeTracker = True
+        if not nodeTracker:
+            shallowerNode = self.add_triangle_to_new_node(shallowerInterval, triangle)
+            self.remove_triangle_from_queue(triangle, nodeId, 'shallow')
+            self.add_new_edge(shallowerNode, nodeId)
+
+            self.grow_node(shallowerNode)
 
     def build_graph(self):
         # startingTriangle = self.triangles[23]
@@ -489,21 +676,58 @@ class Hydropolator:
         # print(self.minmax_from_triangle(startingTriangle))
         print(startingTriangle)
         print(self.find_intervals(startingTriangle))
+        print('=====================')
 
         intervalStart = self.find_intervals(startingTriangle)[0]
         currentNodeId = self.add_triangle_to_new_node(intervalStart, startingTriangle)
-        interval = self.get_interval_from_node(currentNodeId)
+        self.grow_node(currentNodeId)
+
+        unfinished = True
+        i = 0
+        while unfinished:
+            # deepsTracker = len(self.unfinishedDeep)
+            #
+            # for unfinishedDeep in self.unfinishedDeep.copy():
+            #     self.grow_deeper(unfinishedDeep)
+            #
+            # if len(self.unfinishedDeep) == deepsTracker:
+            #     unfinished = False
+            shallowsTracker = len(self.unfinishedShallow)
+            deepsTracker = len(self.unfinishedDeep)
+
+            for unfinishedShallow in self.unfinishedShallow.copy():
+                self.grow_shallower(unfinishedShallow)
+                if not len(self.get_queue(unfinishedShallow, 'shallow')):
+                    self.unfinishedShallow.remove(unfinishedShallow)
+
+            for unfinishedDeep in self.unfinishedDeep.copy():
+                self.grow_deeper(unfinishedDeep)
+                if not len(self.get_queue(unfinishedDeep, 'deep')):
+                    self.unfinishedDeep.remove(unfinishedDeep)
+
+            if len(self.unfinishedShallow) == shallowsTracker and len(self.unfinishedDeep) == deepsTracker:
+                print('triggered')
+                unfinished = False
+            # if i == 1:
+            #     unfinished = False
+
+            print(self.unfinishedShallow)
+            print(self.unfinishedDeep)
+            i += 1
+
+            # unfinished = False
+
+        print(self.unfinishedShallow)
+        print(self.unfinishedDeep)
+        # interval = self.get_interval_from_node(currentNodeId)
+
+        #
+        # self.iterative_generator(startingTriangle, interval, currentNodeId)
+        # self.expand_node(currentNodeId, interval)
+        # self.go_deeper(currentNodeId, interval)
+        # self.go_shallower(currentNodeId, interval)
+
         # self.generate_walker_graph(startingTriangle, interval, currentNodeId)
-        self.iterative_generator(startingTriangle, interval, currentNodeId)
-
-        self.expand_node(currentNodeId, interval)
-        for tri in self.get_queue(currentNodeId, 'deep'):
-            break
-        deeperNode = self.add_triangle_to_new_node(interval+1, tri)
-        deeperInterval = self.get_interval_from_node(deeperNode)
-        self.iterative_generator(tri, deeperInterval, deeperNode)
-        self.expand_node(deeperNode, deeperInterval)
-
         # for interval in self.find_intervals(startingTriangle):
         #     currentNodeId = self.add_triangle_to_new_node(interval, startingTriangle)
         #     # self.generate_walker_graph(startingTriangle, interval, currentNodeId)
