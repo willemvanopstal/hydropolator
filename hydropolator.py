@@ -48,7 +48,7 @@ class Hydropolator:
     meterSeries = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
                    15, 16, 17, 18, 19, 20, 25, 30, 35, 40, 45, 50, 100, 200]
     hdSeries = range(0, 100)
-    testingSeries = [0, 2, 4, 6, 8, 10, 12, 15, 25, 50]
+    testingSeries = [0, 2, 4, 6, 8, 10, 12, 15, 25, 30, 35, 40, 45, 50]
     isobathValues = []
     regions = []
     triangleRegions = []
@@ -389,12 +389,22 @@ class Hydropolator:
 
         with shapefile.Writer(triangleShpFile) as wt:
             wt.field('node', 'N')
+            wt.field('region', 'N')
+            wt.field('interval', 'C')
+            wt.field('shallowNbs', 'C')
+            wt.field('deepNbs', 'C')
             for node in nodeIds:
                 geom = []
                 for triangle in self.graph['nodes'][node]['triangles']:
                     geom.append(self.poly_from_triangle(list(triangle)))
+
+                region = self.get_interval_from_node(node)
+                interval = str(self.regions[region])
+                shallowNeighbors = str(self.get_neighboring_nodes(node, 'shallow'))
+                deepNeighbors = str(self.get_neighboring_nodes(node, 'deep'))
+
                 wt.poly(geom)
-                wt.record(int(node))
+                wt.record(int(node), region, interval, shallowNeighbors, deepNeighbors)
 
     # def create_tr_graph(self):
     #     self.trGraph.initialize_graph(self.triangulation)
@@ -830,9 +840,9 @@ class Hydropolator:
                 print('==============\nresolving node: ', node)
                 print('nodeQueue: ', self.nodeQueue)
                 self.resolve_queues(node)
-                i += 1
-                if i == 30:
-                    finished = True
+                # i += 1
+                # if i == 30:
+                #     finished = True
             if not len(self.nodeQueue):
                 finished = True
 
