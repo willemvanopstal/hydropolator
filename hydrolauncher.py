@@ -100,16 +100,17 @@ if args.regions:
     projectObject.generate_regions()
     projectObject.index_region_triangles()
     projectObject.export_region_triangles()
-    projectObject.summarize_project()
+    # projectObject.summarize_project()
 
 if args.triangleregiongraph:
     print('> generating triangle region graph')
-    projectObject.summarize_project()
+    # projectObject.summarize_project()
     projectObject.generate_regions()
     # projectObject.create_tr_graph()
     projectObject.build_graph()
 
 if projectObject:
+    print('\n> shutting down...')
     projectObject.write_metafile()
     if projectObject.vertexCount:
         projectObject.save_triangulation()
