@@ -1,10 +1,12 @@
 from ElevationDict import ElevationDict
+from PointInTriangle import point_in_triangle
 import os
 from datetime import datetime
 import shapefile
 import bisect
 import startin
 import pickle
+from shapely import geometry, ops
 import colorama
 colorama.init()
 
@@ -296,9 +298,13 @@ class Hydropolator:
         print('vertices: {}'.format(self.vertexCount))
         print('isoType: {}'.format(self.isoType))
 
-    def get_z(self, vertex):
+    def get_z(self, vertex, idOnly=False):
         # return self.vertexDict[tuple(vertex)]['z']
-        return self.vertexDict.get_z(vertex)
+        if not idOnly:
+            return self.vertexDict.get_z(vertex)
+        else:
+            parsedVertex = self.triangulation.get_point(vertex)
+            return self.vertexDict.get_z(parsedVertex)
 
     def poly_from_triangle(self, vertex_list):
         # vertices = self.triangulation.all_vertices()
@@ -346,7 +352,7 @@ class Hydropolator:
             # print(vertex[2], self.vertexDict[tuple(vertex)]['z'])
         return min(elevations), max(elevations)
 
-    def adjacent_triangle_in_set(self, triangle, lookupSet):
+    def adjacent_triangles_in_set(self, triangle, lookupSet):
         adjacentTriangles = []
         addedVertices = []
         for vId in triangle:
@@ -355,15 +361,14 @@ class Hydropolator:
             else:
                 for incidentTriangle in self.triangulation.incident_triangles_to_vertex(vId):
                     if len(set(triangle).intersection(incidentTriangle)) == 2 and set(incidentTriangle).difference(triangle) not in addedVertices:
-                        if self.pseudo_triangle(incidentTriangle) in lookupSet:
+                        if tuple(self.pseudo_triangle(incidentTriangle)) in lookupSet:
                             adjacentTriangles.append(self.pseudo_triangle(incidentTriangle))
                             addedVertices.append(set(incidentTriangle).difference(triangle))
 
         return adjacentTriangles
 
     def locate_point_in_set(self, point, lookupSet):
-
-        pass
+        print(self.pseudo_triangle(self.triangulation.locate(point[0], point[1])))
 
     def adjacent_triangles(self, triangle):
         adjacentTriangles = []
@@ -475,6 +480,30 @@ class Hydropolator:
                 wt.record(isoValue)
 
         self.msg('> edge triangles saved', 'info')
+
+    def export_all_isobaths(self):
+        self.msg('> saving all isobaths...', 'info')
+        lineShpName = 'isobaths_{}.shp'.format(self.now())
+        lineShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, lineShpName)
+        print('isobaths file: ', lineShpFile)
+
+        with shapefile.Writer(lineShpFile) as wt:
+            wt.field('value', 'N')
+            for edgeId in self.graph['edges'].keys():
+                # geom = [[list(value) for value in self.graph['edges'][edgeId]['geom']]]
+                # print(geom)
+                geom = []
+                print(self.graph['edges'][edgeId]['geom'])
+                for coords in self.graph['edges'][edgeId]['geom'].coords:
+                    # print(coords)
+                    geom.append(list(coords))
+                # for triangle in self.get_edge_triangles(edgeId):
+                #     geom.append(self.poly_from_triangle(triangle))
+                wt.line([geom])
+                isoValue = self.graph['edges'][edgeId]['value']
+                wt.record(isoValue)
+
+        self.msg('> isobaths saved', 'info')
 
     def export_node_triangles(self, nodeIds):
         self.msg('> saving selected region triangles...', 'info')
@@ -1058,16 +1087,148 @@ class Hydropolator:
 
         # self.export_node_triangles(['0'])
 
-    def generate_isobaths(self):
-        edgeIds = self.graph['edges'].keys()
+    def check_triangle_vertex_intersections_with_value(self, triangle, isoValue):
+        isPoint = False
+
+        pointZees = []
+        for vId in triangle:
+            pointZees.append(self.get_z(vId, idOnly=True))
+        intersections = len(set(pointZees).intersection([isoValue]))
+        # print(intersections)
+
+        if intersections == 1:
+            min, max = self.minmax_from_triangle(triangle)
+            print(min, max)
+            if min == isoValue or max == isoValue:
+                isPoint = True
+
+        return intersections, isPoint
+
+    def contour_triangle(self, triangle, isoValue):
+
+        triangleVertexZero = self.triangulation.get_point(triangle[0])
+        triangleVertexOne = self.triangulation.get_point(triangle[1])
+        triangleVertexTwo = self.triangulation.get_point(triangle[2])
+        triangleSegments = [[triangleVertexZero, triangleVertexOne],
+                            [triangleVertexOne, triangleVertexTwo],
+                            [triangleVertexTwo, triangleVertexZero]]
+        triangleLine = [0, 0]
+        for i, segment in enumerate(triangleSegments):
+            xOne, yOne, zOne = segment[0][0], segment[0][1], self.get_z(segment[0])
+            xTwo, yTwo, zTwo = segment[1][0], segment[1][1], self.get_z(segment[1])
+            # print(xOne, yOne, zOne)
+            # print(xTwo, yTwo, zTwo)
+            sMin, sMax = min(zOne, zTwo), max(zOne, zTwo)
+            if xTwo-xOne == 0:
+                xTwo += 0.0001
+            if sMin <= isoValue <= sMax:
+                x = round((isoValue*xTwo-isoValue*xOne-zOne*xTwo+zTwo*xOne)/(zTwo-zOne), 3)
+                y = round((x*(yTwo-yOne)-xOne*yTwo+xTwo*yOne)/(xTwo-xOne), 3)
+                # print(x, y)
+                if zOne > zTwo:
+                    triangleLine[0] = (x, y)
+                else:
+                    triangleLine[1] = (x, y)
+                    nextSegment = i
+
+        # nextSegment = {triangle[nextSegment], triangle[(nextSegment+1) % 2]}
+        # print(nextSegment)
+
+        return triangleLine
+        # linePoints.append(triangleLine[0])
+        # linePoints.append(triangleLine[1])
+
+    def generate_isobaths2(self, edgeIds=[]):
+        if len(edgeIds) == 0:
+            edgeIds = list(self.graph['edges'].keys())
+
         for edge in edgeIds:
+            self.msg('--new edge', 'header')
+            isoValue = self.graph['edges'][edge]['value']
+            print('isoValue: ', isoValue)
+
+            linePoints = []
             edgeTriangles = self.get_edge_triangles(edge)
 
+            for triangle in edgeTriangles:
+                triangleLine = self.contour_triangle(triangle, isoValue)
+                if triangleLine != [0, 0]:
+                    # linePoints.append(triangleLine)
+                    linePoints.append(geometry.LineString(
+                        [[triangleLine[0][0], triangleLine[0][1]], [triangleLine[1][0], triangleLine[1][1]]]))
+            # print(linePoints)
+            multiLine = geometry.MultiLineString(linePoints)
+            mergedLine = ops.linemerge(multiLine)
+            self.graph['edges'][edge]['geom'] = mergedLine
+
+        self.export_all_isobaths()
+
+    def generate_isobaths(self, edgeIds=[]):
+        # deep=left of the line
+        if len(edgeIds) == 0:
+            edgeIds = list(self.graph['edges'].keys())
+
+        for edge in edgeIds:
+            self.msg('--new edge', 'header')
+            isoValue = self.graph['edges'][edge]['value']
+            print('isoValue: ', isoValue)
+
+            linePoints = []
+            visitedTriangles = set()
+
+            edgeTriangles = self.get_edge_triangles(edge)
             for startingTriangle in edgeTriangles:
                 break
             print(startingTriangle)
 
-            # print(edgeTriangles)
+            # for vId in startingTriangle:
+            #     print(self.triangulation.get_point(vId))
+
+            trianglePoints = self.contour_triangle(startingTriangle, isoValue)
+            linePoints.append(trianglePoints[0])
+            linePoints.append(trianglePoints[1])
+            visitedTriangles.add(self.pseudo_triangle(startingTriangle))
+            # print(linePoints)
+
+            nextTriangle = startingTriangle
+            # self.locate_point_in_set(linePoints[-1], set())
+
+            finished = False
+            while not finished:
+                additions = 0
+
+                for neighbor in self.adjacent_triangles_in_set(nextTriangle, edgeTriangles.difference(visitedTriangles)):
+                    tri = [self.triangulation.get_point(vId) for vId in neighbor]
+                    # print('neighbor: ', neighbor)
+                    # print('tri: ', tri)
+                    # print(point_in_triangle(linePoints[-1], tri))
+                    # print(linePoints)
+                    if point_in_triangle(linePoints[-1], tri):
+                        trianglePoints = self.contour_triangle(neighbor, isoValue)
+                        # linePoints.append(trianglePoints[0])
+                        linePoints.append(trianglePoints[1])
+                        visitedTriangles.add(tuple(self.pseudo_triangle(neighbor)))
+                        # print(linePoints)
+                        # print(len(edgeTriangles.difference(visitedTriangles)))
+                        nextTriangle = neighbor
+                        additions += 1
+
+                if len(edgeTriangles.difference(visitedTriangles)) == 0 or additions == 0:
+                    finished = True
+                # print(self.triangulation.locate(linePoints[-1][0], linePoints[-1][1]))
+                # print(point_in_triangle(linePoints[0], tri))
+
+            self.graph['edges'][edge]['geom'] = linePoints
+
+        self.export_all_isobaths()
+        # closedLine = True
+        # if not closedLine:
+        #     pass
+
+        # for vId in startingTriangle:
+        #     print(self.get_z(vId, idOnly=True))
+
+        # print(edgeTriangles)
 
     def export_shapefile(self, shpName):
         self.msg('> exporting shapefiles...', 'info')

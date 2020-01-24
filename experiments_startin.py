@@ -1,3 +1,4 @@
+from shapely import geometry, ops
 import itertools
 import startin
 from datetime import datetime
@@ -91,3 +92,42 @@ try:
     setti.remove('4')
 except:
     pass
+
+print(t.locate(0.75, 0.29))
+
+
+# create three lines
+line_a = geometry.LineString([[0, 0], [1, 1]])
+line_b = geometry.LineString([[1, 1], [1, 0]])
+line_c = geometry.LineString([[1, 0], [2, 0]])
+
+# combine them into a multi-linestring
+multi_line = geometry.MultiLineString([line_a, line_b, line_c])
+print(multi_line)  # prints MULTILINESTRING ((0 0, 1 1), (1 1, 2 2), (2 2, 3 3))
+
+# you can now merge the lines
+merged_line = ops.linemerge(multi_line)
+print(merged_line)  # prints LINESTRING (0 0, 1 1, 2 2, 3 3)
+
+geom = []
+for coords in merged_line.coords:
+    print(coords)
+    geom.append(list(coords))
+
+print(geom)
+
+# for line in merged_line:
+#     print(line)
+# print('----')
+# # if your lines aren't contiguous
+# line_a = geometry.LineString([[0, 0], [1, 1]])
+# line_b = geometry.LineString([[1, 1], [1, 0]])
+# line_c = geometry.LineString([[2, 0], [3, 0]])
+#
+# # combine them into a multi-linestring
+# multi_line = geometry.MultiLineString([line_a, line_b, line_c])
+# print(multi_line)  # prints MULTILINESTRING ((0 0, 1 1), (1 1, 1 0), (2 0, 3 0))
+#
+# # note that it will now merge only the contiguous portions into a component of a new multi-linestring
+# merged_line = ops.linemerge(multi_line)
+# print(merged_line)  # prints MULTILINESTRING ((0 0, 1 1, 1 0), (2 0, 3 0))

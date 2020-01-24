@@ -139,7 +139,7 @@ if args.triangleregiongraph:
 
 if args.isobaths:
     msg('> generating isobaths...', 'info')
-    projectObject.generate_isobaths()
+    projectObject.generate_isobaths2()
 
 if projectObject:
     msg('\n> shutting down...', 'header')
