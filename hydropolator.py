@@ -346,6 +346,25 @@ class Hydropolator:
             # print(vertex[2], self.vertexDict[tuple(vertex)]['z'])
         return min(elevations), max(elevations)
 
+    def adjacent_triangle_in_set(self, triangle, lookupSet):
+        adjacentTriangles = []
+        addedVertices = []
+        for vId in triangle:
+            if len(addedVertices) == 3:
+                break
+            else:
+                for incidentTriangle in self.triangulation.incident_triangles_to_vertex(vId):
+                    if len(set(triangle).intersection(incidentTriangle)) == 2 and set(incidentTriangle).difference(triangle) not in addedVertices:
+                        if self.pseudo_triangle(incidentTriangle) in lookupSet:
+                            adjacentTriangles.append(self.pseudo_triangle(incidentTriangle))
+                            addedVertices.append(set(incidentTriangle).difference(triangle))
+
+        return adjacentTriangles
+
+    def locate_point_in_set(self, point, lookupSet):
+
+        pass
+
     def adjacent_triangles(self, triangle):
         adjacentTriangles = []
         addedVertices = []
@@ -355,10 +374,10 @@ class Hydropolator:
             else:
                 for incidentTriangle in self.triangulation.incident_triangles_to_vertex(vId):
                     if len(set(triangle).intersection(incidentTriangle)) == 2 and set(incidentTriangle).difference(triangle) not in addedVertices:
-                        adjacentTriangles.append(incidentTriangle)
+                        adjacentTriangles.append(self.pseudo_triangle(incidentTriangle))
                         addedVertices.append(set(incidentTriangle).difference(triangle))
 
-        return self.pseudo_triangle(adjacentTriangles)
+        return adjacentTriangles
 
     def generate_regions(self):
         self.msg('> generating regions-list from isoType...', 'info')
@@ -556,18 +575,20 @@ class Hydropolator:
 
     def add_new_edge(self, shallowNode, deepNode):
         edgeId = str(self.nrEdges)
-        self.graph['edges'][edgeId] = [shallowNode, deepNode]
+        self.graph['edges'][edgeId] = {}
+        self.graph['edges'][edgeId]['edge'] = [shallowNode, deepNode]
         self.graph['nodes'][str(shallowNode)]['deepNeighbors'].add(deepNode)
         self.graph['nodes'][str(deepNode)]['shallowNeighbors'].add(shallowNode)
+        self.graph['edges'][edgeId]['value'] = self.get_edge_value(edgeId)
         self.nrEdges += 1
         # print('new edge: ', edgeId)
 
     def get_edge_value(self, edgeId):
-        nodeList = self.graph['edges'][edgeId]
-        print(nodeList)
-        print(nodeList[0])
+        nodeList = self.graph['edges'][edgeId]['edge']
+        # print(nodeList)
+        # print(nodeList[0])
         # print('regions: ', self.regions)
-        print(self.get_interval_from_node(nodeList[0]))
+        # print(self.get_interval_from_node(nodeList[0]))
         regionsOne = self.regions[self.get_interval_from_node(nodeList[0])]
         regionsTwo = self.regions[self.get_interval_from_node(nodeList[1])]
         edgeValue = float(list(set(regionsOne).intersection(regionsTwo))[0])
@@ -576,7 +597,7 @@ class Hydropolator:
         return edgeValue
 
     def get_edge_triangles(self, edgeId):
-        nodeList = self.graph['edges'][edgeId]
+        nodeList = self.graph['edges'][edgeId]['edge']
         trianglesOne = self.get_triangles(nodeList[0])
         trianglesTwo = self.get_triangles(nodeList[1])
         return trianglesOne.intersection(trianglesTwo)
@@ -1036,6 +1057,17 @@ class Hydropolator:
         self.export_all_node_triangles()
 
         # self.export_node_triangles(['0'])
+
+    def generate_isobaths(self):
+        edgeIds = self.graph['edges'].keys()
+        for edge in edgeIds:
+            edgeTriangles = self.get_edge_triangles(edge)
+
+            for startingTriangle in edgeTriangles:
+                break
+            print(startingTriangle)
+
+            # print(edgeTriangles)
 
     def export_shapefile(self, shpName):
         self.msg('> exporting shapefiles...', 'info')

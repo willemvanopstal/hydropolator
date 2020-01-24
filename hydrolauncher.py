@@ -75,6 +75,11 @@ parser.add_argument('-triangleregiongraph',
                     type=str,
                     default=False,
                     help='creates triangle region graph')
+parser.add_argument('-isobaths',
+                    metavar=' ',
+                    type=str,
+                    default=False,
+                    help='creates isobaths')
 
 args = parser.parse_args()
 cwd = os.getcwd()
@@ -125,7 +130,16 @@ if args.triangleregiongraph:
     # projectObject.summarize_project()
     projectObject.generate_regions()
     # projectObject.create_tr_graph()
-    projectObject.build_graph()
+    if projectObject.nrNodes:
+        msg('> triangle region graph already generated', 'warning')
+        projectObject.print_graph()
+    else:
+        projectObject.build_graph()
+    projectObject.export_all_edge_triangles()
+
+if args.isobaths:
+    msg('> generating isobaths...', 'info')
+    projectObject.generate_isobaths()
 
 if projectObject:
     msg('\n> shutting down...', 'header')
