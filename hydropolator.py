@@ -1,12 +1,14 @@
+from ElevationDict import ElevationDict
 import os
 from datetime import datetime
 import shapefile
 import bisect
 import startin
 import pickle
+import colorama
+colorama.init()
 
 # from TriangleRegionGraph import TriangleRegionGraph
-from ElevationDict import ElevationDict
 
 # from CGAL.CGAL_Kernel import Point_2, Point_3
 # from CGAL.CGAL_Triangulation_2 import Triangulation_2, Delaunay_triangulation_2
@@ -48,7 +50,7 @@ class Hydropolator:
     meterSeries = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
                    15, 16, 17, 18, 19, 20, 25, 30, 35, 40, 45, 50, 100, 200]
     hdSeries = range(0, 100)
-    testingSeries = [0, 2, 4, 6, 8, 10, 12, 15, 25, 30, 35, 40, 45, 50]
+    testingSeries = [0, 2, 4, 6, 8, 10, 12, 15, 20, 25, 30, 35, 40, 45, 50]
     isobathValues = []
     regions = []
     triangleRegions = []
@@ -73,10 +75,10 @@ class Hydropolator:
                     elif not flip:
                         point = [float(point[0]), float(point[1]), round(float(point[2])+18, 4)]
 
-                    if point[0] < 238 or point[0] > 380:
-                        continue
-                    if point[1] < 110 or point[1] > 193:
-                        continue
+                    # if point[0] < 238 or point[0] > 380:
+                    #     continue
+                    # if point[1] < 110 or point[1] > 193:
+                    #     continue
 
                     self.check_minmax(point)
                     self.pointQueue.append(point)
@@ -134,7 +136,20 @@ class Hydropolator:
     def now(self):
         return datetime.now().strftime("%Y%m%d%H%M%S")
 
+    def msg(self, string, type):
+        if type == 'warning':
+            colColor = colorama.Fore.RED
+        elif type == 'info':
+            colColor = colorama.Fore.YELLOW  # + colorama.Style.DIM
+        elif type == 'infoheader':
+            colColor = colorama.Fore.YELLOW + colorama.Style.BRIGHT
+        elif type == 'header':
+            colColor = colorama.Fore.GREEN
+
+        print(colColor + string + colorama.Style.RESET_ALL)
+
     def write_metafile(self):
+        self.msg('> writing metafile...', 'info')
         metaFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'metafile')
         # self.triangulation.write_to_file(triFile)
         with open(metaFile, 'w') as mf:
@@ -147,8 +162,10 @@ class Hydropolator:
             mf.write('isoType\t{}\n'.format(self.isoType))
             mf.write('nrNodes\t{}\n'.format(self.nrNodes))
             mf.write('nrEdges\t{}\n'.format(self.nrEdges))
+        self.msg('> metafile written to file', 'info')
 
     def load_metafile(self):
+        self.msg('> loading metafile...', 'info')
         metaFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'metafile')
         triFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'triangulationObject')
         # self.triangulation.read_from_file(triFile)
@@ -173,23 +190,27 @@ class Hydropolator:
                 elif line.split('\t')[0] == 'bounds':
                     self.xMin, self.xMax, self.yMin, self.yMax, self.zMin, self.zMax = self.parse_bounds(line.split('\t')[
                         1])
+        self.msg('> metafile loaded from file', 'info')
 
     def save_trGraph(self):
+        self.msg('> saving triangle region graph...', 'info')
         graphFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'triangleRegionGraph')
 
         with open(graphFile, 'wb') as gf:
             pickle.dump(self.graph, gf, protocol=pickle.HIGHEST_PROTOCOL)
 
-        print('> triangle region graph saved')
+        self.msg('> triangle region graph saved to file', 'info')
 
     def load_trGraph(self):
-        print('> loading region graph')
+        self.msg('> loading triangle region graph...', 'info')
         graphFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'triangleRegionGraph')
 
         with open(graphFile, 'rb') as gf:
             self.graph = pickle.load(gf)
+        self.msg('> loaded triangle region graph', 'info')
 
     def save_triangulation(self):
+        self.msg('> saving triangulation to file...', 'info')
         triFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'triangulationVertices')
         trackerFile = os.path.join(os.getcwd(), 'projects',
                                    self.projectName, 'triangulationTracker')
@@ -206,10 +227,10 @@ class Hydropolator:
         with open(elevationFile, 'wb') as ef:
             pickle.dump(self.vertexDict, ef, protocol=pickle.HIGHEST_PROTOCOL)
 
-        print('> triangulation saved')
+        self.msg('> triangulation saved to file', 'info')
 
     def load_triangulation(self):
-        print('> loading triangulation')
+        self.msg('> loading triangulation from file...', 'info')
         triFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'triangulationVertices')
         trackerFile = os.path.join(os.getcwd(), 'projects',
                                    self.projectName, 'triangulationTracker')
@@ -234,6 +255,7 @@ class Hydropolator:
 
         with open(elevationFile, 'rb') as ef:
             self.vertexDict = pickle.load(ef)
+        self.msg('> triangulation loaded', 'info')
 
     def init_project(self, projectName):
         cwd = os.getcwd()
@@ -266,6 +288,7 @@ class Hydropolator:
             print('> project does not exist, load another or initialise a new project with -init')
 
     def summarize_project(self):
+        self.msg('> project summary', 'header')
         print('initialisation: {}'.format(self.initDate))
         print('modified: {}'.format(self.modifiedDate))
         print('pointCount: {}'.format(self.pointCount))
@@ -338,6 +361,7 @@ class Hydropolator:
         return self.pseudo_triangle(adjacentTriangles)
 
     def generate_regions(self):
+        self.msg('> generating regions-list from isoType...', 'info')
         # self.isoType = isobathSeries
         if self.isoType == 'standard':
             isobathValues = self.standardSeries
@@ -363,8 +387,10 @@ class Hydropolator:
         # self.trGraph.triangleRegions = self.triangleRegions
 
         # print(self.triangleRegions, regions, isobathValues)
+        self.msg('> regions-list established', 'info')
 
     def index_region_triangles(self):
+        self.msg('> indexing region triangles...', 'info')
         for triangle in self.triangles:
             min, max = self.minmax_from_triangle(triangle)
             # print(min, max)
@@ -372,6 +398,7 @@ class Hydropolator:
                 # print(self.regions[index])
                 self.triangleRegions[index].append(triangle)
         # print(self.triangleRegions)
+        self.msg('> triangles indexed in regions', 'info')
 
     def find_intervals(self, triangle, indexOnly=True):
         min, max = self.minmax_from_triangle(triangle)
@@ -387,8 +414,10 @@ class Hydropolator:
             return intervals
 
     def export_region_triangles(self):
+        self.msg('> exporting region triangles...', 'info')
         triangleShpName = 'region_triangles_{}.shp'.format(self.now())
         triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
+        print('region triangles file: ', triangleShpFile)
 
         with shapefile.Writer(triangleShpFile) as wt:
             wt.field('region', 'N')
@@ -400,15 +429,21 @@ class Hydropolator:
                     wt.poly(geom)
                     wt.record(i)
 
+        self.msg('> region triangles saved to file', 'info')
+
     def export_all_node_triangles(self):
+        self.msg('> saving all node triangles...', 'info')
         nodeList = []
         for node in self.graph['nodes'].keys():
             nodeList.append(node)
         self.export_node_triangles(nodeList)
+        self.msg('> all node triangles saved', 'info')
 
     def export_all_edge_triangles(self):
+        self.msg('> saving all edge triangles...', 'info')
         triangleShpName = 'edge_triangles_{}.shp'.format(self.now())
         triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
+        print('edge triangles file: ', triangleShpFile)
 
         with shapefile.Writer(triangleShpFile) as wt:
             wt.field('value', 'N')
@@ -420,9 +455,13 @@ class Hydropolator:
                 isoValue = self.get_edge_value(edgeId)
                 wt.record(isoValue)
 
+        self.msg('> edge triangles saved', 'info')
+
     def export_node_triangles(self, nodeIds):
+        self.msg('> saving selected region triangles...', 'info')
         triangleShpName = 'node_triangles_{}.shp'.format(self.now())
         triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
+        print('selected node triangles file: ', triangleShpFile)
 
         with shapefile.Writer(triangleShpFile) as wt:
             wt.field('node', 'N')
@@ -442,6 +481,8 @@ class Hydropolator:
 
                 wt.poly(geom)
                 wt.record(int(node), region, interval, shallowNeighbors, deepNeighbors)
+
+        self.msg('> selected node triangles saved', 'info')
 
     # def create_tr_graph(self):
     #     self.trGraph.initialize_graph(self.triangulation)
@@ -469,6 +510,7 @@ class Hydropolator:
         self.graph['nodes'][nodeId] = {'region': interval, 'triangles': {tuple(self.pseudo_triangle(
             triangle))}, 'deepNeighbors': set(), 'shallowNeighbors': set(), 'currentQueue': set(), 'shallowQueue': set(), 'deepQueue': set()}
         self.nrNodes += 1
+        # print('new node: ', nodeId)
         return nodeId
 
     def add_triangle_to_queue(self, triangle, nodeId, type):
@@ -513,21 +555,23 @@ class Hydropolator:
             return False
 
     def add_new_edge(self, shallowNode, deepNode):
-        self.graph['edges'][str(self.nrEdges)] = [shallowNode, deepNode]
+        edgeId = str(self.nrEdges)
+        self.graph['edges'][edgeId] = [shallowNode, deepNode]
         self.graph['nodes'][str(shallowNode)]['deepNeighbors'].add(deepNode)
         self.graph['nodes'][str(deepNode)]['shallowNeighbors'].add(shallowNode)
         self.nrEdges += 1
+        # print('new edge: ', edgeId)
 
     def get_edge_value(self, edgeId):
         nodeList = self.graph['edges'][edgeId]
         print(nodeList)
         print(nodeList[0])
-        print('regions: ', self.regions)
+        # print('regions: ', self.regions)
         print(self.get_interval_from_node(nodeList[0]))
         regionsOne = self.regions[self.get_interval_from_node(nodeList[0])]
         regionsTwo = self.regions[self.get_interval_from_node(nodeList[1])]
         edgeValue = float(list(set(regionsOne).intersection(regionsTwo))[0])
-        print('EdgeValue: ', edgeValue)
+        # print('EdgeValue: ', edgeValue)
 
         return edgeValue
 
@@ -538,13 +582,15 @@ class Hydropolator:
         return trianglesOne.intersection(trianglesTwo)
 
     def print_graph(self):
-        print('\n======GRAPH======\nNODES')
+        self.msg('\n======GRAPH======', 'header')
+        self.msg('NODES', 'header')
+        # print('\n======GRAPH======\nNODES')
         for nodeId in self.graph['nodes'].keys():
             # print(nodeId, self.graph['nodes'][nodeId])
             print('id: ', nodeId, 'interval: ', self.graph['nodes'][nodeId]['region'], 'triangles: ', len(self.graph['nodes'][nodeId]['triangles']), 'deepNeighbors: ', self.graph['nodes'][nodeId]['deepNeighbors'], 'shallowNeighbors: ', self.graph['nodes'][nodeId]['shallowNeighbors'], '\ncurrent: ',
                   len(self.graph['nodes'][nodeId]['currentQueue']), 'deep: ', len(
                       self.graph['nodes'][nodeId]['deepQueue']), 'shallow: ', len(self.graph['nodes'][nodeId]['shallowQueue']))
-        print('EDGES')
+        self.msg('\nEDGES', 'header')
         for edgeId in self.graph['edges'].keys():
             print(edgeId, self.graph['edges'][edgeId])
 
@@ -755,7 +801,7 @@ class Hydropolator:
 
     def establish_node(self, nodeId):
         nodeInterval = self.get_interval_from_node(nodeId)
-        print('nodeId: ', nodeId, 'nodeInterval: ', nodeInterval)
+        # print('nodeId: ', nodeId, 'nodeInterval: ', nodeInterval)
         trianglesInNode = self.get_triangles(nodeId)
 
         visitedTriangles = set()
@@ -797,14 +843,14 @@ class Hydropolator:
                                 self.add_triangle_to_queue(neighbor, nodeId, 'shallow')
                                 addedTriangles += 1
 
-                        for neighboringNode in self.get_neighboring_nodes(nodeId, 'deep'):
-                            if self.triangle_in_queue(neighbor, neighboringNode, 'shallow'):
-                                self.remove_triangle_from_queue(
-                                    neighbor, neighboringNode, 'shallow')
-
-                        for neighboringNode in self.get_neighboring_nodes(nodeId, 'shallow'):
-                            if self.triangle_in_queue(neighbor, neighboringNode, 'deep'):
-                                self.remove_triangle_from_queue(neighbor, neighboringNode, 'deep')
+                        # for neighboringNode in self.get_neighboring_nodes(nodeId, 'deep'):
+                        #     if self.triangle_in_queue(neighbor, neighboringNode, 'shallow'):
+                        #         self.remove_triangle_from_queue(
+                        #             neighbor, neighboringNode, 'shallow')
+                        #
+                        # for neighboringNode in self.get_neighboring_nodes(nodeId, 'shallow'):
+                        #     if self.triangle_in_queue(neighbor, neighboringNode, 'deep'):
+                        #         self.remove_triangle_from_queue(neighbor, neighboringNode, 'deep')
 
             if not addedTriangles:
                 adding = False
@@ -820,6 +866,11 @@ class Hydropolator:
 
         resolved = False
         while not resolved:
+            # print('deepQueue: ', len(self.get_queue(nodeId, 'deep')))
+            if not len(self.get_queue(nodeId, 'deep')):
+                # print('resolveTrigger')
+                resolved = True
+
             triangle = 0
             for triangle in self.get_queue(nodeId, 'deep'):
                 break
@@ -835,16 +886,21 @@ class Hydropolator:
                     self.add_new_edge(nodeId, deeperNode)
                     self.establish_node(deeperNode)
 
-                # print(len(self.get_queue(nodeId, 'deep')))
-                if not len(self.get_queue(nodeId, 'deep')):
-                    print('resolveTrigger')
-                    resolved = True
+                # print('deepQueue: ', len(self.get_queue(nodeId, 'deep')))
+                # if not len(self.get_queue(nodeId, 'deep')):
+                #     # print('resolveTrigger')
+                #     resolved = True
             else:
-                print('resolveTrigger')
+                # print('resolveTrigger')
                 resolved = True
 
         resolved = False
         while not resolved:
+            # print('shallowQueue: ', len(self.get_queue(nodeId, 'deep')))
+            if not len(self.get_queue(nodeId, 'shallow')):
+                # print('resolveTrigger')
+                resolved = True
+
             triangle = 0
             for triangle in self.get_queue(nodeId, 'shallow'):
                 break
@@ -860,17 +916,18 @@ class Hydropolator:
                     self.add_new_edge(shallowerNode, nodeId)
                     self.establish_node(shallowerNode)
 
-                # print(len(self.get_queue(nodeId, 'deep')))
-                if not len(self.get_queue(nodeId, 'shallow')):
-                    print('resolveTrigger')
-                    resolved = True
+                # print('shallowQueue: ', len(self.get_queue(nodeId, 'deep')))
+                # if not len(self.get_queue(nodeId, 'shallow')):
+                #     print('resolveTrigger')
+                #     resolved = True
             else:
-                print('resolveTrigger')
+                # print('resolveTrigger')
                 resolved = True
 
         self.check_unfinished(nodeId)
 
     def build_graph(self):
+        self.msg('> building triangle region graph...', 'info')
         for startingTriangle in self.triangles:
             if len(self.find_intervals(startingTriangle)) == 1:
                 break
@@ -879,8 +936,8 @@ class Hydropolator:
 
         print('\n=======starter=======')
         # print(self.minmax_from_triangle(startingTriangle))
-        print(startingTriangle)
-        print(self.find_intervals(startingTriangle))
+        print('starting triangle: ', startingTriangle)
+        print('starting interval: ', self.find_intervals(startingTriangle))
         print('=====================')
 
         intervalStart = self.find_intervals(startingTriangle)[0]
@@ -975,15 +1032,19 @@ class Hydropolator:
 
         self.print_graph()
         print('nodeQueue: ', self.nodeQueue)
+        self.msg('> triangle region graph created', 'info')
         self.export_all_node_triangles()
 
         # self.export_node_triangles(['0'])
 
     def export_shapefile(self, shpName):
+        self.msg('> exporting shapefiles...', 'info')
         pointShpName = 'points_{}_{}.shp'.format(shpName, self.now())
         triangleShpName = 'triangles_{}_{}.shp'.format(shpName, self.now())
         pointShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, pointShpName)
         triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
+        print('triangles file: ', triangleShpFile)
+        print('points file: ', pointShpFile)
 
         with shapefile.Writer(pointShpFile) as wp:
             wp.field('depth', 'F', decimal=4)
@@ -991,6 +1052,7 @@ class Hydropolator:
             for point in self.vertices[1:]:  # remove the infinite vertex in startTIN
                 wp.point(point[0], point[1])
                 wp.record(point[2])
+            self.msg('> points written to shapefile', 'info')
 
         with shapefile.Writer(triangleShpFile) as wt:
             wt.field('min_depth', 'F', decimal=4)
@@ -1002,3 +1064,4 @@ class Hydropolator:
                 # min, max, avg = 10, 10, 10  # self.minmaxavg_from_triangle(triangle)
                 wt.poly([geom])
                 wt.record(min, max, avg)
+            self.msg('> triangles written to shapefile', 'info')

@@ -2,6 +2,22 @@ from Hydropolator import Hydropolator
 from hydroasci import cli_description
 import argparse
 import os
+import colorama
+colorama.init()
+
+
+def msg(string, type):
+    if type == 'warning':
+        colColor = colorama.Fore.RED
+    elif type == 'info':
+        colColor = colorama.Fore.YELLOW  # + colorama.Style.DIM
+    elif type == 'infoheader':
+        colColor = colorama.Fore.YELLOW + colorama.Style.BRIGHT
+    elif type == 'header':
+        colColor = colorama.Fore.GREEN
+
+    print(colColor + string + colorama.Style.RESET_ALL)
+
 
 print('\n\n')
 
@@ -65,16 +81,17 @@ cwd = os.getcwd()
 projectDir = os.path.join(cwd, 'projects')
 
 if args.init:
-    print('> initializing new project')
+    msg('> initializing new project...', 'info')
     projectObject = Hydropolator()
     print(projectObject.init_project(args.init))
+    msg('> initialized new project', 'header')
 elif args.project:
-    print('> opening existing project')
+    msg('> opening existing project', 'info')
     projectObject = Hydropolator()
     if projectObject.load_project(args.project) == True:
+        msg('> loaded project', 'header')
         projectObject.summarize_project()
         print(projectObject.insertions)
-        projectObject.export_all_edge_triangles()
 
 if args.flip:
     flip = True
@@ -82,7 +99,7 @@ else:
     flip = False
 
 if args.pointfile:
-    print('> inserting points from file')
+    msg('> inserting points from file', 'info')
     if args.pointfile == 'surveyData':
         projectObject.load_pointfile(surveyData, args.filetype, args.delimiter, flip)
     else:
@@ -90,12 +107,12 @@ if args.pointfile:
     projectObject.summarize_project()
 
 if args.exportshp:
-    print('> exporting shapefiles')
+    msg('> exporting shapefiles', 'info')
     projectObject.summarize_project()
     projectObject.export_shapefile(args.exportshp)
 
 if args.regions:
-    print('> generating regions')
+    msg('> generating regions', 'info')
     projectObject.summarize_project()
     projectObject.isoType = args.regions
     projectObject.generate_regions()
@@ -104,14 +121,14 @@ if args.regions:
     # projectObject.summarize_project()
 
 if args.triangleregiongraph:
-    print('> generating triangle region graph')
+    msg('> generating triangle region graph', 'info')
     # projectObject.summarize_project()
     projectObject.generate_regions()
     # projectObject.create_tr_graph()
     projectObject.build_graph()
 
 if projectObject:
-    print('\n> shutting down...')
+    msg('\n> shutting down...', 'header')
     projectObject.write_metafile()
     if projectObject.vertexCount:
         projectObject.save_triangulation()
