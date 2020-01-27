@@ -136,10 +136,12 @@ if args.triangleregiongraph:
     else:
         projectObject.build_graph()
     projectObject.export_all_edge_triangles()
+    # projectObject.export_shapefile('outputting')
+
 
 if args.isobaths:
     msg('> generating isobaths...', 'info')
-    projectObject.generate_isobaths3()
+    projectObject.generate_isobaths4()
     # projectObject.make_network_graph()
 
 if projectObject:

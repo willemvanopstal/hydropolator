@@ -183,8 +183,8 @@ class Hydropolator:
                     self.modifiedDate = line.split('\t')[1].strip()
                 elif line.split('\t')[0] == 'pointCount':
                     self.pointCount = int(line.split('\t')[1])
-                elif line.split('\t')[0] == 'nrNodes':
-                    self.nrNodes = int(line.split('\t')[1])
+                # elif line.split('\t')[0] == 'nrNodes':
+                #     self.nrNodes = int(line.split('\t')[1])
                 elif line.split('\t')[0] == 'nrEdges':
                     self.nrEdges = int(line.split('\t')[1])
                 elif line.split('\t')[0] == 'vertices':
@@ -286,7 +286,7 @@ class Hydropolator:
             self.load_metafile()
             self.generate_regions()
             self.load_triangulation()
-            self.load_trGraph()
+            # self.load_trGraph()
             return True
         else:
             print('> project does not exist, load another or initialise a new project with -init')
@@ -868,6 +868,21 @@ class Hydropolator:
             if nodeId in self.nodeQueue:
                 self.nodeQueue.remove(nodeId)
 
+    def saddle_test(self, triangleOne, triangleTwo, interval):
+        similarEdge = set(triangleOne).intersection(triangleTwo)
+        region = self.regions[interval]  # 8-10 eg
+        lower = 0
+        higher = 0
+        for vertex in similarEdge:
+            if self.get_z(vertex, idOnly=True) < region[0]:
+                lower += 1
+            elif self.get_z(vertex, idOnly=True) > region[1]:
+                higher += 1
+        if lower == 2 or higher == 2:
+            return True
+        else:
+            return False
+
     def establish_node(self, nodeId):
         nodeInterval = self.get_interval_from_node(nodeId)
         # print('nodeId: ', nodeId, 'nodeInterval: ', nodeInterval)
@@ -887,6 +902,7 @@ class Hydropolator:
 
                         # same interval
                         if nodeInterval in self.find_intervals(neighbor) and not self.triangle_in_node(neighbor, nodeId):
+                            # if not self.saddle_test(triangle, neighbor, nodeInterval):
                             self.add_triangle_to_node(neighbor, nodeId)
                             addedTriangles += 1
 
@@ -1280,23 +1296,36 @@ class Hydropolator:
         # print(triangle, edge)
         adjacentTriangles = []
         addedVertices = []
-        for vId in triangle:
-            if len(addedVertices) == 3:
-                break
-            else:
-                for incidentTriangle in self.triangulation.incident_triangles_to_vertex(vId):
-                    # print('inc: ', incidentTriangle)
-                    if len(set(triangle).intersection(incidentTriangle)) == 2 and set(incidentTriangle).difference(triangle) not in addedVertices:
-                        if tuple(self.pseudo_triangle(incidentTriangle)) in lookupSet:
-                            adjacentTriangles.append(self.pseudo_triangle(incidentTriangle))
-                            addedVertices.append(set(incidentTriangle).difference(triangle))
 
-        for triangle in adjacentTriangles:
-            # print('adj:', triangle)
-            if len(set(triangle).intersection(edge)) == 2:
-                return tuple(self.pseudo_triangle(triangle))
+        for vertex in edge:
+            for incidentTriangle in self.triangulation.incident_triangles_to_vertex(vertex):
+                # print(incidentTriangle)
+                if len(set(incidentTriangle).intersection(edge)) == 2:
+                    # print(incidentTriangle)
+                    if len(set(incidentTriangle).intersection(triangle)) != 3:
+                        if tuple(self.pseudo_triangle(incidentTriangle)) in lookupSet:
+                            # print(incidentTriangle)
+                            return tuple(self.pseudo_triangle(incidentTriangle))
 
         return False
+
+        # for vId in triangle:
+        #     if len(addedVertices) == 3:
+        #         break
+        #     else:
+        #         for incidentTriangle in self.triangulation.incident_triangles_to_vertex(vId):
+        #             # print('inc: ', incidentTriangle)
+        #             if len(set(triangle).intersection(incidentTriangle)) == 2 and set(incidentTriangle).difference(triangle) not in addedVertices:
+        #                 if tuple(self.pseudo_triangle(incidentTriangle)) in lookupSet:
+        #                     adjacentTriangles.append(self.pseudo_triangle(incidentTriangle))
+        #                     addedVertices.append(set(incidentTriangle).difference(triangle))
+        #
+        # for triangle in adjacentTriangles:
+        #     # print('adj:', triangle)
+        #     if len(set(triangle).intersection(edge)) == 2:
+        #         return tuple(self.pseudo_triangle(triangle))
+
+        # return False
 
         # return adjacentTriangles
 
@@ -1346,6 +1375,8 @@ class Hydropolator:
                     # print(nextTriangle)
                     intersections, isPoint = self.check_triangle_vertex_intersections_with_value(
                         nextTriangle, isoValue)
+                    # print(intersections, isPoint, nextTriangle)
+
                     if intersections == 0:
                         segmentIntersections = self.get_intersected_segments(
                             nextTriangle, isoValue, 'full')
@@ -1421,3 +1452,200 @@ class Hydropolator:
                 wt.poly([geom])
                 wt.record(min, max, avg)
             self.msg('> triangles written to shapefile', 'info')
+
+    def triangle_intersections(self, triangle, isoValue):
+        isPoint = False
+        intersections = 0
+        for vId in triangle:
+            vertexElevation = self.get_z(vId, idOnly=True)
+            if vertexElevation == isoValue:
+                intersections += 1
+
+        if intersections == 1:
+            triangleMin, triangleMax = self.minmax_from_triangle(triangle)
+            if triangleMin == isoValue or triangleMax == isoValue:
+                isPoint = True
+
+        return intersections, isPoint
+
+    def intersected_triangle_segments(self, triangle, isoValue, type):
+        if type == 'full':
+            triangleSegment = ['start', 'end']
+            for i in range(3):
+                segment = [triangle[i], triangle[(i + 1) % 3]]
+                zOne = self.get_z(segment[0], idOnly=True)
+                zTwo = self.get_z(segment[1], idOnly=True)
+                if min(zOne, zTwo) < isoValue < max(zOne, zTwo):
+                    if zOne > zTwo:
+                        # deep is on the left
+                        triangleSegment[0] = segment
+                    else:
+                        triangleSegment[1] = segment
+            return triangleSegment
+
+    def find_next_edge_triangle(self, currentTriangle, edge, lookupSet):
+
+        for vId in edge:
+            incidentTriangles = self.triangulation.incident_triangles_to_vertex(vId)
+            for incidentTriangle in incidentTriangles:
+                if len(set(incidentTriangle).intersection(edge)) == 2:
+                    if len(set(incidentTriangle).intersection(currentTriangle)) != 3:
+                        incidentTriangle = tuple(self.pseudo_triangle(incidentTriangle))
+                        if incidentTriangle not in lookupSet:
+                            return tuple(self.pseudo_triangle(incidentTriangle))
+
+        # no neighboring triangle found
+        return False
+
+    def generate_isobaths4(self, edgeIds=[]):
+        if len(edgeIds) == 0:
+            edgeIds = list(self.graph['edges'].keys())
+
+        for edge in edgeIds:
+            self.msg('--new edge', 'header')
+            isoValue = self.graph['edges'][edge]['value']
+            print('isoValue: ', isoValue, self.graph['edges'][edge]['edge'])
+
+            edgeTriangles = self.get_edge_triangles(edge)
+            print('len: ', len(edgeTriangles))
+
+            isobathSegments = set()
+
+            for triangle in edgeTriangles:
+                # triangleContour = ['start', 'end']
+                intersections, isPoint = self.triangle_intersections(triangle, isoValue)
+                triangleMin, triangleMax = self.minmax_from_triangle(triangle)
+
+                if intersections == 3 or isPoint:
+                    continue
+                else:
+                    triangleSegment = ['start', 'end']
+                    if intersections == 0:
+                        # full intersection
+                        for i in range(3):
+                            segment = (triangle[i], triangle[(i + 1) % 3])
+                            zOne = self.get_z(segment[0], idOnly=True)
+                            zTwo = self.get_z(segment[1], idOnly=True)
+                            if min(zOne, zTwo) < isoValue < max(zOne, zTwo):
+                                if zOne > zTwo:
+                                    # deep is on the left
+                                    triangleSegment[0] = segment
+                                else:
+                                    triangleSegment[1] = segment
+                        # print(triangleSegment, tuple(triangleSegment))
+                        isobathSegments.add(tuple(triangleSegment))
+                    elif intersections == 1:
+                        # point to edge or edge to point
+                        print('IM A SEMI')
+                        for i in range(3):
+                            segment = (triangle[i], triangle[(i + 1) % 3])
+                            zOne = self.get_z(segment[0], idOnly=True)
+                            zTwo = self.get_z(segment[1], idOnly=True)
+                            if min(zOne, zTwo) < isoValue < max(zOne, zTwo):
+                                if zOne > zTwo:
+                                    # deep is on the left
+                                    triangleSegment[0] = segment
+                                else:
+                                    triangleSegment[1] = segment
+                            elif zOne == isoValue and zOne < zTwo:
+                                triangleSegment[1] = (segment[0])
+                            elif zOne == isoValue and zOne > zTwo:
+                                triangleSegment[0] = (segment[0])
+                        print(triangleSegment)
+                        isobathSegments.add(tuple(triangleSegment))
+
+                    elif intersections == 2:
+                        # edge
+                        print('IM AN EDGE')
+                        for i in range(3):
+                            segment = (triangle[i], triangle[(i + 1) % 3])
+                            zOne = self.get_z(segment[0], idOnly=True)
+                            zTwo = self.get_z(segment[1], idOnly=True)
+                            if zOne == isoValue and zTwo != isoValue:
+                                if zTwo < isoValue:
+                                    triangleSegment[0] = (segment[0])
+                                elif zTwo > isoValue:
+                                    triangleSegment[1] = (segment[0])
+                            elif zTwo == isoValue and zOne != isoValue:
+                                if zOne > isoValue:
+                                    triangleSegment[0] = (segment[1])
+                                elif zOne < isoValue:
+                                    triangleSegment[1] = (segment[1])
+                        isobathSegments.add(tuple(triangleSegment))
+
+            forwardPath = []
+            backwardPath = []
+            for path in isobathSegments:
+                break
+            isobathSegments.remove(path)
+            forwardPath.append(path[1])
+            backwardPath.append(path[0])
+
+            i = 0
+            finished = False
+            while not finished:
+                i = 0
+
+                for seg in isobathSegments.copy():
+                    # print(forwardPath[-1], backwardPath[-1], seg)
+                    # print(seg)
+                    if type(forwardPath[-1]) == int or type(seg[0]) == int:
+                        if forwardPath[-1] == seg[0]:
+                            # print('forward add')
+                            forwardPath.append(seg[1])
+                            isobathSegments.remove(seg)
+                    elif type(backwardPath[-1]) == int or type(seg[-1]) == int:
+                        if backwardPath[-1] == seg[1]:
+                            # print('backward add')
+                            backwardPath.append(seg[0])
+                            isobathSegments.remove(seg)
+                    elif len(set(forwardPath[-1]).intersection(seg[0])) == 2:
+                        forwardPath.append(seg[1])
+                        # print('forward add')
+                        isobathSegments.remove(seg)
+                    elif len(set(backwardPath[-1]).intersection(seg[1])) == 2:
+                        backwardPath.append(seg[0])
+                        # print('backward add')
+                        isobathSegments.remove(seg)
+                    else:
+                        i += 1
+
+                if len(isobathSegments) == 0:
+                    print(len(forwardPath), len(backwardPath))
+                    # print(forwardPath)
+                    # print(backwardPath)
+
+                    finished = True
+
+                i += 0
+                if i > 10000:
+                    self.msg('longer trigger', 'warning')
+                    finished = True
+
+            backwardPath.reverse()
+            fullPath = backwardPath + forwardPath
+            # print(fullPath)
+
+            isoGeom = []
+            for intersection in fullPath:
+                # print(intersection)
+                if type(intersection) == int:
+                    geom = self.triangulation.get_point(intersection)
+                    isoGeom.append([geom[0], geom[1]])
+                else:
+                    geomOne = self.triangulation.get_point(intersection[0])
+                    geomTwo = self.triangulation.get_point(intersection[1])
+                    xOne, yOne, zOne = geomOne[0], geomOne[1], self.get_z(
+                        intersection[0], idOnly=True)
+                    xTwo, yTwo, zTwo = geomTwo[0], geomTwo[1], self.get_z(
+                        intersection[1], idOnly=True)
+                    if xOne == xTwo:
+                        x = round(xOne, 3)
+                        y = round(yOne + ((isoValue-zOne)/(zTwo-zOne)) * (yTwo-yOne), 3)
+                    else:
+                        x = round((isoValue*xTwo-isoValue*xOne-zOne*xTwo+zTwo*xOne)/(zTwo-zOne), 3)
+                        y = round((x*(yTwo-yOne)-xOne*yTwo+xTwo*yOne)/(xTwo-xOne), 3)
+                    isoGeom.append([x, y])
+
+            self.graph['edges'][edge]['geom'] = isoGeom
+        self.export_all_isobaths()
