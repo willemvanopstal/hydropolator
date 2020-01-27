@@ -139,7 +139,8 @@ if args.triangleregiongraph:
 
 if args.isobaths:
     msg('> generating isobaths...', 'info')
-    projectObject.generate_isobaths2()
+    projectObject.generate_isobaths3()
+    # projectObject.make_network_graph()
 
 if projectObject:
     msg('\n> shutting down...', 'header')

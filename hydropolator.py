@@ -1,3 +1,5 @@
+import networkx as nx
+import matplotlib.pyplot as plt
 from ElevationDict import ElevationDict
 from PointInTriangle import point_in_triangle
 import os
@@ -491,12 +493,13 @@ class Hydropolator:
             wt.field('value', 'N')
             for edgeId in self.graph['edges'].keys():
                 # geom = [[list(value) for value in self.graph['edges'][edgeId]['geom']]]
+                geom = self.graph['edges'][edgeId]['geom']
                 # print(geom)
-                geom = []
-                print(self.graph['edges'][edgeId]['geom'])
-                for coords in self.graph['edges'][edgeId]['geom'].coords:
-                    # print(coords)
-                    geom.append(list(coords))
+                # geom = []
+                # print(self.graph['edges'][edgeId]['geom'])
+                # for coords in self.graph['edges'][edgeId]['geom'].coords:
+                #     # print(coords)
+                #     geom.append(list(coords))
                 # for triangle in self.get_edge_triangles(edgeId):
                 #     geom.append(self.poly_from_triangle(triangle))
                 wt.line([geom])
@@ -642,7 +645,9 @@ class Hydropolator:
                       self.graph['nodes'][nodeId]['deepQueue']), 'shallow: ', len(self.graph['nodes'][nodeId]['shallowQueue']))
         self.msg('\nEDGES', 'header')
         for edgeId in self.graph['edges'].keys():
-            print(edgeId, self.graph['edges'][edgeId])
+            print('id: ', edgeId, self.graph['edges'][edgeId]['edge'],
+                  'value: ', self.graph['edges'][edgeId]['value'])
+            # print(edgeId, self.graph['edges'][edgeId])
 
     # def generate_walker_graph(self, triangle, interval, nodeId):
     #     # NOT IN USE ANYMORE: Max recursion limit
@@ -829,6 +834,20 @@ class Hydropolator:
             self.add_new_edge(shallowerNode, nodeId)
 
             self.grow_node(shallowerNode)
+
+    def make_network_graph(self):
+        G = nx.Graph()
+        for node in self.graph['nodes'].keys():
+            G.add_node(node)
+        for edge in self.graph['edges'].keys():
+            G.add_edge(self.graph['edges'][edge]['edge'][0], self.graph['edges'][edge]['edge'][1])
+
+        V = nx.petersen_graph()
+        # plt.subplot(121)
+        nx.draw(V, with_labels=True, font_weight='bold')
+        # plt.subplot(122)
+        # nx.draw_shell(V, n)
+        plt.show()
 
     def check_unfinished(self, nodeId):
         if len(self.get_queue(nodeId, 'deep')):
@@ -1229,6 +1248,150 @@ class Hydropolator:
         #     print(self.get_z(vId, idOnly=True))
 
         # print(edgeTriangles)
+
+    def get_intersected_segments(self, triangle, isoValue, type):
+        if type == 'full':
+            # full intersection model
+            segmentIntersections = [0, 0]
+            for i in range(3):
+                # print('segment: ', i)
+                segment = [triangle[i], triangle[(i+1) % 3]]
+                zOne, zTwo = self.get_z(segment[0], idOnly=True), self.get_z(
+                    segment[1], idOnly=True)
+                sMin, sMax = min(zOne, zTwo), max(zOne, zTwo)
+                if sMin < isoValue < sMax:
+                    # print('intersects!')
+                    if zOne > zTwo:
+                        # print('start segment')
+                        segmentIntersections[0] = segment
+                    else:
+                        # print('end segment')
+                        segmentIntersections[1] = segment
+            # print(segmentIntersections)
+            return segmentIntersections
+
+        if type == 'nextPoint':
+            for vId in triangle:
+                vertexZ = self.get_z(vId, idOnly=True)
+                if vertexZ == isoValue:
+                    return [vId]
+
+    def adjacent_triangle_in_set_with_edge(self, triangle, lookupSet, edge):
+        # print(triangle, edge)
+        adjacentTriangles = []
+        addedVertices = []
+        for vId in triangle:
+            if len(addedVertices) == 3:
+                break
+            else:
+                for incidentTriangle in self.triangulation.incident_triangles_to_vertex(vId):
+                    # print('inc: ', incidentTriangle)
+                    if len(set(triangle).intersection(incidentTriangle)) == 2 and set(incidentTriangle).difference(triangle) not in addedVertices:
+                        if tuple(self.pseudo_triangle(incidentTriangle)) in lookupSet:
+                            adjacentTriangles.append(self.pseudo_triangle(incidentTriangle))
+                            addedVertices.append(set(incidentTriangle).difference(triangle))
+
+        for triangle in adjacentTriangles:
+            # print('adj:', triangle)
+            if len(set(triangle).intersection(edge)) == 2:
+                return tuple(self.pseudo_triangle(triangle))
+
+        return False
+
+        # return adjacentTriangles
+
+    def generate_isobaths3(self, edgeIds=[]):
+        if len(edgeIds) == 0:
+            edgeIds = list(self.graph['edges'].keys())
+
+        for edge in edgeIds:
+            self.msg('--new edge', 'header')
+            isoValue = self.graph['edges'][edge]['value']
+            print('isoValue: ', isoValue)
+
+            edgeTriangles = self.get_edge_triangles(edge)
+            for triangle in edgeTriangles:
+                intersections, isPoint = self.check_triangle_vertex_intersections_with_value(
+                    triangle, isoValue)
+                if intersections == 0:
+                    startingTriangle = triangle
+                    break
+            print(startingTriangle)
+
+            isobathSegments = []
+            visitedTriangles = set()
+
+            segmentIntersections = self.get_intersected_segments(startingTriangle, isoValue, 'full')
+            isobathSegments.append(segmentIntersections[0])
+            isobathSegments.append(segmentIntersections[1])
+            visitedTriangles.add(startingTriangle)
+            nextTriangle = startingTriangle
+
+            # print(isobathSegments)
+
+            finished = False
+            i = 0
+            while not finished:
+                # print('---New Loop')
+                if len(segmentIntersections) == 2:
+                    # print('find neighboring edge')
+                    nextTriangle = self.adjacent_triangle_in_set_with_edge(
+                        nextTriangle, edgeTriangles.difference(visitedTriangles), segmentIntersections[1])
+                    if not nextTriangle:
+                        # couldnt find a satisfying neighbor (end of sequence)
+                        print('end of sequence')
+                        # finished = True
+                        break
+
+                    # print(nextTriangle)
+                    intersections, isPoint = self.check_triangle_vertex_intersections_with_value(
+                        nextTriangle, isoValue)
+                    if intersections == 0:
+                        segmentIntersections = self.get_intersected_segments(
+                            nextTriangle, isoValue, 'full')
+                        isobathSegments.append(segmentIntersections[1])
+                        visitedTriangles.add(nextTriangle)
+                    elif intersections == 1:
+                        segmentIntersections == self.get_intersected_segments(
+                            nextTriangle, isoValue, 'nextPoint')
+                        isobathSegments.append(segmentIntersections[0])
+                        visitedTriangles.add(nextTriangle)
+
+                elif len(segmentIntersections) == 1:
+                    print('finding neighboring points')
+
+                    # print(isobathSegments)
+
+                if len(edgeTriangles.difference(visitedTriangles)) == 0:
+                    print('every edge triangle visited')
+                    finished = True
+                i += 0
+                if i > 2:
+                    finished = True
+
+            isoGeom = []
+            for intersection in isobathSegments:
+                # print(intersection)
+                if len(intersection) == 1:
+                    geom = self.triangulation.get_point(intersection[0])
+                    isoGeom.append([geom[0], geom[1]])
+                else:
+                    geomOne = self.triangulation.get_point(intersection[0])
+                    geomTwo = self.triangulation.get_point(intersection[1])
+                    xOne, yOne, zOne = geomOne[0], geomOne[1], self.get_z(
+                        intersection[0], idOnly=True)
+                    xTwo, yTwo, zTwo = geomTwo[0], geomTwo[1], self.get_z(
+                        intersection[1], idOnly=True)
+                    if xOne == xTwo:
+                        x = round(xOne, 3)
+                        y = round(yOne + ((isoValue-zOne)/(zTwo-zOne)) * (yTwo-yOne), 3)
+                    else:
+                        x = round((isoValue*xTwo-isoValue*xOne-zOne*xTwo+zTwo*xOne)/(zTwo-zOne), 3)
+                        y = round((x*(yTwo-yOne)-xOne*yTwo+xTwo*yOne)/(xTwo-xOne), 3)
+                    isoGeom.append([x, y])
+
+            self.graph['edges'][edge]['geom'] = isoGeom
+        self.export_all_isobaths()
 
     def export_shapefile(self, shpName):
         self.msg('> exporting shapefiles...', 'info')
