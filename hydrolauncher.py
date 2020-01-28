@@ -134,8 +134,8 @@ if args.triangleregiongraph:
         msg('> triangle region graph already generated', 'warning')
         projectObject.print_graph()
     else:
-        projectObject.build_graph()
-    projectObject.export_all_edge_triangles()
+        projectObject.build_graph2()
+    # projectObject.export_all_edge_triangles()
     # projectObject.export_shapefile('outputting')
 
 
