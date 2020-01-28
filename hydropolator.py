@@ -54,7 +54,8 @@ class Hydropolator:
     meterSeries = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
                    15, 16, 17, 18, 19, 20, 25, 30, 35, 40, 45, 50, 100, 200]
     hdSeries = range(0, 100)
-    testingSeries = [0, 2, 4, 6, 8, 10, 12, 15, 20, 25, 30, 35, 40, 45, 50]
+    # testingSeries = [0, 2, 4, 6, 8, 10, 12, 15, 20, 25, 30, 35, 40, 45, 50]
+    testingSeries = range(0, 50, 2)
     isobathValues = []
     regions = []
     triangleRegions = []
@@ -477,13 +478,14 @@ class Hydropolator:
 
         with shapefile.Writer(triangleShpFile) as wt:
             wt.field('value', 'N')
+            wt.field('id', 'N')
             for edgeId in self.graph['edges'].keys():
                 geom = []
                 for triangle in self.get_edge_triangles(edgeId):
                     geom.append(self.poly_from_triangle(triangle))
                 wt.poly(geom)
                 isoValue = self.get_edge_value(edgeId)
-                wt.record(isoValue)
+                wt.record(isoValue, int(edgeId))
 
         self.msg('> edge triangles saved', 'info')
 
@@ -495,6 +497,7 @@ class Hydropolator:
 
         with shapefile.Writer(lineShpFile) as wt:
             wt.field('value', 'N')
+            wt.field('id', 'N')
             for edgeId in self.graph['edges'].keys():
                 # geom = [[list(value) for value in self.graph['edges'][edgeId]['geom']]]
                 geom = self.graph['edges'][edgeId]['geom']
@@ -508,7 +511,7 @@ class Hydropolator:
                 #     geom.append(self.poly_from_triangle(triangle))
                 wt.line([geom])
                 isoValue = self.graph['edges'][edgeId]['value']
-                wt.record(isoValue)
+                wt.record(isoValue, int(edgeId))
 
         self.msg('> isobaths saved', 'info')
 
@@ -625,6 +628,7 @@ class Hydropolator:
             self.graph['nodes'][str(shallowNode)]['deepNeighbors'].add(deepNode)
             self.graph['nodes'][str(deepNode)]['shallowNeighbors'].add(shallowNode)
             self.graph['edges'][edgeId]['value'] = self.get_edge_value(edgeId)
+            self.graph['edges'][edgeId]['closed'] = None
             self.nrEdges += 1
             # print('new edge: ', edgeId)
 
@@ -660,7 +664,7 @@ class Hydropolator:
         self.msg('\nEDGES', 'header')
         for edgeId in self.graph['edges'].keys():
             print('id: ', edgeId, self.graph['edges'][edgeId]['edge'],
-                  'value: ', self.graph['edges'][edgeId]['value'])
+                  'value: ', self.graph['edges'][edgeId]['value'], 'closed: ', self.graph['edges'][edgeId]['closed'])
             # print(edgeId, self.graph['edges'][edgeId])
 
         self.msg('\nREGIONS', 'header')
@@ -1497,10 +1501,11 @@ class Hydropolator:
 
         with shapefile.Writer(pointShpFile) as wp:
             wp.field('depth', 'F', decimal=4)
+            wp.field('id', 'N')
             # for point in self.triangulation.all_vertices()[1:]:
-            for point in self.vertices[1:]:  # remove the infinite vertex in startTIN
+            for i, point in enumerate(self.vertices[1:]):  # remove the infinite vertex in startTIN
                 wp.point(point[0], point[1])
-                wp.record(point[2])
+                wp.record(point[2], i)
             self.msg('> points written to shapefile', 'info')
 
         with shapefile.Writer(triangleShpFile) as wt:
@@ -1566,7 +1571,7 @@ class Hydropolator:
         for edge in edgeIds:
             self.msg('--new edge', 'header')
             isoValue = self.graph['edges'][edge]['value']
-            print('isoValue: ', isoValue, self.graph['edges'][edge]['edge'])
+            print('isoValue: ', isoValue, self.graph['edges'][edge]['edge'], edge)
 
             edgeTriangles = self.get_edge_triangles(edge)
             print('len: ', len(edgeTriangles))
@@ -1579,6 +1584,7 @@ class Hydropolator:
                 triangleMin, triangleMax = self.minmax_from_triangle(triangle)
 
                 if intersections == 3 or isPoint:
+                    print('IM A POINT')
                     continue
                 else:
                     triangleSegment = ['start', 'end']
@@ -1634,6 +1640,7 @@ class Hydropolator:
                                 elif zOne < isoValue:
                                     triangleSegment[1] = (segment[1])
                         isobathSegments.add(tuple(triangleSegment))
+                        print((triangleSegment))
 
             forwardPath = []
             backwardPath = []
@@ -1646,12 +1653,20 @@ class Hydropolator:
             i = 0
             finished = False
             while not finished:
-                i = 0
+                # i = 0
 
                 # print('==NEW LOOP==')
+                # print(len(isobathSegments))
+                # print('FPath-1: ', forwardPath[-1])
+                # print('BPath-1: ', backwardPath[-1])
+                # print('fpathfull: ', forwardPath)
+                # print('bpathfull: ', backwardPath)
                 # print('isobathSegments: ', isobathSegments)
 
                 for seg in isobathSegments.copy():
+
+                    # FPath-1:  (3162, 4261)
+                    # BPath-1:  (1820, 693)
                     # print('new seg: ', seg)
                     # print(forwardPath[-1], backwardPath[-1], seg)
                     # print(seg)
@@ -1671,7 +1686,26 @@ class Hydropolator:
                     #         # print('backward add')
                     #         backwardPath.append(seg[0])
                     #         isobathSegments.remove(seg)
+                    if type(backwardPath[-1]) == type(seg[1]) == int:
+                        if backwardPath[-1] == seg[1]:
+                            backwardPath.append(seg[0])
+                            isobathSegments.remove(seg)
+                    elif type(backwardPath[-1]) == type(seg[1]) == tuple:
+                        if len(set(backwardPath[-1]).intersection(seg[1])) == 2:
+                            backwardPath.append(seg[0])
+                            isobathSegments.remove(seg)
 
+                    elif type(forwardPath[-1]) == type(seg[0]) == int:
+                        # print('FPath: ', forwardPath[-1], 'seg: ', seg[0])
+                        if forwardPath[-1] == seg[0]:
+                            forwardPath.append(seg[1])
+                            isobathSegments.remove(seg)
+                    elif type(forwardPath[-1]) == type(seg[0]) == tuple:
+                        if len(set(forwardPath[-1]).intersection(seg[0])) == 2:
+                            forwardPath.append(seg[1])
+                            isobathSegments.remove(seg)
+
+                    '''
                     if type(seg[0]) != int and type(seg[1]) != int and type(forwardPath[-1]) != int and type(backwardPath[-1]) != int:
                         if len(set(forwardPath[-1]).intersection(seg[0])) == 2:
                             forwardPath.append(seg[1])
@@ -1688,7 +1722,7 @@ class Hydropolator:
                             # print('forward add')
                             forwardPath.append(seg[1])
                             isobathSegments.remove(seg)
-                        elif type(forwardPath[-1]) == type(seg[0]):
+                        elif type(forwardPath[-1]) == type(seg[0]) and type(seg[0]) != int:
                             if len(set(forwardPath[-1]).intersection(seg[0])) == 2:
                                 forwardPath.append(seg[1])
                                 # print('forward add')
@@ -1705,10 +1739,11 @@ class Hydropolator:
                             backwardPath.append(seg[0])
                             isobathSegments.remove(seg)
                         elif type(backwardPath[-1]) == seg[1]:
-                            if len(set(backwardPath[-1]).intersection(seg[1])) == 2:
+                            if len(set(backwardPath[-1]).intersection(seg[1])) == 2 and type(seg[1]) != int:
                                 backwardPath.append(seg[0])
                                 # print('backward add')
                                 isobathSegments.remove(seg)
+                    '''
 
                 if len(isobathSegments) == 0:
                     print(len(forwardPath), len(backwardPath))
@@ -1717,13 +1752,18 @@ class Hydropolator:
 
                     finished = True
 
-                i += 0
-                if i > 10000:
+                i += 1
+                if i > 100000:
                     self.msg('longer trigger', 'warning')
                     finished = True
 
             backwardPath.reverse()
             fullPath = backwardPath + forwardPath
+            print(fullPath[0], fullPath[-1])
+            # if min(fullPath[0]) == min(fullPath[-1]) and max(fullPath[0]) == max(fullPath[-1]):
+            #     self.graph['edges'][edge]['closed'] = True
+            # else:
+            #     self.graph['edges'][edge]['closed'] = False
             # print(fullPath)
 
             isoGeom = []
@@ -1807,10 +1847,11 @@ class Hydropolator:
         self.msg('> building triangle region graph...', 'info')
         self.msg('> splitting all triangles in regions...', 'info')
         for triangle in self.triangles:
-            intervals = self.find_intervals(triangle, indexOnly=True)
-            pseudoTriangle = tuple(self.pseudo_triangle(triangle))
-            for interval in intervals:
-                self.triangleRegionDict[str(interval)].add(pseudoTriangle)
+            if 0 not in triangle:
+                intervals = self.find_intervals(triangle, indexOnly=True)
+                pseudoTriangle = tuple(self.pseudo_triangle(triangle))
+                for interval in intervals:
+                    self.triangleRegionDict[str(interval)].add(pseudoTriangle)
         self.msg('> all triangles split in regions', 'info')
 
         self.msg('> splitting regions in touching nodes...', 'info')
@@ -1888,7 +1929,7 @@ class Hydropolator:
                     indexedTriangles.add(triangle)
                     currentNode = self.add_triangle_to_new_node(interval, triangle)
                     for neighboringTriangle in self.adjacent_triangles(triangle):
-                        if 0 not in triangle:
+                        if 0 not in neighboringTriangle:
                             neighborIntervals = self.find_intervals(neighboringTriangle)
                             if int(interval) in neighborIntervals:
                                 if neighboringTriangle not in indexedTriangles:
@@ -1912,8 +1953,8 @@ class Hydropolator:
 
         self.establish_edges()
 
-        self.print_graph()
         self.export_all_node_triangles()
         self.export_all_edge_triangles()
 
         self.generate_isobaths4()
+        self.print_graph()
