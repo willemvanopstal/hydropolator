@@ -57,7 +57,7 @@ class Hydropolator:
     hdSeries = range(0, 100)
     # testingSeries = [0, 2, 4, 6, 8, 10, 12, 15, 20, 25, 30, 35, 40, 45, 50]
     # testingSeries = [float(value/2) for value in range(0, 50, 1)]
-    testingSeries = [0, 2, 5, 8, 10, 15, 20, 28, 30, 40, 50]
+    testingSeries = [0, 2, 5, 8, 10, 15, 20, 28, 30, 35, 40, 45, 50]
     isobathValues = []
     regions = []
     triangleRegions = []
@@ -1849,11 +1849,13 @@ class Hydropolator:
             if type(fullPath[0]) == type(fullPath[-1]) == int:
                 if fullPath[0] == fullPath[-1]:
                     self.graph['edges'][edge]['closed'] = True
+                else:
+                    self.graph['edges'][edge]['closed'] = False
             elif type(fullPath[0]) == type(fullPath[-1]) == tuple:
                 if min(fullPath[0]) == min(fullPath[-1]) and max(fullPath[0]) == max(fullPath[-1]):
                     self.graph['edges'][edge]['closed'] = True
-            else:
-                self.graph['edges'][edge]['closed'] = False
+                else:
+                    self.graph['edges'][edge]['closed'] = False
 
             # if min(fullPath[0]) == min(fullPath[-1]) and max(fullPath[0]) == max(fullPath[-1]):
             #     self.graph['edges'][edge]['closed'] = True
@@ -2100,9 +2102,34 @@ class Hydropolator:
         # self.print_graph()
 
     def angularity(self, ptHead, ptMid, ptTail):
-        pass
+        dx1, dy1 = ptMid[0] - ptHead[0], ptMid[1] - ptHead[1]
+        dx2, dy2 = ptTail[0] - ptMid[0], ptTail[1] - ptMid[1]
+        inner_product = dx1*dx2 + dy1*dy2
+        len1 = math.hypot(dx1, dy1)
+        len2 = math.hypot(dx2, dy2)
+        return round(math.acos(inner_product/(len1*len2)), 4)
 
-    def check_isobath_angularity(self, edgeIds=[4, 12]):
+    def export_all_angularities(self):
+        pointShpName = 'angularities_{}.shp'.format(self.now())
+        pointShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, pointShpName)
+        # print('invalid/missing isobathsegmentsPoints file: ', pointShpFile)
+
+        with shapefile.Writer(pointShpFile) as wp:
+            wp.field('angle', 'F', decimal=4)
+            # wp.field('id', 'N')
+            # wp.field('segment', 'C')
+            # for point in self.triangulation.all_vertices()[1:]:
+            for edge in self.graph['edges'].keys():
+                # closed = self.graph['edges'][str(edge)]['closed']
+                geom = self.graph['edges'][str(edge)]['geom']
+                pointAngularities = self.graph['edges'][str(edge)]['point_angularities']
+
+                for i in range(len(pointAngularities)):
+                    point = geom[i]
+                    wp.point(point[0], point[1])
+                    wp.record(pointAngularities[i])
+
+    def check_isobath_angularity(self, edgeIds=[]):
         if not len(edgeIds):
             edgeIds = self.graph['edges'].keys()
 
@@ -2111,10 +2138,14 @@ class Hydropolator:
             geom = self.graph['edges'][str(edge)]['geom']
             self.graph['edges'][str(edge)]['point_angularities'] = []
             pointAngularities = self.graph['edges'][str(edge)]['point_angularities']
-            print(geom)
-            print('edge: ', edge)
+            # print(geom)
+            # print('edge: ', edge)
 
             if closed:
-                print('0', geom[-2], geom[0], geom[1])
+                # print('0', geom[-2], geom[0], geom[1])
+                pointAngularities.append(self.angularity(geom[-2], geom[0], geom[1]))
             for i in range(1, len(geom)-1):
-                print(i, geom[i-1], geom[i], geom[i+1])
+                # print(i, geom[i-1], geom[i], geom[i+1])
+                pointAngularities.append(self.angularity(geom[i-1], geom[i], geom[i+1]))
+
+            # print(pointAngularities)

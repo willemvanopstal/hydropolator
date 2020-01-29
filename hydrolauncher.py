@@ -158,10 +158,12 @@ if args.angularity:
     msg('> checking angularity in isobaths...', 'info')
     projectObject.check_isobath_angularity()
     msg('> checked angulariy in isobaths', 'info')
+    projectObject.export_all_angularities()
 
 if projectObject:
-    # projectObject.print_graph()
+    projectObject.print_graph()
     projectObject.print_errors()
+
     msg('\n> shutting down...', 'header')
     projectObject.write_metafile()
     if projectObject.vertexCount:
