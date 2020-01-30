@@ -58,8 +58,9 @@ class Hydropolator:
                    15, 16, 17, 18, 19, 20, 25, 30, 35, 40, 45, 50, 100, 200]
     hdSeries = range(0, 100)
     # testingSeries = [0, 2, 4, 6, 8, 10, 12, 15, 20, 25, 30, 35, 40, 45, 50]
-    # testingSeries = [float(value/2) for value in range(0, 50, 1)]
+    # testingSeries = [float(value/2) for value in range(0, 100, 1)]
     testingSeries = [0, 2, 5, 8, 10, 15, 20, 28, 30, 35, 40, 45, 50]
+    # testingSeries = [0, 5, 10, 15, 20, 25, 50]
     isobathValues = []
     regions = []
     triangleRegions = []
@@ -491,7 +492,7 @@ class Hydropolator:
         print('edge triangles file: ', triangleShpFile)
 
         with shapefile.Writer(triangleShpFile) as wt:
-            wt.field('value', 'N')
+            wt.field('value', 'F', decimal=4)
             wt.field('id', 'N')
             for edgeId in self.graph['edges'].keys():
                 geom = []
@@ -510,7 +511,7 @@ class Hydropolator:
         print('isobaths file: ', lineShpFile)
 
         with shapefile.Writer(lineShpFile) as wt:
-            wt.field('value', 'N')
+            wt.field('value', 'F', decimal=4)
             wt.field('id', 'N')
             for edgeId in self.graph['edges'].keys():
                 # geom = [[list(value) for value in self.graph['edges'][edgeId]['geom']]]
@@ -580,7 +581,7 @@ class Hydropolator:
         #     tuple(self.pseudo_triangle(triangle))}, 'edges': set()}
         nodeId = str(self.nrNodes)
         self.graph['nodes'][nodeId] = {'region': interval, 'triangles': {tuple(self.pseudo_triangle(
-            triangle))}, 'deepNeighbors': set(), 'shallowNeighbors': set(), 'currentQueue': set(), 'shallowQueue': set(), 'deepQueue': set()}
+            triangle))}, 'deepNeighbors': set(), 'shallowNeighbors': set(), 'currentQueue': set(), 'shallowQueue': set(), 'deepQueue': set(), 'classification': None}
         self.nrNodes += 1
         # print('new node: ', nodeId)
 
@@ -882,21 +883,35 @@ class Hydropolator:
 
         nodelabels = {}
         colorLabels = []
+        edgeColors = []
         for node in G.nodes():
             regionInterval = self.regions[int(self.graph['nodes'][node]['region'])]
             label = '{}-{}\n{}'.format(regionInterval[0], regionInterval[1], node)
             color = cmap(norm(int(self.graph['nodes'][node]['region'])))
-            print(node, regionInterval, color)
-            color = [float(value) for value in color]
+
+            # print(self.graph['nodes'][node]['classification'])
+
+            if self.graph['nodes'][node]['classification'] == 'peak':
+                edgeColors.append('red')
+            elif self.graph['nodes'][node]['classification'] == 'pit':
+                edgeColors.append('blue')
+            else:
+                edgeColors.append(color)
+
             colorLabels.append(color)
             nodelabels[node] = label
 
         pos = nx.kamada_kawai_layout(G)
-        nx.draw(G, pos, node_color=colorLabels, font_size=16, with_labels=False)
+        nx.draw(G, pos, node_color=colorLabels, edgecolors=edgeColors,
+                font_size=16, with_labels=False)
         # for p in pos:  # raise text positions
         #     pos[p][1] += 0.07
         nx.draw_networkx_labels(G, pos, nodelabels, font_size=6)
-        plt.show()
+        # plt.show()
+
+        regionGraphName = 'regiongraph_{}.pdf'.format(self.now())
+        regionGraphFile = os.path.join(os.getcwd(), 'projects', self.projectName, regionGraphName)
+        plt.savefig(regionGraphFile)
 
     def check_unfinished(self, nodeId):
         if len(self.get_queue(nodeId, 'deep')):
@@ -1955,6 +1970,97 @@ class Hydropolator:
 
         self.msg('> edges established', 'info')
 
+    def classify_nodes(self):
+        classifiedNodes = set()
+        peakQueue = set()
+        pitQueue = set()
+        nrNodes = len(self.graph['nodes'].keys())
+
+        for nodeId in self.graph['nodes'].keys():
+            node = self.graph['nodes'][nodeId]
+            # print(len(node['shallowNeighbors']))
+            if len(node['shallowNeighbors']) == 0:
+                node['classification'] = 'peak'
+                peakQueue.add(nodeId)
+                classifiedNodes.add(nodeId)
+            elif len(node['deepNeighbors']) == 0:
+                node['classification'] = 'pit'
+                pitQueue.add(nodeId)
+                classifiedNodes.add(nodeId)
+
+        finished = True
+        i = 0
+        while not finished:
+            print('============\npQ: ', peakQueue, pitQueue)
+
+            for nodeId in peakQueue.copy():
+                print('nodeId: ', nodeId)
+                for deeperNodeId in self.graph['nodes'][nodeId]['deepNeighbors']:
+                    print('deeperNode: ', deeperNodeId)
+                    deeperNode = self.graph['nodes'][deeperNodeId]
+                    if len(deeperNode['shallowNeighbors'].difference({nodeId})) == 0:
+                        print('only neighboring, im also a peak')
+                        deeperNode['classification'] = 'peak'
+                        peakQueue.add(deeperNodeId)
+                        classifiedNodes.add(deeperNodeId)
+                        peakQueue.remove(nodeId)
+                    else:
+                        print('not the only neighbor')
+                        peakTracker = True
+                        for shallowerNodeId in deeperNode['shallowNeighbors']:
+                            if self.graph['nodes'][shallowerNodeId]['classification'] != 'peak':
+                                peakTracker = False
+                        if len(self.graph['nodes'][deeperNodeId]['deepNeighbors']) > 1:
+                            peakTracker = False
+                        # for deeperNeighborId in self.graph['nodes'][deeperNodeId]['deepNeighbors']:
+                        #     if self.graph['nodes'][deeperNeighborId]['classification'] == 'pit':
+                        #         peakTracker = False
+
+                        if peakTracker:
+                            deeperNode['classification'] = 'peak'
+                            peakQueue.add(deeperNodeId)
+                            classifiedNodes.add(deeperNodeId)
+                            peakQueue.remove(nodeId)
+
+            for nodeId in pitQueue.copy():
+                print('nodeId: ', nodeId)
+                for shallowerNodeId in self.graph['nodes'][nodeId]['shallowNeighbors']:
+                    print('shallowerNode: ', shallowerNodeId)
+                    shallowerNode = self.graph['nodes'][shallowerNodeId]
+                    if len(shallowerNode['deepNeighbors'].difference({nodeId})) == 0:
+                        print('only neighboring, im also a peak')
+                        shallowerNode['classification'] = 'pit'
+                        pitQueue.add(shallowerNodeId)
+                        classifiedNodes.add(shallowerNodeId)
+                        pitQueue.remove(nodeId)
+                    else:
+                        print('not the only neighbor')
+                        pitTracker = True
+                        for deeperNodeId in shallowerNode['deepNeighbors']:
+                            if self.graph['nodes'][deeperNodeId]['classification'] != 'pit':
+                                pitTracker = False
+                        # for shallowerNeighborId in self.graph['nodes'][shallowerNodeId]['shallowNeighbors']:
+                        #     if self.graph['nodes'][shallowerNeighborId]['classification'] == 'peak':
+                        #         pitTracker = False
+                        if len(self.graph['nodes'][shallowerNodeId]['shallowNeighbors']) > 1:
+                            pitTracker = False
+                        if pitTracker:
+                            shallowerNode['classification'] = 'pit'
+                            peakQueue.add(shallowerNodeId)
+                            classifiedNodes.add(shallowerNodeId)
+                            pitQueue.remove(nodeId)
+
+                    # elif len(deeperNode['shallowNeighbors'].difference(peakQueue)) == 0:
+                    #     deeperNode['classification'] = 'peak'
+                    #     peakQueue.add(deeperNodeId)
+                    #     classifiedNodes.add(deeperNodeId)
+                # peakQueue.remove(nodeId)
+
+            i += 1
+            if len(peakQueue) == 0 or len(pitQueue) == 0 or i > 20:
+                finished = True
+                print(peakQueue)
+
     def build_graph2(self):
         self.msg('> building triangle region graph...', 'info')
         self.msg('> splitting all triangles in regions...', 'info')
@@ -2109,6 +2215,8 @@ class Hydropolator:
         self.msg('> all regions split in adjacent triangles', 'info')
 
         self.establish_edges()
+
+        self.classify_nodes()
 
         self.msg('> triangle region graph created', 'info')
         # self.export_all_node_triangles()
