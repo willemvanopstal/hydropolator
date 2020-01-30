@@ -1,5 +1,7 @@
+
 import math
 import networkx as nx
+from matplotlib import cm, colors
 import matplotlib.pyplot as plt
 from ElevationDict import ElevationDict
 from PointInTriangle import point_in_triangle
@@ -871,16 +873,29 @@ class Hydropolator:
 
     def make_network_graph(self):
         G = nx.Graph()
-        for node in self.graph['nodes'].keys():
-            G.add_node(node)
         for edge in self.graph['edges'].keys():
-            G.add_edge(self.graph['edges'][edge]['edge'][0], self.graph['edges'][edge]['edge'][1])
+            edgingNodes = self.graph['edges'][edge]['edge']
+            G.add_edge(edgingNodes[0], edgingNodes[1])
 
-        V = nx.petersen_graph()
-        # plt.subplot(121)
-        nx.draw(V, with_labels=True, font_weight='bold')
-        # plt.subplot(122)
-        # nx.draw_shell(V, n)
+        cmap = cm.get_cmap('Spectral')
+        norm = colors.Normalize(vmin=0, vmax=len(self.regions))
+
+        nodelabels = {}
+        colorLabels = []
+        for node in G.nodes():
+            regionInterval = self.regions[int(self.graph['nodes'][node]['region'])]
+            label = '{}-{}\n{}'.format(regionInterval[0], regionInterval[1], node)
+            color = cmap(norm(int(self.graph['nodes'][node]['region'])))
+            print(node, regionInterval, color)
+            color = [float(value) for value in color]
+            colorLabels.append(color)
+            nodelabels[node] = label
+
+        pos = nx.kamada_kawai_layout(G)
+        nx.draw(G, pos, node_color=colorLabels, font_size=16, with_labels=False)
+        # for p in pos:  # raise text positions
+        #     pos[p][1] += 0.07
+        nx.draw_networkx_labels(G, pos, nodelabels, font_size=6)
         plt.show()
 
     def check_unfinished(self, nodeId):

@@ -80,6 +80,11 @@ parser.add_argument('-isobaths',
                     type=str,
                     default=False,
                     help='creates isobaths')
+parser.add_argument('-graph',
+                    metavar=' ',
+                    type=str,
+                    default=False,
+                    help='visualize graph')
 
 parser.add_argument('-angularity',
                     metavar=' ',
@@ -142,8 +147,6 @@ if args.triangleregiongraph:
     else:
         projectObject.build_graph2()
 
-    projectObject.export_all_edge_triangles()
-    projectObject.export_all_node_triangles()
     # projectObject.export_shapefile('outputting')
 
 
@@ -160,7 +163,14 @@ if args.angularity:
     msg('> checked angulariy in isobaths', 'info')
     projectObject.export_all_angularities()
 
+if args.graph:
+    msg('> visualizing graph...', 'info')
+    projectObject.make_network_graph()
+    msg('> visualized graph', 'info')
+
 if projectObject:
+    projectObject.export_all_edge_triangles()
+    projectObject.export_all_node_triangles()
     projectObject.print_graph()
     projectObject.print_errors()
 
