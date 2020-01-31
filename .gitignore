@@ -2,13 +2,16 @@
 .DS_store
 
 # Ignore folders
-node_modules
 __pycache__
 projects
 
-# Ignore all files of type
-default_db
-notes
+# Ignore test files
+experiments_startin.py
+experiments.py
+PointInTriangle.py
+TriangleRegionGraph.py
+
+# Ignore file types
 *.txt
 *.cpg
 *.dbf

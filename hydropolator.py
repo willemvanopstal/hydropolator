@@ -4,23 +4,18 @@ import networkx as nx
 from matplotlib import cm, colors
 import matplotlib.pyplot as plt
 from ElevationDict import ElevationDict
-from PointInTriangle import point_in_triangle
+# from PointInTriangle import point_in_triangle
 import os
 from datetime import datetime
 import shapefile
 import bisect
 import startin
 import pickle
-from shapely import geometry, ops
+# from shapely import geometry, ops
 import colorama
 colorama.init()
 
 # from TriangleRegionGraph import TriangleRegionGraph
-
-# from CGAL.CGAL_Kernel import Point_2, Point_3
-# from CGAL.CGAL_Triangulation_2 import Triangulation_2, Delaunay_triangulation_2
-# from CGAL.CGAL_Triangulation_2 import Triangulation_2_Vertex_circulator
-# from CGAL.CGAL_Triangulation_2 import Triangulation_2_Vertex_handle
 
 
 class Hydropolator:
@@ -76,79 +71,20 @@ class Hydropolator:
     def __init__(self):
         return
 
-    def load_pointfile(self, pointFile, fileType, delimiter, flip=False):
-        pointFilePath = os.path.normpath(os.path.join(os.getcwd(), pointFile))
-        print(pointFilePath)
-
-        if fileType == 'csv':
-            with open(pointFile) as fi:
-                for line in fi.readlines():
-                    point = line.split(delimiter)
-                    if flip:
-                        point = [float(point[0]), float(point[1]), round(-1*float(point[2])+18, 4)]
-                    elif not flip:
-                        point = [float(point[0]), float(point[1]), round(float(point[2])+18, 4)]
-
-                    # if point[0] < 238 or point[0] > 380:
-                    #     continue
-                    # if point[1] < 110 or point[1] > 193:
-                    #     continue
-
-                    self.check_minmax(point)
-                    self.pointQueue.append(point)
-                    self.pointCount += 1
-
-        elif fileType == 'shapefile':
-            print('> ShapeFile not supported yet.')
-
-        self.triangulation_insert()
-
-        self.modifiedDate = self.now()
-        self.write_metafile()
-
-    def triangulation_insert(self):
-        prevVertexCount = self.triangulation.number_of_vertices()
-        self.triangulation.insert(self.pointQueue)
-        # print('pqueue: ', len(self.pointQueue))
-        # print('nrvertices: ', self.triangulation.number_of_vertices())
-        # print('metaVertexCount: ', prevVertexCount)
-        # print('triangulated inserts: ', self.triangulation.number_of_vertices() - self.vertexCount)
-        self.insertions.append(self.triangulation.number_of_vertices() - prevVertexCount)
-        self.vertexCount = self.triangulation.number_of_vertices()
-        self.vertices = self.triangulation.all_vertices()
-        self.triangles = self.triangulation.all_triangles()
-
-        for vertex in self.vertices:
-            # self.vertexDict[tuple(vertex)] = {'z': vertex[2]}
-            self.vertexDict.add_new(vertex)
-
-        self.pointQueue = []
-        print('new insertionslist: ', self.insertions)
-
-    def check_minmax(self, pointTuple):
-        if pointTuple[0] > self.xMax:
-            self.xMax = pointTuple[0]
-        if pointTuple[0] < self.xMin:
-            self.xMin = pointTuple[0]
-        if pointTuple[1] > self.yMax:
-            self.yMax = pointTuple[1]
-        if pointTuple[1] < self.yMin:
-            self.yMin = pointTuple[1]
-        if pointTuple[2] > self.zMax:
-            self.zMax = pointTuple[2]
-        if pointTuple[2] < self.zMin:
-            self.zMin = pointTuple[2]
-
-    def bounds(self):
-        return [self.xMin, self.xMax, self.yMin, self.yMax, self.zMin, self.zMax]
-
-    def parse_bounds(self, boundsString):
-        boundsList = boundsString.strip().strip('[').strip(']').split(',')
-        boundsListFloat = [float(value) for value in boundsList]
-        return boundsListFloat
+    # ====================================== #
+    #
+    #   Miscellaneous
+    #
+    # ====================================== #
 
     def now(self):
         return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # ====================================== #
+    #
+    #   Messaging / Notifications
+    #
+    # ====================================== #
 
     def msg(self, string, type):
         if type == 'warning':
@@ -168,12 +104,116 @@ class Hydropolator:
             for i, error in enumerate(self.errors):
                 print(i, error)
         else:
-            self.msg('no errors produced', 'info')
+            self.msg('No errors produced', 'info')
+
+    def summarize_project(self):
+        self.msg('> project summary', 'header')
+        print('initialisation: {}'.format(self.initDate))
+        print('modified: {}'.format(self.modifiedDate))
+        print('pointCount: {}'.format(self.pointCount))
+        print('bounds: {}'.format(self.bounds()))
+        print('vertices: {}'.format(self.vertexCount))
+        print('isoType: {}'.format(self.isoType))
+
+    def print_graph(self):
+        self.msg('\n======GRAPH======', 'header')
+        self.msg('NODES', 'header')
+        # print('\n======GRAPH======\nNODES')
+        for nodeId in self.graph['nodes'].keys():
+            # print(nodeId, self.graph['nodes'][nodeId])
+            print('id: ', nodeId, 'interval: ', self.graph['nodes'][nodeId]['region'], 'triangles: ', len(self.graph['nodes'][nodeId]['triangles']), 'deepNeighbors: ', (self.graph['nodes'][nodeId]['deepNeighbors']), 'shallowNeighbors: ', (self.graph['nodes'][nodeId]['shallowNeighbors']), '\ncurrent: ',
+                  len(self.graph['nodes'][nodeId]['currentQueue']), 'deep: ', len(
+                      self.graph['nodes'][nodeId]['deepQueue']), 'shallow: ', len(self.graph['nodes'][nodeId]['shallowQueue']))
+        self.msg('\nEDGES', 'header')
+        for edgeId in self.graph['edges'].keys():
+            print('id: ', edgeId, self.graph['edges'][edgeId]['edge'],
+                  'value: ', self.graph['edges'][edgeId]['value'], 'closed: ', self.graph['edges'][edgeId]['closed'])
+            # print(edgeId, self.graph['edges'][edgeId])
+
+        self.msg('\nREGIONS', 'header')
+        for region in self.regionNodes.keys():
+            print(region, self.regionNodes[region])
+
+    def make_network_graph(self):
+        G = nx.Graph()
+        for edge in self.graph['edges'].keys():
+            edgingNodes = self.graph['edges'][edge]['edge']
+            G.add_edge(edgingNodes[0], edgingNodes[1])
+
+        cmap = cm.get_cmap('Spectral')
+        norm = colors.Normalize(vmin=0, vmax=len(self.regions))
+
+        nodelabels = {}
+        colorLabels = []
+        edgeColors = []
+        for node in G.nodes():
+            regionInterval = self.regions[int(self.graph['nodes'][node]['region'])]
+            label = '{}-{}\n{}'.format(regionInterval[0], regionInterval[1], node)
+            color = cmap(norm(int(self.graph['nodes'][node]['region'])))
+
+            # print(self.graph['nodes'][node]['classification'])
+
+            if self.graph['nodes'][node]['classification'] == 'peak':
+                edgeColors.append('red')
+            elif self.graph['nodes'][node]['classification'] == 'pit':
+                edgeColors.append('blue')
+            else:
+                edgeColors.append(color)
+
+            colorLabels.append(color)
+            nodelabels[node] = label
+
+        pos = nx.kamada_kawai_layout(G)
+        nx.draw(G, pos, node_color=colorLabels, edgecolors=edgeColors,
+                font_size=16, with_labels=False)
+        # for p in pos:  # raise text positions
+        #     pos[p][1] += 0.07
+        nx.draw_networkx_labels(G, pos, nodelabels, font_size=6)
+        # plt.show()
+
+        regionGraphName = 'regiongraph_{}.pdf'.format(self.now())
+        regionGraphFile = os.path.join(os.getcwd(), 'projects', self.projectName, regionGraphName)
+        plt.savefig(regionGraphFile)
+
+    # ====================================== #
+    #
+    #   Project Management
+    #
+    # ====================================== #
+
+    def init_project(self, projectName):
+        cwd = os.getcwd()
+        projectDir = os.path.join(cwd, 'projects', projectName)
+        print('project directory: ', projectDir)
+
+        if not os.path.exists(projectDir):
+            os.mkdir(projectDir)
+            self.projectName = projectName
+            self.initDate = self.now()
+            self.modifiedDate = self.now()
+            # self.write_metafile()
+            return '> new project created'
+        else:
+            return '> project already exists, choose another name or load the project with -project'
+
+    def load_project(self, projectName):
+        cwd = os.getcwd()
+        projectDir = os.path.join(cwd, 'projects', projectName)
+        print('project directory: ', projectDir)
+
+        if os.path.exists(projectDir):
+            self.projectName = projectName
+            self.load_metafile()
+            self.generate_regions()
+            self.load_triangulation()
+            # self.load_trGraph()
+            return True
+        else:
+            print('> project does not exist, load another or initialise a new project with -init')
 
     def write_metafile(self):
         self.msg('> writing metafile...', 'info')
         metaFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'metafile')
-        # self.triangulation.write_to_file(triFile)
         with open(metaFile, 'w') as mf:
             mf.write('projectName\t{}\n'.format(self.projectName))
             mf.write('initialisation\t{}\n'.format(self.initDate))
@@ -189,8 +229,6 @@ class Hydropolator:
     def load_metafile(self):
         self.msg('> loading metafile...', 'info')
         metaFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'metafile')
-        triFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'triangulationObject')
-        # self.triangulation.read_from_file(triFile)
         with open(metaFile) as mf:
             for line in mf.readlines():
                 if line.split('\t')[0] == 'initialisation':
@@ -240,7 +278,6 @@ class Hydropolator:
 
         with open(triFile, 'w') as tf:
             for vertex in self.vertices[1:]:
-                # print(vertex)
                 tf.write('{};{};{}\n'.format(vertex[0], vertex[1], vertex[2]))
         with open(trackerFile, 'w') as trf:
             trf.write('totalVertices\t{}\n'.format(self.vertexCount))
@@ -267,10 +304,8 @@ class Hydropolator:
         with open(triFile) as tf:
             insertionTracker = 0
             for insertion in tempInsertions:
-                # print('insertion: ', insertion)
                 for line in tf.readlines()[insertionTracker:insertion]:
                     point = [float(value) for value in line.split(';')]
-                    # print(point)
                     self.pointQueue.append(point)
                 self.triangulation_insert()
                 insertionTracker = insertion
@@ -279,52 +314,223 @@ class Hydropolator:
             self.vertexDict = pickle.load(ef)
         self.msg('> triangulation loaded', 'info')
 
-    def init_project(self, projectName):
-        cwd = os.getcwd()
-        projectDir = os.path.join(cwd, 'projects', projectName)
-        print('project directory: ', projectDir)
+    def bounds(self):
+        return [self.xMin, self.xMax, self.yMin, self.yMax, self.zMin, self.zMax]
 
-        if not os.path.exists(projectDir):
-            os.mkdir(projectDir)
-            self.projectName = projectName
-            self.initDate = self.now()
-            self.modifiedDate = self.now()
-            # self.write_metafile()
-            return '> new project created'
-        else:
-            return '> project already exists, choose another name or load the project with -project'
+    def parse_bounds(self, boundsString):
+        boundsList = boundsString.strip().strip('[').strip(']').split(',')
+        boundsListFloat = [float(value) for value in boundsList]
+        return boundsListFloat
 
-    def load_project(self, projectName):
-        cwd = os.getcwd()
-        projectDir = os.path.join(cwd, 'projects', projectName)
-        print('project directory: ', projectDir)
+    # ====================================== #
+    #
+    #   Exporting
+    #
+    # ====================================== #
 
-        if os.path.exists(projectDir):
-            self.projectName = projectName
-            self.load_metafile()
-            self.generate_regions()
-            self.load_triangulation()
-            # self.load_trGraph()
-            return True
-        else:
-            print('> project does not exist, load another or initialise a new project with -init')
+    def export_shapefile(self, shpName):
+        self.msg('> exporting shapefiles...', 'info')
+        pointShpName = 'points_{}_{}.shp'.format(shpName, self.now())
+        triangleShpName = 'triangles_{}_{}.shp'.format(shpName, self.now())
+        pointShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, pointShpName)
+        triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
+        print('triangles file: ', triangleShpFile)
+        print('points file: ', pointShpFile)
 
-    def summarize_project(self):
-        self.msg('> project summary', 'header')
-        print('initialisation: {}'.format(self.initDate))
-        print('modified: {}'.format(self.modifiedDate))
-        print('pointCount: {}'.format(self.pointCount))
-        print('bounds: {}'.format(self.bounds()))
-        print('vertices: {}'.format(self.vertexCount))
-        print('isoType: {}'.format(self.isoType))
+        with shapefile.Writer(pointShpFile) as wp:
+            wp.field('depth', 'F', decimal=4)
+            wp.field('id', 'N')
+            # for point in self.triangulation.all_vertices()[1:]:
+            for i, point in enumerate(self.vertices[1:]):  # remove the infinite vertex in startTIN
+                wp.point(point[0], point[1])
+                wp.record(point[2], i)
+            self.msg('> points written to shapefile', 'info')
 
-    def get_z(self, vertex, idOnly=False):
-        # return self.vertexDict[tuple(vertex)]['z']
-        if not idOnly:
-            return self.vertexDict.get_z(vertex)
-        else:
-            parsedVertex = self.triangulation.get_point(vertex)
-            return self.vertexDict.get_z(parsedVertex)
+        with shapefile.Writer(triangleShpFile) as wt:
+            wt.field('min_depth', 'F', decimal=4)
+            wt.field('max_depth', 'F', decimal=4)
+            wt.field('avg_depth', 'F', decimal=4)
+            for triangle in self.triangles:
+                geom, min, max, avg = self.polystats_from_triangle(triangle)
+                # wt.poly(self.poly_from_triangle(triangle))
+                # min, max, avg = 10, 10, 10  # self.minmaxavg_from_triangle(triangle)
+                wt.poly([geom])
+                wt.record(min, max, avg)
+            self.msg('> triangles written to shapefile', 'info')
+
+    def export_region_triangles(self):
+        self.msg('> exporting region triangles...', 'info')
+        triangleShpName = 'region_triangles_{}.shp'.format(self.now())
+        triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
+        print('region triangles file: ', triangleShpFile)
+
+        with shapefile.Writer(triangleShpFile) as wt:
+            wt.field('region', 'N')
+            for i, region in enumerate(self.triangleRegions):
+                if len(region):
+                    geom = []
+                    for triangle in region:
+                        geom.append(self.poly_from_triangle(triangle))
+                    wt.poly(geom)
+                    wt.record(i)
+
+        self.msg('> region triangles saved to file', 'info')
+
+    def export_all_node_triangles(self):
+        self.msg('> saving all node triangles...', 'info')
+        nodeList = []
+        for node in self.graph['nodes'].keys():
+            nodeList.append(node)
+        self.export_node_triangles(nodeList)
+        self.msg('> all node triangles saved', 'info')
+
+    def export_node_triangles(self, nodeIds):
+        self.msg('> saving selected region triangles...', 'info')
+        triangleShpName = 'node_triangles_{}.shp'.format(self.now())
+        triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
+        print('selected node triangles file: ', triangleShpFile)
+
+        with shapefile.Writer(triangleShpFile) as wt:
+            wt.field('node', 'N')
+            wt.field('region', 'N')
+            wt.field('interval', 'C')
+            wt.field('shallowNbs', 'C')
+            wt.field('deepNbs', 'C')
+            for node in nodeIds:
+                geom = []
+                for triangle in self.graph['nodes'][node]['triangles']:
+                    geom.append(self.poly_from_triangle(list(triangle)))
+
+                region = self.get_interval_from_node(node)
+                interval = str(self.regions[region])
+                shallowNeighbors = str(self.get_neighboring_nodes(node, 'shallow'))
+                deepNeighbors = str(self.get_neighboring_nodes(node, 'deep'))
+
+                wt.poly(geom)
+                wt.record(int(node), region, interval, shallowNeighbors, deepNeighbors)
+
+        self.msg('> selected node triangles saved', 'info')
+
+    def export_all_edge_triangles(self):
+        self.msg('> saving all edge triangles...', 'info')
+        triangleShpName = 'edge_triangles_{}.shp'.format(self.now())
+        triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
+        print('edge triangles file: ', triangleShpFile)
+
+        with shapefile.Writer(triangleShpFile) as wt:
+            wt.field('value', 'F', decimal=4)
+            wt.field('id', 'N')
+            for edgeId in self.graph['edges'].keys():
+                geom = []
+                for triangle in self.get_edge_triangles(edgeId):
+                    geom.append(self.poly_from_triangle(triangle))
+                wt.poly(geom)
+                isoValue = self.get_edge_value(edgeId)
+                wt.record(isoValue, int(edgeId))
+
+        self.msg('> edge triangles saved', 'info')
+
+    def export_all_isobaths(self):
+        self.msg('> saving all isobaths...', 'info')
+        lineShpName = 'isobaths_{}.shp'.format(self.now())
+        lineShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, lineShpName)
+        print('isobaths file: ', lineShpFile)
+
+        with shapefile.Writer(lineShpFile) as wt:
+            wt.field('value', 'F', decimal=4)
+            wt.field('id', 'N')
+            for edgeId in self.graph['edges'].keys():
+                # geom = [[list(value) for value in self.graph['edges'][edgeId]['geom']]]
+                geom = self.graph['edges'][edgeId]['geom']
+                # print(geom)
+                # geom = []
+                # print(self.graph['edges'][edgeId]['geom'])
+                # for coords in self.graph['edges'][edgeId]['geom'].coords:
+                #     # print(coords)
+                #     geom.append(list(coords))
+                # for triangle in self.get_edge_triangles(edgeId):
+                #     geom.append(self.poly_from_triangle(triangle))
+                wt.line([geom])
+                isoValue = self.graph['edges'][edgeId]['value']
+                wt.record(isoValue, int(edgeId))
+
+        self.msg('> isobaths saved', 'info')
+
+    def export_all_angularities(self):
+        pointShpName = 'angularities_{}.shp'.format(self.now())
+        pointShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, pointShpName)
+        # print('invalid/missing isobathsegmentsPoints file: ', pointShpFile)
+
+        with shapefile.Writer(pointShpFile) as wp:
+            wp.field('angle', 'F', decimal=4)
+            # wp.field('id', 'N')
+            # wp.field('segment', 'C')
+            # for point in self.triangulation.all_vertices()[1:]:
+            for edge in self.graph['edges'].keys():
+                # closed = self.graph['edges'][str(edge)]['closed']
+                geom = self.graph['edges'][str(edge)]['geom']
+                pointAngularities = self.graph['edges'][str(edge)]['point_angularities']
+
+                for i in range(len(pointAngularities)):
+                    point = geom[i]
+                    wp.point(point[0], point[1])
+                    wp.record(pointAngularities[i])
+
+    # ====================================== #
+    #
+    #   Point Functions
+    #
+    # ====================================== #
+
+    def load_pointfile(self, pointFile, fileType, delimiter, flip=False):
+        pointFilePath = os.path.normpath(os.path.join(os.getcwd(), pointFile))
+        print(pointFilePath)
+
+        if fileType == 'csv':
+            with open(pointFile) as fi:
+                for line in fi.readlines():
+                    point = line.split(delimiter)
+                    if flip:
+                        point = [float(point[0]), float(point[1]), round(-1*float(point[2])+18, 4)]
+                    elif not flip:
+                        point = [float(point[0]), float(point[1]), round(float(point[2])+18, 4)]
+
+                    # if point[0] < 238 or point[0] > 380:
+                    #     continue
+                    # if point[1] < 110 or point[1] > 193:
+                    #     continue
+
+                    self.check_minmax(point)
+                    self.pointQueue.append(point)
+                    self.pointCount += 1
+
+        elif fileType == 'shapefile':
+            print('> ShapeFile not supported yet.')
+
+        self.triangulation_insert()
+
+        self.modifiedDate = self.now()
+        self.write_metafile()
+
+    def check_minmax(self, pointTuple):
+        if pointTuple[0] > self.xMax:
+            self.xMax = pointTuple[0]
+        if pointTuple[0] < self.xMin:
+            self.xMin = pointTuple[0]
+        if pointTuple[1] > self.yMax:
+            self.yMax = pointTuple[1]
+        if pointTuple[1] < self.yMin:
+            self.yMin = pointTuple[1]
+        if pointTuple[2] > self.zMax:
+            self.zMax = pointTuple[2]
+        if pointTuple[2] < self.zMin:
+            self.zMin = pointTuple[2]
+
+    # ====================================== #
+    #
+    #   Triangle Functions
+    #
+    # ====================================== #
 
     def poly_from_triangle(self, vertex_list):
         # vertices = self.triangulation.all_vertices()
@@ -372,23 +578,65 @@ class Hydropolator:
             # print(vertex[2], self.vertexDict[tuple(vertex)]['z'])
         return min(elevations), max(elevations)
 
-    def adjacent_triangles_in_set(self, triangle, lookupSet):
-        adjacentTriangles = []
-        addedVertices = []
-        for vId in triangle:
-            if len(addedVertices) == 3:
-                break
+    def find_intervals(self, triangle, indexOnly=True):
+        min, max = self.minmax_from_triangle(triangle)
+        intervals = []
+        for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_left(self.isobathValues, max) + 1):
+            if indexOnly:
+                intervals.append(index)
             else:
-                for incidentTriangle in self.triangulation.incident_triangles_to_vertex(vId):
-                    if len(set(triangle).intersection(incidentTriangle)) == 2 and set(incidentTriangle).difference(triangle) not in addedVertices:
-                        if tuple(self.pseudo_triangle(incidentTriangle)) in lookupSet:
-                            adjacentTriangles.append(self.pseudo_triangle(incidentTriangle))
-                            addedVertices.append(set(incidentTriangle).difference(triangle))
+                intervals.append(self.regions[index])
+        if indexOnly:
+            return intervals
+        else:
+            return intervals
 
-        return adjacentTriangles
+    def pseudo_triangle(self, triangle):
+        # rotates the triangle_list so the smallest index is in front
+        # so we can easily compare and not store duplicates
+        n = triangle.index(min(triangle))
+        if not n:
+            return triangle
+        else:
+            return triangle[n:] + triangle[:n]
 
-    def locate_point_in_set(self, point, lookupSet):
-        print(self.pseudo_triangle(self.triangulation.locate(point[0], point[1])))
+    # ====================================== #
+    #
+    #   Vertex Functions
+    #
+    # ====================================== #
+
+    def get_z(self, vertex, idOnly=False):
+        # return self.vertexDict[tuple(vertex)]['z']
+        if not idOnly:
+            return self.vertexDict.get_z(vertex)
+        else:
+            parsedVertex = self.triangulation.get_point(vertex)
+            return self.vertexDict.get_z(parsedVertex)
+
+    # ====================================== #
+    #
+    #   Triangulation
+    #
+    # ====================================== #
+
+    def triangulation_insert(self):
+        prevVertexCount = self.triangulation.number_of_vertices()
+        self.triangulation.insert(self.pointQueue)
+        # print('pqueue: ', len(self.pointQueue))
+        # print('nrvertices: ', self.triangulation.number_of_vertices())
+        # print('metaVertexCount: ', prevVertexCount)
+        # print('triangulated inserts: ', self.triangulation.number_of_vertices() - self.vertexCount)
+        self.insertions.append(self.triangulation.number_of_vertices() - prevVertexCount)
+        self.vertexCount = self.triangulation.number_of_vertices()
+        self.vertices = self.triangulation.all_vertices()
+        self.triangles = self.triangulation.all_triangles()
+
+        for vertex in self.vertices:
+            self.vertexDict.add_new(vertex)
+
+        self.pointQueue = []
+        print('new insertionslist: ', self.insertions)
 
     def adjacent_triangles(self, triangle):
         adjacentTriangles = []
@@ -403,6 +651,16 @@ class Hydropolator:
                         addedVertices.append(set(incidentTriangle).difference(triangle))
 
         return adjacentTriangles
+
+    # ====================================== #
+    #
+    #   Triangle Region Graph
+    #
+    # ====================================== #
+
+    # --------------- #
+    #   CREATION
+    # --------------- #
 
     def generate_regions(self):
         self.msg('> generating regions-list from isoType...', 'info')
@@ -435,146 +693,318 @@ class Hydropolator:
         # print(self.triangleRegions, regions, isobathValues)
         self.msg('> regions-list established', 'info')
 
-    def index_region_triangles(self):
-        self.msg('> indexing region triangles...', 'info')
+    def build_graph2(self):
+        self.msg('> building triangle region graph...', 'info')
+        self.msg('> splitting all triangles in regions...', 'info')
         for triangle in self.triangles:
-            min, max = self.minmax_from_triangle(triangle)
-            # print(min, max)
-            for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_left(self.isobathValues, max) + 1):
-                # print(self.regions[index])
-                self.triangleRegions[index].append(triangle)
-        # print(self.triangleRegions)
-        self.msg('> triangles indexed in regions', 'info')
+            if 0 not in triangle:
+                intervals = self.find_intervals(triangle, indexOnly=True)
+                pseudoTriangle = tuple(self.pseudo_triangle(triangle))
+                for interval in intervals:
+                    self.triangleRegionDict[str(interval)].add(pseudoTriangle)
+        self.msg('> all triangles split in regions', 'info')
 
-    def find_intervals(self, triangle, indexOnly=True):
-        min, max = self.minmax_from_triangle(triangle)
-        intervals = []
-        for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_left(self.isobathValues, max) + 1):
-            if indexOnly:
-                intervals.append(index)
-            else:
-                intervals.append(self.regions[index])
-        if indexOnly:
-            return intervals
-        else:
-            return intervals
+        self.msg('> splitting regions in touching nodes...', 'info')
 
-    def export_region_triangles(self):
-        self.msg('> exporting region triangles...', 'info')
-        triangleShpName = 'region_triangles_{}.shp'.format(self.now())
-        triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
-        print('region triangles file: ', triangleShpFile)
+        for interval in self.triangleRegionDict.keys():
+            # print(interval)
+            regionTriangles = self.triangleRegionDict[interval]
+            triangleAmount = len(regionTriangles)
 
-        with shapefile.Writer(triangleShpFile) as wt:
-            wt.field('region', 'N')
-            for i, region in enumerate(self.triangleRegions):
-                if len(region):
-                    geom = []
-                    for triangle in region:
-                        geom.append(self.poly_from_triangle(triangle))
-                    wt.poly(geom)
-                    wt.record(i)
+            if triangleAmount == 0:
+                self.errors.append(
+                    '{} build_graph2\tno triangles in this interval\tinterval: {}'.format(self.now(), interval))
+                # print('no triangles in this region')
+                break
 
-        self.msg('> region triangles saved to file', 'info')
+            indexedTriangles = set()
+            queue = set()
+            finished = False
+            i = 0
 
-    def export_all_node_triangles(self):
-        self.msg('> saving all node triangles...', 'info')
-        nodeList = []
+            for triangle in regionTriangles:
+                if 0 not in triangle and len(self.find_intervals(triangle)) == 1:
+                    break
+            indexedTriangles.add(triangle)
+            currentNode = self.add_triangle_to_new_node(interval, triangle)
+            queue.add(triangle)
+
+            # for neighboringTriangle in self.adjacent_triangles(triangle):
+            #     if int(interval) in self.find_intervals(neighboringTriangle):
+            #         if neighboringTriangle not in indexedTriangles:
+            #             if not self.saddle_test(triangle, neighboringTriangle, int(interval)):
+            #                 indexedTriangles.add(neighboringTriangle)
+            #                 queue.add(neighboringTriangle)
+            #                 self.add_triangle_to_node(neighboringTriangle, currentNode)
+
+            # print(queue)
+
+            while not finished:
+
+                # for triangle in regionTriangles.copy():
+                #     break
+                additions = 0
+                # print(queue)
+                for triangle in queue.copy():
+                    for neighboringTriangle in self.adjacent_triangles(triangle):
+                        # print(neighboringTriangle)
+                        if 0 not in neighboringTriangle:
+                            neighborIntervals = self.find_intervals(neighboringTriangle)
+                            if int(interval) in neighborIntervals:
+                                if neighboringTriangle not in indexedTriangles:
+                                    if not self.saddle_test(triangle, neighboringTriangle, int(interval)):
+                                        indexedTriangles.add(neighboringTriangle)
+                                        queue.add(neighboringTriangle)
+                                        self.add_triangle_to_node(neighboringTriangle, currentNode)
+                                        additions += 1
+                            if int(interval) + 1 in neighborIntervals:
+                                self.add_triangle_to_queue(
+                                    neighboringTriangle, currentNode, 'deep')
+                            if int(interval) - 1 in neighborIntervals:
+                                self.add_triangle_to_queue(
+                                    neighboringTriangle, currentNode, 'shallow')
+
+                    queue.remove(triangle)
+
+                i += 0
+                if len(indexedTriangles) == triangleAmount:
+                    # print('all triangles in this region visited, ending')
+                    finished = True
+                elif i > 500:
+                    self.errors.append('{} build_graph2\titeration limit exceeded on splitting in touching nodes\tinterval: {}\tcurrent node: {}'.format(self.now(),
+                                                                                                                                                         interval, currentNode))
+                    finished = True
+                elif not additions:
+                    # print('====new node====')
+                    for triangle in regionTriangles.difference(indexedTriangles):
+                        if 0 not in triangle and len(self.find_intervals(triangle)) == 1:
+                            break
+                    indexedTriangles.add(triangle)
+                    # print(triangle)
+                    # print('istriangle: ', self.triangulation.is_triangle(triangle))
+                    # print('neighbors: ', self.adjacent_triangles(triangle))
+
+                    existingTracker = False
+                    neighboringTriangles = self.adjacent_triangles(triangle)
+                    for existingNode in self.get_all_nodes_in_interval(interval):
+                        if existingTracker:
+                            break
+                        # print('\nexistingNode: ', existingNode, interval)
+                        if self.get_triangles(existingNode).intersection(triangle):
+                            self.add_triangle_to_node(triangle, existingNode)
+                            existingTracker = True
+                        else:
+                            for neighboringTriangle in neighboringTriangles:
+                                # print('neighboringTriangle: ', neighboringTriangle)
+                                # print(neighboringTriangle in self.get_triangles(existingNode))
+                                if 0 not in neighboringTriangle:
+                                    neighborIntervals = self.find_intervals(neighboringTriangle)
+                                    # print('neighborIntervals: ', neighborIntervals)
+                                    if int(interval) in neighborIntervals:
+                                        # print('im in the interval')
+                                        # if self.saddle_test(triangle, neighboringTriangle, int(interval)):
+                                        #     # print('im a saddle...')
+                                        if not self.saddle_test(triangle, neighboringTriangle, int(interval)):
+                                            # print('im not a saddle')
+                                            # print(self.get_triangles(
+                                            #     existingNode).intersection(neighboringTriangle))
+                                            # print(neighboringTriangle in self.get_triangles(existingNode))
+                                            if neighboringTriangle in self.get_triangles(existingNode):
+                                                self.add_triangle_to_node(triangle, existingNode)
+                                                existingTracker = True
+                                                break
+
+                    if not existingTracker:
+                        currentNode = self.add_triangle_to_new_node(interval, triangle)
+                        for neighboringTriangle in self.adjacent_triangles(triangle):
+                            if 0 not in neighboringTriangle:
+                                neighborIntervals = self.find_intervals(neighboringTriangle)
+                                if int(interval) in neighborIntervals:
+                                    if neighboringTriangle not in indexedTriangles:
+                                        if not self.saddle_test(triangle, neighboringTriangle, int(interval)):
+                                            indexedTriangles.add(neighboringTriangle)
+                                            queue.add(neighboringTriangle)
+                                            self.add_triangle_to_node(
+                                                neighboringTriangle, currentNode)
+                                if int(interval) + 1 in neighborIntervals:
+                                    self.add_triangle_to_queue(
+                                        neighboringTriangle, currentNode, 'deep')
+                                if int(interval) - 1 in neighborIntervals:
+                                    self.add_triangle_to_queue(
+                                        neighboringTriangle, currentNode, 'shallow')
+
+                    if len(queue) == 0:
+                        finished = True
+                        # print(triangle)
+                        # for vId in triangle:
+                        #     print(self.triangulation.get_point(vId))
+                        # self.msg('no queue left', 'warning')
+                        self.errors.append(
+                            '{} build_graph2\tno queue left\tinterval: {}\tcurrent node: {}'.format(self.now(), interval, currentNode))
+
+            # self.add_triangle_to_new_node(interval, triangle)
+
+        self.msg('> all regions split in adjacent triangles', 'info')
+
+        self.establish_edges()
+
+        self.classify_nodes()
+
+        self.msg('> triangle region graph created', 'info')
+        # self.export_all_node_triangles()
+        # self.export_all_edge_triangles()
+
+        # self.print_graph()
+        pass
+
+    def establish_edges(self):
+        self.msg('> establishing edges...', 'info')
+
         for node in self.graph['nodes'].keys():
-            nodeList.append(node)
-        self.export_node_triangles(nodeList)
-        self.msg('> all node triangles saved', 'info')
+            nodeInterval = self.get_interval_from_node(node)
+            # print('----- new node:', node, nodeInterval)
 
-    def export_all_edge_triangles(self):
-        self.msg('> saving all edge triangles...', 'info')
-        triangleShpName = 'edge_triangles_{}.shp'.format(self.now())
-        triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
-        print('edge triangles file: ', triangleShpFile)
+            # finished = False
+            # i = 0
+            # while not finished:
 
-        with shapefile.Writer(triangleShpFile) as wt:
-            wt.field('value', 'F', decimal=4)
-            wt.field('id', 'N')
-            for edgeId in self.graph['edges'].keys():
-                geom = []
-                for triangle in self.get_edge_triangles(edgeId):
-                    geom.append(self.poly_from_triangle(triangle))
-                wt.poly(geom)
-                isoValue = self.get_edge_value(edgeId)
-                wt.record(isoValue, int(edgeId))
+            deepQueue = self.get_triangles(node)
+            if len(self.get_queue(node, 'deep')):
+                # print('resolving deeps')
+                deeperNodes = self.get_all_nodes_in_interval(nodeInterval + 1)
+                # print(deeperNodes)
+                for deeperNode in deeperNodes:
+                    edgeIntersection = deepQueue.intersection(
+                        self.get_triangles(deeperNode))
+                    if len(edgeIntersection):
+                        self.add_new_edge(node, deeperNode)
+                        self.graph['nodes'][node]['deepQueue'].difference_update(
+                            edgeIntersection)
+                        self.graph['nodes'][deeperNode]['shallowQueue'].difference_update(
+                            edgeIntersection)
 
-        self.msg('> edge triangles saved', 'info')
+            shallowQueue = self.get_triangles(node)
+            if len(self.get_queue(node, 'shallow')):
+                # print('resolving shallows')
+                shallowerNodes = self.get_all_nodes_in_interval(nodeInterval - 1)
+                for shallowerNode in shallowerNodes:
+                    edgeIntersection = shallowQueue.intersection(
+                        self.get_triangles(shallowerNode))
+                    if len(edgeIntersection):
+                        self.add_new_edge(shallowerNode, node)
+                        self.graph['nodes'][node]['shallowQueue'].difference_update(
+                            edgeIntersection)
+                        self.graph['nodes'][shallowerNode]['deepQueue'].difference_update(
+                            edgeIntersection)
 
-    def export_all_isobaths(self):
-        self.msg('> saving all isobaths...', 'info')
-        lineShpName = 'isobaths_{}.shp'.format(self.now())
-        lineShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, lineShpName)
-        print('isobaths file: ', lineShpFile)
+                # i += 1
+                # if len(self.get_queue(node, 'deep')) == 0 and len(self.get_queue(node, 'shallow')) == 0:
+                #     print('no limit queues left')
+                #     finished = True
+                # if i > 10:
+                #     print('iteration limit exceeded')
+                #     finished = True
 
-        with shapefile.Writer(lineShpFile) as wt:
-            wt.field('value', 'F', decimal=4)
-            wt.field('id', 'N')
-            for edgeId in self.graph['edges'].keys():
-                # geom = [[list(value) for value in self.graph['edges'][edgeId]['geom']]]
-                geom = self.graph['edges'][edgeId]['geom']
-                # print(geom)
-                # geom = []
-                # print(self.graph['edges'][edgeId]['geom'])
-                # for coords in self.graph['edges'][edgeId]['geom'].coords:
-                #     # print(coords)
-                #     geom.append(list(coords))
-                # for triangle in self.get_edge_triangles(edgeId):
-                #     geom.append(self.poly_from_triangle(triangle))
-                wt.line([geom])
-                isoValue = self.graph['edges'][edgeId]['value']
-                wt.record(isoValue, int(edgeId))
+        self.msg('> edges established', 'info')
 
-        self.msg('> isobaths saved', 'info')
+    def classify_nodes(self):
+        classifiedNodes = set()
+        peakQueue = set()
+        pitQueue = set()
+        nrNodes = len(self.graph['nodes'].keys())
 
-    def export_node_triangles(self, nodeIds):
-        self.msg('> saving selected region triangles...', 'info')
-        triangleShpName = 'node_triangles_{}.shp'.format(self.now())
-        triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
-        print('selected node triangles file: ', triangleShpFile)
+        for nodeId in self.graph['nodes'].keys():
+            node = self.graph['nodes'][nodeId]
+            # print(len(node['shallowNeighbors']))
+            if len(node['shallowNeighbors']) == 0:
+                node['classification'] = 'peak'
+                peakQueue.add(nodeId)
+                classifiedNodes.add(nodeId)
+            elif len(node['deepNeighbors']) == 0:
+                node['classification'] = 'pit'
+                pitQueue.add(nodeId)
+                classifiedNodes.add(nodeId)
 
-        with shapefile.Writer(triangleShpFile) as wt:
-            wt.field('node', 'N')
-            wt.field('region', 'N')
-            wt.field('interval', 'C')
-            wt.field('shallowNbs', 'C')
-            wt.field('deepNbs', 'C')
-            for node in nodeIds:
-                geom = []
-                for triangle in self.graph['nodes'][node]['triangles']:
-                    geom.append(self.poly_from_triangle(list(triangle)))
+        finished = True
+        i = 0
+        while not finished:
+            print('============\npQ: ', peakQueue, pitQueue)
 
-                region = self.get_interval_from_node(node)
-                interval = str(self.regions[region])
-                shallowNeighbors = str(self.get_neighboring_nodes(node, 'shallow'))
-                deepNeighbors = str(self.get_neighboring_nodes(node, 'deep'))
+            for nodeId in peakQueue.copy():
+                print('nodeId: ', nodeId)
+                for deeperNodeId in self.graph['nodes'][nodeId]['deepNeighbors']:
+                    print('deeperNode: ', deeperNodeId)
+                    deeperNode = self.graph['nodes'][deeperNodeId]
+                    if len(deeperNode['shallowNeighbors'].difference({nodeId})) == 0:
+                        print('only neighboring, im also a peak')
+                        deeperNode['classification'] = 'peak'
+                        peakQueue.add(deeperNodeId)
+                        classifiedNodes.add(deeperNodeId)
+                        peakQueue.remove(nodeId)
+                    else:
+                        print('not the only neighbor')
+                        peakTracker = True
+                        for shallowerNodeId in deeperNode['shallowNeighbors']:
+                            if self.graph['nodes'][shallowerNodeId]['classification'] != 'peak':
+                                peakTracker = False
+                        if len(self.graph['nodes'][deeperNodeId]['deepNeighbors']) > 1:
+                            peakTracker = False
+                        # for deeperNeighborId in self.graph['nodes'][deeperNodeId]['deepNeighbors']:
+                        #     if self.graph['nodes'][deeperNeighborId]['classification'] == 'pit':
+                        #         peakTracker = False
 
-                wt.poly(geom)
-                wt.record(int(node), region, interval, shallowNeighbors, deepNeighbors)
+                        if peakTracker:
+                            deeperNode['classification'] = 'peak'
+                            peakQueue.add(deeperNodeId)
+                            classifiedNodes.add(deeperNodeId)
+                            peakQueue.remove(nodeId)
 
-        self.msg('> selected node triangles saved', 'info')
+            for nodeId in pitQueue.copy():
+                print('nodeId: ', nodeId)
+                for shallowerNodeId in self.graph['nodes'][nodeId]['shallowNeighbors']:
+                    print('shallowerNode: ', shallowerNodeId)
+                    shallowerNode = self.graph['nodes'][shallowerNodeId]
+                    if len(shallowerNode['deepNeighbors'].difference({nodeId})) == 0:
+                        print('only neighboring, im also a peak')
+                        shallowerNode['classification'] = 'pit'
+                        pitQueue.add(shallowerNodeId)
+                        classifiedNodes.add(shallowerNodeId)
+                        pitQueue.remove(nodeId)
+                    else:
+                        print('not the only neighbor')
+                        pitTracker = True
+                        for deeperNodeId in shallowerNode['deepNeighbors']:
+                            if self.graph['nodes'][deeperNodeId]['classification'] != 'pit':
+                                pitTracker = False
+                        # for shallowerNeighborId in self.graph['nodes'][shallowerNodeId]['shallowNeighbors']:
+                        #     if self.graph['nodes'][shallowerNeighborId]['classification'] == 'peak':
+                        #         pitTracker = False
+                        if len(self.graph['nodes'][shallowerNodeId]['shallowNeighbors']) > 1:
+                            pitTracker = False
+                        if pitTracker:
+                            shallowerNode['classification'] = 'pit'
+                            peakQueue.add(shallowerNodeId)
+                            classifiedNodes.add(shallowerNodeId)
+                            pitQueue.remove(nodeId)
 
-    # def create_tr_graph(self):
-    #     self.trGraph.initialize_graph(self.triangulation)
-    #     self.trGraph.vertexDict = self.vertexDict
-    #     self.trGraph.build_graph()
+                    # elif len(deeperNode['shallowNeighbors'].difference(peakQueue)) == 0:
+                    #     deeperNode['classification'] = 'peak'
+                    #     peakQueue.add(deeperNodeId)
+                    #     classifiedNodes.add(deeperNodeId)
+                # peakQueue.remove(nodeId)
 
-    def pseudo_triangle(self, triangle):
-        # rotates the triangle_list so the smallest index is in front
-        # so we can easily compare and not store duplicates
-        n = triangle.index(min(triangle))
-        if not n:
-            return triangle
-        else:
-            return triangle[n:] + triangle[:n]
-        # print(self.triangulation.is_triangle(pseudoTriangle))
-        # return pseudoTriangle
+            i += 1
+            if len(peakQueue) == 0 or len(pitQueue) == 0 or i > 20:
+                finished = True
+                print(peakQueue)
 
-    def add_triangle_to_node(self, triangle, nodeId):
-        self.graph['nodes'][nodeId]['triangles'].add(tuple(self.pseudo_triangle(triangle)))
+    # --------------- #
+    #   UPDATING
+    # --------------- #
+
+    # --------------- #
+    #   HELPERS
+    # --------------- #
 
     def add_triangle_to_new_node(self, interval, triangle):
         # self.graph['nodes'][str(self.nrNodes)] = {'region': tuple(interval), 'triangles': {
@@ -589,12 +1019,11 @@ class Hydropolator:
 
         return nodeId
 
+    def add_triangle_to_node(self, triangle, nodeId):
+        self.graph['nodes'][nodeId]['triangles'].add(tuple(self.pseudo_triangle(triangle)))
+
     def add_triangle_to_queue(self, triangle, nodeId, type):
         queueType = type + 'Queue'
-        self.graph['nodes'][nodeId][queueType].add(tuple(self.pseudo_triangle(triangle)))
-
-    def add_triangle_to_limit(self, triangle, nodeId, type):
-        queueType = type + 'Neighbors'
         self.graph['nodes'][nodeId][queueType].add(tuple(self.pseudo_triangle(triangle)))
 
     def remove_triangle_from_queue(self, triangle, nodeId, type):
@@ -606,6 +1035,10 @@ class Hydropolator:
         #     pass
 
         self.graph['nodes'][nodeId][queueType].remove(tuple(self.pseudo_triangle(triangle)))
+
+    def add_triangle_to_limit(self, triangle, nodeId, type):
+        queueType = type + 'Neighbors'
+        self.graph['nodes'][nodeId][queueType].add(tuple(self.pseudo_triangle(triangle)))
 
     def get_queue(self, nodeId, type):
         queueType = type + 'Queue'
@@ -645,7 +1078,6 @@ class Hydropolator:
             self.graph['edges'][edgeId]['value'] = self.get_edge_value(edgeId)
             self.graph['edges'][edgeId]['closed'] = None
             self.nrEdges += 1
-            # print('new edge: ', edgeId)
 
     def get_edge_value(self, edgeId):
         nodeList = self.graph['edges'][edgeId]['edge']
@@ -666,271 +1098,6 @@ class Hydropolator:
         trianglesOne = self.get_triangles(nodeList[0])
         trianglesTwo = self.get_triangles(nodeList[1])
         return trianglesOne.intersection(trianglesTwo)
-
-    def print_graph(self):
-        self.msg('\n======GRAPH======', 'header')
-        self.msg('NODES', 'header')
-        # print('\n======GRAPH======\nNODES')
-        for nodeId in self.graph['nodes'].keys():
-            # print(nodeId, self.graph['nodes'][nodeId])
-            print('id: ', nodeId, 'interval: ', self.graph['nodes'][nodeId]['region'], 'triangles: ', len(self.graph['nodes'][nodeId]['triangles']), 'deepNeighbors: ', (self.graph['nodes'][nodeId]['deepNeighbors']), 'shallowNeighbors: ', (self.graph['nodes'][nodeId]['shallowNeighbors']), '\ncurrent: ',
-                  len(self.graph['nodes'][nodeId]['currentQueue']), 'deep: ', len(
-                      self.graph['nodes'][nodeId]['deepQueue']), 'shallow: ', len(self.graph['nodes'][nodeId]['shallowQueue']))
-        self.msg('\nEDGES', 'header')
-        for edgeId in self.graph['edges'].keys():
-            print('id: ', edgeId, self.graph['edges'][edgeId]['edge'],
-                  'value: ', self.graph['edges'][edgeId]['value'], 'closed: ', self.graph['edges'][edgeId]['closed'])
-            # print(edgeId, self.graph['edges'][edgeId])
-
-        self.msg('\nREGIONS', 'header')
-        for region in self.regionNodes.keys():
-            print(region, self.regionNodes[region])
-
-    # def generate_walker_graph(self, triangle, interval, nodeId):
-    #     # NOT IN USE ANYMORE: Max recursion limit
-    #     for neighbor in self.adjacent_triangles(triangle):
-    #         if interval in self.find_intervals(neighbor) and not self.triangle_in_node(neighbor, nodeId):
-    #             # print(neighbor)
-    #             self.add_triangle_to_node(neighbor, nodeId)
-    #             self.generate_walker_graph(neighbor, interval, nodeId)
-
-    def iterative_generator(self, triangle, interval, nodeId):
-        print('--itergenerator--', interval)
-        for neighbor in self.adjacent_triangles(triangle):
-            neighborIntervals = self.find_intervals(neighbor)
-            print(neighbor, neighborIntervals)
-
-            if interval in neighborIntervals and not self.triangle_in_node(neighbor, nodeId):
-                self.add_triangle_to_queue(neighbor, nodeId, 'current')
-                print('current')
-
-            if interval+1 in neighborIntervals:
-                alreadyDeeper = False
-                for deeperNeighbor in self.get_neighboring_nodes(nodeId, 'deep'):
-                    if self.triangle_in_node(neighbor, nodeId):
-                        alreadyDeeper = True
-                        print('adeep')
-                        self.remove_triangle_from_queue(neighbor, deeperNeighbor, 'shallow')
-                        self.remove_triangle_from_queue(neighbor, nodeId, 'deep')
-                if not alreadyDeeper:
-                    self.add_triangle_to_queue(neighbor, nodeId, 'deep')
-                    print('deep')
-
-            if interval-1 in neighborIntervals:
-                alreadyShallower = False
-                for shallowerNeighbor in self.get_neighboring_nodes(nodeId, 'shallow'):
-                    if self.triangle_in_node(neighbor, nodeId):
-                        alreadyShallower = True
-                        print('ashallow')
-                        self.remove_triangle_from_queue(neighbor, shallowerNeighbor, 'deep')
-                        self.remove_triangle_from_queue(neighbor, nodeId, 'shallow')
-                if not alreadyShallower:
-                    self.add_triangle_to_queue(neighbor, nodeId, 'shallow')
-                    print('shallow')
-
-    def clean_queues(self, nodeId):
-        deeperNeighbors = self.get_neighboring_nodes(nodeId, 'deep')
-        shallowerNeighbors = self.get_neighboring_nodes(nodeId, 'shallow')
-        deepQueue = self.get_queue(nodeId, 'deep')
-        shallowQueue = self.get_queue(nodeId, 'shallow')
-
-        for deepNeighbor in deeperNeighbors:
-            deepNeighborShallowQueue = self.get_queue(deepNeighbor, 'shallow')
-            for triangle in deepQueue.copy():
-                if triangle in deepNeighborShallowQueue:
-                    self.remove_triangle_from_queue(triangle, deepNeighbor, 'shallow')
-                    self.remove_triangle_from_queue(triangle, nodeId, 'deep')
-        for shallowNeighbor in shallowerNeighbors:
-            shallowNeighborDeepQueue = self.get_queue(shallowNeighbor, 'deep')
-            for triangle in shallowQueue.copy():
-                if triangle in shallowNeighborDeepQueue:
-                    self.remove_triangle_from_queue(triangle, shallowNeighbor, 'deep')
-                    self.remove_triangle_from_queue(triangle, nodeId, 'shallow')
-
-    def expand_node(self, nodeId, interval):
-        while len(self.get_queue(nodeId, 'current')):
-            for triangle in self.get_queue(nodeId, 'current').copy():
-                self.add_triangle_to_node(triangle, nodeId)
-                self.remove_triangle_from_queue(triangle, nodeId, 'current')
-                self.iterative_generator(triangle, interval, nodeId)
-
-        self.clean_queues(nodeId)
-
-    def go_deeper(self, nodeId, interval):
-        for tri in self.get_queue(nodeId, 'deep'):
-            break
-        deeperNode = self.add_triangle_to_new_node(interval+1, tri)
-        self.add_new_edge(nodeId, deeperNode)
-        deeperInterval = self.get_interval_from_node(deeperNode)
-
-        self.iterative_generator(tri, deeperInterval, deeperNode)
-        self.expand_node(deeperNode, deeperInterval)
-
-    def go_shallower(self, nodeId, interval):
-        for tri in self.get_queue(nodeId, 'shallow'):
-            break
-        shallowerNode = self.add_triangle_to_new_node(interval-1, tri)
-        self.add_new_edge(shallowerNode, nodeId)
-        shallowerInterval = self.get_interval_from_node(shallowerNode)
-
-        self.iterative_generator(tri, shallowerInterval, shallowerNode)
-        self.expand_node(shallowerNode, shallowerInterval)
-
-    def grow_node(self, nodeId):
-        nodeInterval = self.get_interval_from_node(nodeId)
-        print('nodeId: ', nodeId, 'nodeInterval: ', nodeInterval)
-        trianglesInNode = self.get_triangles(nodeId)
-
-        additions = True
-        visitedTriangles = set()
-        while additions:
-            addedTriangles = 0
-            for triangle in trianglesInNode.copy():
-                if triangle:  # not in visitedTriangles:
-                    for neighbor in self.adjacent_triangles(triangle):
-                        if 0 in neighbor:
-                            break
-                        if tuple(self.pseudo_triangle(neighbor)) not in visitedTriangles:
-                            visitedTriangles.add(tuple(self.pseudo_triangle(neighbor)))
-
-                            deepTracker = False
-                            shallowTracker = False
-
-                            # same interval
-                            if nodeInterval in self.find_intervals(neighbor) and not self.triangle_in_node(neighbor, nodeId):
-                                self.add_triangle_to_node(neighbor, nodeId)
-                                addedTriangles += 1
-
-                            # deeper interval
-                            # and not self.triangle_in_queue(neighbor, nodeId, 'deep'):
-                            if nodeInterval + 1 in self.find_intervals(neighbor):
-                                for deeperNode in self.get_neighboring_nodes(nodeId, 'deep'):
-                                    if self.triangle_in_queue(neighbor, deeperNode, 'shallow'):
-                                        self.remove_triangle_from_queue(
-                                            neighbor, deeperNode, 'shallow')
-                                        # self.remove_triangle_from_queue(neighbor, nodeId, 'deep')
-                                        deepTracker = True
-                                        # print('remove')
-                                if not deepTracker:
-                                    self.add_triangle_to_queue(neighbor, nodeId, 'deep')
-                                    self.unfinishedDeep.add(nodeId)
-                                    addedTriangles += 1
-                                    # print('not remove')
-
-                            # shallower interval
-                            # and not self.triangle_in_queue(neighbor, nodeId, 'shallow'):
-                            if nodeInterval - 1 in self.find_intervals(neighbor):
-                                for shallowerNode in self.get_neighboring_nodes(nodeId, 'shallow'):
-                                    if self.triangle_in_queue(neighbor, shallowerNode, 'deep'):
-                                        self.remove_triangle_from_queue(
-                                            neighbor, shallowerNode, 'deep')
-                                        # self.remove_triangle_from_queue(neighbor, nodeId, 'shallow')
-                                        shallowTracker = True
-                                        # print('remove')
-                                if not shallowTracker:
-                                    self.add_triangle_to_queue(neighbor, nodeId, 'shallow')
-                                    self.unfinishedShallow.add(nodeId)
-                                    addedTriangles += 1
-                                    # print('not remove')
-            # print(addedTriangles)
-            if not addedTriangles:
-                additions = False
-
-    def grow_deeper(self, nodeId):
-        for triangle in self.get_queue(nodeId, 'deep'):
-            break
-        currentInterval = self.get_interval_from_node(nodeId)
-        deeperInterval = currentInterval + 1
-
-        nodeTracker = False
-        neighbors = self.get_neighboring_nodes(nodeId, 'deep')
-        for neighbor in neighbors:
-            if self.triangle_in_node(triangle, neighbor):
-                nodeTracker = True
-        if not nodeTracker:
-            deeperNode = self.add_triangle_to_new_node(deeperInterval, triangle)
-            self.remove_triangle_from_queue(triangle, nodeId, 'deep')
-            self.add_new_edge(nodeId, deeperNode)
-
-            self.grow_node(deeperNode)
-
-    def grow_shallower(self, nodeId):
-        for triangle in self.get_queue(nodeId, 'shallow'):
-            break
-        currentInterval = self.get_interval_from_node(nodeId)
-        shallowerInterval = currentInterval - 1
-
-        nodeTracker = False
-        neighbors = self.get_neighboring_nodes(nodeId, 'shallow')
-        for neighbor in neighbors:
-            if self.triangle_in_node(triangle, neighbor):
-                nodeTracker = True
-        if not nodeTracker:
-            shallowerNode = self.add_triangle_to_new_node(shallowerInterval, triangle)
-            self.remove_triangle_from_queue(triangle, nodeId, 'shallow')
-            self.add_new_edge(shallowerNode, nodeId)
-
-            self.grow_node(shallowerNode)
-
-    def make_network_graph(self):
-        G = nx.Graph()
-        for edge in self.graph['edges'].keys():
-            edgingNodes = self.graph['edges'][edge]['edge']
-            G.add_edge(edgingNodes[0], edgingNodes[1])
-
-        cmap = cm.get_cmap('Spectral')
-        norm = colors.Normalize(vmin=0, vmax=len(self.regions))
-
-        nodelabels = {}
-        colorLabels = []
-        edgeColors = []
-        for node in G.nodes():
-            regionInterval = self.regions[int(self.graph['nodes'][node]['region'])]
-            label = '{}-{}\n{}'.format(regionInterval[0], regionInterval[1], node)
-            color = cmap(norm(int(self.graph['nodes'][node]['region'])))
-
-            # print(self.graph['nodes'][node]['classification'])
-
-            if self.graph['nodes'][node]['classification'] == 'peak':
-                edgeColors.append('red')
-            elif self.graph['nodes'][node]['classification'] == 'pit':
-                edgeColors.append('blue')
-            else:
-                edgeColors.append(color)
-
-            colorLabels.append(color)
-            nodelabels[node] = label
-
-        pos = nx.kamada_kawai_layout(G)
-        nx.draw(G, pos, node_color=colorLabels, edgecolors=edgeColors,
-                font_size=16, with_labels=False)
-        # for p in pos:  # raise text positions
-        #     pos[p][1] += 0.07
-        nx.draw_networkx_labels(G, pos, nodelabels, font_size=6)
-        # plt.show()
-
-        regionGraphName = 'regiongraph_{}.pdf'.format(self.now())
-        regionGraphFile = os.path.join(os.getcwd(), 'projects', self.projectName, regionGraphName)
-        plt.savefig(regionGraphFile)
-
-    def check_unfinished(self, nodeId):
-        if len(self.get_queue(nodeId, 'deep')):
-            self.unfinishedDeep.add(nodeId)
-            self.nodeQueue.add(nodeId)
-        else:
-            if nodeId in self.unfinishedDeep:
-                self.unfinishedDeep.remove(nodeId)
-
-        if len(self.get_queue(nodeId, 'shallow')):
-            self.unfinishedShallow.add(nodeId)
-            self.nodeQueue.add(nodeId)
-        else:
-            if nodeId in self.unfinishedShallow:
-                self.unfinishedShallow.remove(nodeId)
-
-        if not len(self.get_queue(nodeId, 'deep')) and not len(self.get_queue(nodeId, 'shallow')):
-            if nodeId in self.nodeQueue:
-                self.nodeQueue.remove(nodeId)
 
     def saddle_test(self, triangleOne, triangleTwo, interval):
         similarEdge = set(triangleOne).intersection(triangleTwo)
@@ -959,655 +1126,14 @@ class Hydropolator:
         else:
             return False
 
-    def clean_nodes(self):
-        for nodeId in self.graph['nodes'].keys():
-            conflictingTris = set()
-            saddleTris = set()
-            print(nodeId)
-            interval = self.get_interval_from_node(nodeId)
-            region = self.regions[interval]
-            print(region)
-            for triangle in self.get_triangles(nodeId):
-                print(triangle)
-                outsiders = 0
-                conflictingVids = []
-                for vId in triangle:
-                    vertexElevation = self.get_z(vId, True)
-                    if vertexElevation < region[0] or vertexElevation > region[1]:
-                        outsiders += 1
-                        conflictingVids.append(vId)
-                        print(vertexElevation)
-
-                if outsiders == 2:
-                    conflictingTris.add((min(conflictingVids), max(conflictingVids)))
-
-                    if (min(conflictingVids), max(conflictingVids)) in conflictingTris:
-                        saddleTris.add(self.pseudo_triangle(triangle))
-            # print(saddleTris)
-            # self.msg('I contain a saddle', 'warning')
-
-    def establish_node(self, nodeId):
-        nodeInterval = self.get_interval_from_node(nodeId)
-        # print('nodeId: ', nodeId, 'nodeInterval: ', nodeInterval)
-        trianglesInNode = self.get_triangles(nodeId)
-
-        visitedTriangles = set()
-        adding = True
-        while adding:
-            addedTriangles = 0
-            for triangle in trianglesInNode.copy():
-                for neighbor in self.adjacent_triangles(triangle):
-                    if 0 in neighbor:
-                        continue
-                    # if len(self.find_intervals(neighbor)) != 1:
-                    #     continue
-                    if tuple(neighbor) not in visitedTriangles:
-                        visitedTriangles.add(tuple(neighbor))
-                        # print(neighbor)
-
-                        # same interval
-                        if nodeInterval in self.find_intervals(neighbor) and not self.triangle_in_node(neighbor, nodeId):
-                            # if not self.saddle_test(triangle, neighbor, nodeInterval):
-                            self.add_triangle_to_node(neighbor, nodeId)
-                            addedTriangles += 1
-                            # else:
-                            #     visitedTriangles.remove(tuple(neighbor))
-
-                        # deeper interval
-                        deepTracker = False
-                        if nodeInterval + 1 in self.find_intervals(neighbor):
-                            for deeperNode in self.get_neighboring_nodes(nodeId, 'deep'):
-                                if self.triangle_in_queue(neighbor, deeperNode, 'shallow'):
-                                    self.remove_triangle_from_queue(neighbor, deeperNode, 'shallow')
-                                    deepTracker = True
-                            if not deepTracker:
-                                self.add_triangle_to_queue(neighbor, nodeId, 'deep')
-                                addedTriangles += 1
-                                # visitedTriangles.add(tuple(neighbor))
-
-                        # shallower interval
-                        shallowTracker = False
-                        if nodeInterval - 1 in self.find_intervals(neighbor):
-                            for shallowerNode in self.get_neighboring_nodes(nodeId, 'shallow'):
-                                if self.triangle_in_queue(neighbor, shallowerNode, 'deep'):
-                                    self.remove_triangle_from_queue(neighbor, shallowerNode, 'deep')
-                                    shallowTracker = True
-                            if not shallowTracker:
-                                self.add_triangle_to_queue(neighbor, nodeId, 'shallow')
-                                addedTriangles += 1
-                                # visitedTriangles.add(tuple(neighbor))
-
-                        # for neighboringNode in self.get_neighboring_nodes(nodeId, 'deep'):
-                        #     if self.triangle_in_queue(neighbor, neighboringNode, 'shallow'):
-                        #         self.remove_triangle_from_queue(
-                        #             neighbor, neighboringNode, 'shallow')
-                        #
-                        # for neighboringNode in self.get_neighboring_nodes(nodeId, 'shallow'):
-                        #     if self.triangle_in_queue(neighbor, neighboringNode, 'deep'):
-                        #         self.remove_triangle_from_queue(neighbor, neighboringNode, 'deep')
-
-            if not addedTriangles:
-                adding = False
-
-        self.check_unfinished(nodeId)
-
-    def resolve_queues(self, nodeId):
-        nodeInterval = self.get_interval_from_node(nodeId)
-        deeperInterval = nodeInterval + 1
-        shallowerInterval = nodeInterval - 1
-        # deeperNodes = self.get_neighboring_nodes(nodeId, 'deep')
-        # shallowerNodes = self.get_neighboring_nodes(nodeId, 'shallow')
-
-        resolved = False
-        while not resolved:
-            # print('deepQueue: ', len(self.get_queue(nodeId, 'deep')))
-            if not len(self.get_queue(nodeId, 'deep')):
-                # print('resolveTrigger')
-                resolved = True
-
-            triangle = 0
-            for triangle in self.get_queue(nodeId, 'deep'):
-                break
-            if triangle:
-                triangleTracker = False
-                for neighboringNode in self.get_neighboring_nodes(nodeId, 'deep'):
-                    if self.triangle_in_node(triangle, neighboringNode):
-                        self.remove_triangle_from_queue(triangle, nodeId, 'deep')
-                        triangleTracker = True
-                if not triangleTracker:
-                    deeperNode = self.add_triangle_to_new_node(deeperInterval, triangle)
-                    self.remove_triangle_from_queue(triangle, nodeId, 'deep')
-                    self.add_new_edge(nodeId, deeperNode)
-                    self.establish_node(deeperNode)
-
-                # print('deepQueue: ', len(self.get_queue(nodeId, 'deep')))
-                # if not len(self.get_queue(nodeId, 'deep')):
-                #     # print('resolveTrigger')
-                #     resolved = True
-            else:
-                # print('resolveTrigger')
-                resolved = True
-
-        resolved = False
-        while not resolved:
-            # print('shallowQueue: ', len(self.get_queue(nodeId, 'deep')))
-            if not len(self.get_queue(nodeId, 'shallow')):
-                # print('resolveTrigger')
-                resolved = True
-
-            triangle = 0
-            for triangle in self.get_queue(nodeId, 'shallow'):
-                break
-            if triangle:
-                triangleTracker = False
-                for neighboringNode in self.get_neighboring_nodes(nodeId, 'shallow'):
-                    if self.triangle_in_node(triangle, neighboringNode):
-                        self.remove_triangle_from_queue(triangle, nodeId, 'shallow')
-                        triangleTracker = True
-                if not triangleTracker:
-                    shallowerNode = self.add_triangle_to_new_node(shallowerInterval, triangle)
-                    self.remove_triangle_from_queue(triangle, nodeId, 'shallow')
-                    self.add_new_edge(shallowerNode, nodeId)
-                    self.establish_node(shallowerNode)
-
-                # print('shallowQueue: ', len(self.get_queue(nodeId, 'deep')))
-                # if not len(self.get_queue(nodeId, 'shallow')):
-                #     print('resolveTrigger')
-                #     resolved = True
-            else:
-                # print('resolveTrigger')
-                resolved = True
-
-        self.check_unfinished(nodeId)
-
-    def build_graph(self):
-        self.msg('> building triangle region graph...', 'info')
-        for startingTriangle in self.triangles:
-            if len(self.find_intervals(startingTriangle)) == 1:
-                break
-        # startingTriangle = self.triangles[23]
-        # startingTriangle = self.triangles[0]
-
-        print('\n=======starter=======')
-        # print(self.minmax_from_triangle(startingTriangle))
-        print('starting triangle: ', startingTriangle)
-        print('starting interval: ', self.find_intervals(startingTriangle))
-        print('=====================')
-
-        intervalStart = self.find_intervals(startingTriangle)[0]
-        currentNodeId = self.add_triangle_to_new_node(intervalStart, startingTriangle)
-
-        self.establish_node(currentNodeId)
-        self.check_unfinished(currentNodeId)
-
-        finished = False
-        i = 0
-        while not finished:
-            for node in self.nodeQueue.copy():
-                print('==============\nresolving node: ', node)
-                print('nodeQueue: ', self.nodeQueue)
-                self.resolve_queues(node)
-                # i += 1
-                # if i == 30:
-                #     finished = True
-            if not len(self.nodeQueue):
-                finished = True
-
-        # self.clean_nodes()
-
-        # self.load_node_queues(currentNodeId)
-
-        ###################
-        # self.grow_node(currentNodeId)
-        #
-        # unfinished = True
-        # i = 0
-        # while unfinished:
-        #     # deepsTracker = len(self.unfinishedDeep)
-        #     #
-        #     # for unfinishedDeep in self.unfinishedDeep.copy():
-        #     #     self.grow_deeper(unfinishedDeep)
-        #     #
-        #     # if len(self.unfinishedDeep) == deepsTracker:
-        #     #     unfinished = False
-        #     shallowsTracker = len(self.unfinishedShallow)
-        #     deepsTracker = len(self.unfinishedDeep)
-        #
-        #     for unfinishedShallow in self.unfinishedShallow.copy():
-        #         self.grow_shallower(unfinishedShallow)
-        #         if not len(self.get_queue(unfinishedShallow, 'shallow')):
-        #             self.unfinishedShallow.remove(unfinishedShallow)
-        #
-        #     for unfinishedDeep in self.unfinishedDeep.copy():
-        #         self.grow_deeper(unfinishedDeep)
-        #         if not len(self.get_queue(unfinishedDeep, 'deep')):
-        #             self.unfinishedDeep.remove(unfinishedDeep)
-        #
-        #     if len(self.unfinishedShallow) == shallowsTracker and len(self.unfinishedDeep) == deepsTracker:
-        #         print('triggered')
-        #         unfinished = False
-        #     # if i == 1:
-        #     #     unfinished = False
-        #
-        #     print(self.unfinishedShallow)
-        #     print(self.unfinishedDeep)
-        #     i += 1
-        #
-        #     # unfinished = False
-        #
-        # print(self.unfinishedShallow)
-        # print(self.unfinishedDeep)
-        # interval = self.get_interval_from_node(currentNodeId)
-        ###################
-
-        ###################
-        # self.iterative_generator(startingTriangle, interval, currentNodeId)
-        # self.expand_node(currentNodeId, interval)
-        # self.go_deeper(currentNodeId, interval)
-        # self.go_shallower(currentNodeId, interval)
-        ###################
-
-        # self.generate_walker_graph(startingTriangle, interval, currentNodeId)
-        # for interval in self.find_intervals(startingTriangle):
-        #     currentNodeId = self.add_triangle_to_new_node(interval, startingTriangle)
-        #     # self.generate_walker_graph(startingTriangle, interval, currentNodeId)
-        #     self.iterative_generator(startingTriangle, interval, currentNodeId)
-        #     while len(self.get_queue(currentNodeId, 'current')):
-        #         for triangle in self.get_queue(currentNodeId, 'current').copy():
-        #             self.add_triangle_to_node(list(triangle), currentNodeId)
-        #             self.remove_triangle_from_queue(list(triangle), currentNodeId, 'current')
-        #             self.iterative_generator(triangle, interval, currentNodeId)
-
-        # print('----neighbors----')
-        # for neighbor in self.adjacent_triangles(startingTriangle):
-        #     # print(neighbor, self.find_intervals(neighbor))
-        #     # print('pseudo: ', self.pseudo_triangle(neighbor))
-        #     print(self.pseudo_triangle(neighbor), self.find_intervals(self.pseudo_triangle(neighbor)))
-
-        # self.add_new_edge(0, 1)
-
-        self.print_graph()
-        print('nodeQueue: ', self.nodeQueue)
-        self.msg('> triangle region graph created', 'info')
-        self.export_all_node_triangles()
-
-        # self.export_node_triangles(['0'])
-
-    def check_triangle_vertex_intersections_with_value(self, triangle, isoValue):
-        isPoint = False
-
-        pointZees = []
-        for vId in triangle:
-            pointZees.append(self.get_z(vId, idOnly=True))
-        intersections = len(set(pointZees).intersection([isoValue]))
-        # print(intersections)
-
-        if intersections == 1:
-            min, max = self.minmax_from_triangle(triangle)
-            print(min, max)
-            if min == isoValue or max == isoValue:
-                isPoint = True
-
-        return intersections, isPoint
-
-    def contour_triangle(self, triangle, isoValue):
-
-        triangleVertexZero = self.triangulation.get_point(triangle[0])
-        triangleVertexOne = self.triangulation.get_point(triangle[1])
-        triangleVertexTwo = self.triangulation.get_point(triangle[2])
-        triangleSegments = [[triangleVertexZero, triangleVertexOne],
-                            [triangleVertexOne, triangleVertexTwo],
-                            [triangleVertexTwo, triangleVertexZero]]
-        triangleLine = [0, 0]
-        for i, segment in enumerate(triangleSegments):
-            xOne, yOne, zOne = segment[0][0], segment[0][1], self.get_z(segment[0])
-            xTwo, yTwo, zTwo = segment[1][0], segment[1][1], self.get_z(segment[1])
-            # print(xOne, yOne, zOne)
-            # print(xTwo, yTwo, zTwo)
-            sMin, sMax = min(zOne, zTwo), max(zOne, zTwo)
-            if xTwo-xOne == 0:
-                xTwo += 0.0001
-            if sMin <= isoValue <= sMax:
-                x = round((isoValue*xTwo-isoValue*xOne-zOne*xTwo+zTwo*xOne)/(zTwo-zOne), 3)
-                y = round((x*(yTwo-yOne)-xOne*yTwo+xTwo*yOne)/(xTwo-xOne), 3)
-                # print(x, y)
-                if zOne > zTwo:
-                    triangleLine[0] = (x, y)
-                else:
-                    triangleLine[1] = (x, y)
-                    nextSegment = i
-
-        # nextSegment = {triangle[nextSegment], triangle[(nextSegment+1) % 2]}
-        # print(nextSegment)
-
-        return triangleLine
-        # linePoints.append(triangleLine[0])
-        # linePoints.append(triangleLine[1])
-
-    def generate_isobaths2(self, edgeIds=[]):
-        if len(edgeIds) == 0:
-            edgeIds = list(self.graph['edges'].keys())
-
-        for edge in edgeIds:
-            self.msg('--new edge', 'header')
-            isoValue = self.graph['edges'][edge]['value']
-            print('isoValue: ', isoValue)
-
-            linePoints = []
-            edgeTriangles = self.get_edge_triangles(edge)
-
-            for triangle in edgeTriangles:
-                triangleLine = self.contour_triangle(triangle, isoValue)
-                if triangleLine != [0, 0]:
-                    # linePoints.append(triangleLine)
-                    linePoints.append(geometry.LineString(
-                        [[triangleLine[0][0], triangleLine[0][1]], [triangleLine[1][0], triangleLine[1][1]]]))
-            # print(linePoints)
-            multiLine = geometry.MultiLineString(linePoints)
-            mergedLine = ops.linemerge(multiLine)
-            self.graph['edges'][edge]['geom'] = mergedLine
-
-        self.export_all_isobaths()
-
-    def generate_isobaths(self, edgeIds=[]):
-        # deep=left of the line
-        if len(edgeIds) == 0:
-            edgeIds = list(self.graph['edges'].keys())
-
-        for edge in edgeIds:
-            self.msg('--new edge', 'header')
-            isoValue = self.graph['edges'][edge]['value']
-            print('isoValue: ', isoValue)
-
-            linePoints = []
-            visitedTriangles = set()
-
-            edgeTriangles = self.get_edge_triangles(edge)
-            for startingTriangle in edgeTriangles:
-                break
-            print(startingTriangle)
-
-            # for vId in startingTriangle:
-            #     print(self.triangulation.get_point(vId))
-
-            trianglePoints = self.contour_triangle(startingTriangle, isoValue)
-            linePoints.append(trianglePoints[0])
-            linePoints.append(trianglePoints[1])
-            visitedTriangles.add(self.pseudo_triangle(startingTriangle))
-            # print(linePoints)
-
-            nextTriangle = startingTriangle
-            # self.locate_point_in_set(linePoints[-1], set())
-
-            finished = False
-            while not finished:
-                additions = 0
-
-                for neighbor in self.adjacent_triangles_in_set(nextTriangle, edgeTriangles.difference(visitedTriangles)):
-                    tri = [self.triangulation.get_point(vId) for vId in neighbor]
-                    # print('neighbor: ', neighbor)
-                    # print('tri: ', tri)
-                    # print(point_in_triangle(linePoints[-1], tri))
-                    # print(linePoints)
-                    if point_in_triangle(linePoints[-1], tri):
-                        trianglePoints = self.contour_triangle(neighbor, isoValue)
-                        # linePoints.append(trianglePoints[0])
-                        linePoints.append(trianglePoints[1])
-                        visitedTriangles.add(tuple(self.pseudo_triangle(neighbor)))
-                        # print(linePoints)
-                        # print(len(edgeTriangles.difference(visitedTriangles)))
-                        nextTriangle = neighbor
-                        additions += 1
-
-                if len(edgeTriangles.difference(visitedTriangles)) == 0 or additions == 0:
-                    finished = True
-                # print(self.triangulation.locate(linePoints[-1][0], linePoints[-1][1]))
-                # print(point_in_triangle(linePoints[0], tri))
-
-            self.graph['edges'][edge]['geom'] = linePoints
-
-        self.export_all_isobaths()
-        # closedLine = True
-        # if not closedLine:
-        #     pass
-
-        # for vId in startingTriangle:
-        #     print(self.get_z(vId, idOnly=True))
-
-        # print(edgeTriangles)
-
-    def get_intersected_segments(self, triangle, isoValue, type):
-        if type == 'full':
-            # full intersection model
-            segmentIntersections = [0, 0]
-            for i in range(3):
-                # print('segment: ', i)
-                segment = [triangle[i], triangle[(i+1) % 3]]
-                zOne, zTwo = self.get_z(segment[0], idOnly=True), self.get_z(
-                    segment[1], idOnly=True)
-                sMin, sMax = min(zOne, zTwo), max(zOne, zTwo)
-                if sMin < isoValue < sMax:
-                    # print('intersects!')
-                    if zOne > zTwo:
-                        # print('start segment')
-                        segmentIntersections[0] = segment
-                    else:
-                        # print('end segment')
-                        segmentIntersections[1] = segment
-            # print(segmentIntersections)
-            return segmentIntersections
-
-        if type == 'nextPoint':
-            for vId in triangle:
-                vertexZ = self.get_z(vId, idOnly=True)
-                if vertexZ == isoValue:
-                    return [vId]
-
-    def adjacent_triangle_in_set_with_edge(self, triangle, lookupSet, edge):
-        # print(triangle, edge)
-        adjacentTriangles = []
-        addedVertices = []
-
-        for vertex in edge:
-            for incidentTriangle in self.triangulation.incident_triangles_to_vertex(vertex):
-                # print(incidentTriangle)
-                if len(set(incidentTriangle).intersection(edge)) == 2:
-                    # print(incidentTriangle)
-                    if len(set(incidentTriangle).intersection(triangle)) != 3:
-                        if tuple(self.pseudo_triangle(incidentTriangle)) in lookupSet:
-                            # print(incidentTriangle)
-                            return tuple(self.pseudo_triangle(incidentTriangle))
-
-        return False
-
-        # for vId in triangle:
-        #     if len(addedVertices) == 3:
-        #         break
-        #     else:
-        #         for incidentTriangle in self.triangulation.incident_triangles_to_vertex(vId):
-        #             # print('inc: ', incidentTriangle)
-        #             if len(set(triangle).intersection(incidentTriangle)) == 2 and set(incidentTriangle).difference(triangle) not in addedVertices:
-        #                 if tuple(self.pseudo_triangle(incidentTriangle)) in lookupSet:
-        #                     adjacentTriangles.append(self.pseudo_triangle(incidentTriangle))
-        #                     addedVertices.append(set(incidentTriangle).difference(triangle))
-        #
-        # for triangle in adjacentTriangles:
-        #     # print('adj:', triangle)
-        #     if len(set(triangle).intersection(edge)) == 2:
-        #         return tuple(self.pseudo_triangle(triangle))
-
-        # return False
-
-        # return adjacentTriangles
-
-    def generate_isobaths3(self, edgeIds=[]):
-        if len(edgeIds) == 0:
-            edgeIds = list(self.graph['edges'].keys())
-
-        for edge in edgeIds:
-            self.msg('--new edge', 'header')
-            isoValue = self.graph['edges'][edge]['value']
-            print('isoValue: ', isoValue)
-
-            edgeTriangles = self.get_edge_triangles(edge)
-            for triangle in edgeTriangles:
-                intersections, isPoint = self.check_triangle_vertex_intersections_with_value(
-                    triangle, isoValue)
-                if intersections == 0:
-                    startingTriangle = triangle
-                    break
-            print(startingTriangle)
-
-            isobathSegments = []
-            visitedTriangles = set()
-
-            segmentIntersections = self.get_intersected_segments(startingTriangle, isoValue, 'full')
-            isobathSegments.append(segmentIntersections[0])
-            isobathSegments.append(segmentIntersections[1])
-            visitedTriangles.add(startingTriangle)
-            nextTriangle = startingTriangle
-
-            # print(isobathSegments)
-
-            finished = False
-            i = 0
-            while not finished:
-                # print('---New Loop')
-                if len(segmentIntersections) == 2:
-                    # print('find neighboring edge')
-                    nextTriangle = self.adjacent_triangle_in_set_with_edge(
-                        nextTriangle, edgeTriangles.difference(visitedTriangles), segmentIntersections[1])
-                    if not nextTriangle:
-                        # couldnt find a satisfying neighbor (end of sequence)
-                        print('end of sequence')
-                        # finished = True
-                        break
-
-                    # print(nextTriangle)
-                    intersections, isPoint = self.check_triangle_vertex_intersections_with_value(
-                        nextTriangle, isoValue)
-                    # print(intersections, isPoint, nextTriangle)
-
-                    if intersections == 0:
-                        segmentIntersections = self.get_intersected_segments(
-                            nextTriangle, isoValue, 'full')
-                        isobathSegments.append(segmentIntersections[1])
-                        visitedTriangles.add(nextTriangle)
-                    elif intersections == 1:
-                        segmentIntersections == self.get_intersected_segments(
-                            nextTriangle, isoValue, 'nextPoint')
-                        isobathSegments.append(segmentIntersections[0])
-                        visitedTriangles.add(nextTriangle)
-
-                elif len(segmentIntersections) == 1:
-                    print('finding neighboring points')
-
-                    # print(isobathSegments)
-
-                if len(edgeTriangles.difference(visitedTriangles)) == 0:
-                    print('every edge triangle visited')
-                    finished = True
-                i += 0
-                if i > 2:
-                    finished = True
-
-            isoGeom = []
-            for intersection in isobathSegments:
-                # print(intersection)
-                if len(intersection) == 1:
-                    geom = self.triangulation.get_point(intersection[0])
-                    isoGeom.append([geom[0], geom[1]])
-                else:
-                    geomOne = self.triangulation.get_point(intersection[0])
-                    geomTwo = self.triangulation.get_point(intersection[1])
-                    xOne, yOne, zOne = geomOne[0], geomOne[1], self.get_z(
-                        intersection[0], idOnly=True)
-                    xTwo, yTwo, zTwo = geomTwo[0], geomTwo[1], self.get_z(
-                        intersection[1], idOnly=True)
-                    if xOne == xTwo:
-                        x = round(xOne, 3)
-                        y = round(yOne + ((isoValue-zOne)/(zTwo-zOne)) * (yTwo-yOne), 3)
-                    else:
-                        x = round((isoValue*xTwo-isoValue*xOne-zOne*xTwo+zTwo*xOne)/(zTwo-zOne), 3)
-                        y = round((x*(yTwo-yOne)-xOne*yTwo+xTwo*yOne)/(xTwo-xOne), 3)
-                    isoGeom.append([x, y])
-
-            self.graph['edges'][edge]['geom'] = isoGeom
-        self.export_all_isobaths()
-
-    def export_shapefile(self, shpName):
-        self.msg('> exporting shapefiles...', 'info')
-        pointShpName = 'points_{}_{}.shp'.format(shpName, self.now())
-        triangleShpName = 'triangles_{}_{}.shp'.format(shpName, self.now())
-        pointShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, pointShpName)
-        triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
-        print('triangles file: ', triangleShpFile)
-        print('points file: ', pointShpFile)
-
-        with shapefile.Writer(pointShpFile) as wp:
-            wp.field('depth', 'F', decimal=4)
-            wp.field('id', 'N')
-            # for point in self.triangulation.all_vertices()[1:]:
-            for i, point in enumerate(self.vertices[1:]):  # remove the infinite vertex in startTIN
-                wp.point(point[0], point[1])
-                wp.record(point[2], i)
-            self.msg('> points written to shapefile', 'info')
-
-        with shapefile.Writer(triangleShpFile) as wt:
-            wt.field('min_depth', 'F', decimal=4)
-            wt.field('max_depth', 'F', decimal=4)
-            wt.field('avg_depth', 'F', decimal=4)
-            for triangle in self.triangles:
-                geom, min, max, avg = self.polystats_from_triangle(triangle)
-                # wt.poly(self.poly_from_triangle(triangle))
-                # min, max, avg = 10, 10, 10  # self.minmaxavg_from_triangle(triangle)
-                wt.poly([geom])
-                wt.record(min, max, avg)
-            self.msg('> triangles written to shapefile', 'info')
-
-    def triangle_intersections(self, triangle, isoValue):
-        isPoint = False
-        intersections = 0
-        for vId in triangle:
-            vertexElevation = self.get_z(vId, idOnly=True)
-            if vertexElevation == isoValue:
-                intersections += 1
-
-        if intersections == 1:
-            triangleMin, triangleMax = self.minmax_from_triangle(triangle)
-            if triangleMin == isoValue or triangleMax == isoValue:
-                isPoint = True
-
-        return intersections, isPoint
-
-    def intersected_triangle_segments(self, triangle, isoValue, type):
-        if type == 'full':
-            triangleSegment = ['start', 'end']
-            for i in range(3):
-                segment = [triangle[i], triangle[(i + 1) % 3]]
-                zOne = self.get_z(segment[0], idOnly=True)
-                zTwo = self.get_z(segment[1], idOnly=True)
-                if min(zOne, zTwo) < isoValue < max(zOne, zTwo):
-                    if zOne > zTwo:
-                        # deep is on the left
-                        triangleSegment[0] = segment
-                    else:
-                        triangleSegment[1] = segment
-            return triangleSegment
-
-    def find_next_edge_triangle(self, currentTriangle, edge, lookupSet):
-
-        for vId in edge:
-            incidentTriangles = self.triangulation.incident_triangles_to_vertex(vId)
-            for incidentTriangle in incidentTriangles:
-                if len(set(incidentTriangle).intersection(edge)) == 2:
-                    if len(set(incidentTriangle).intersection(currentTriangle)) != 3:
-                        incidentTriangle = tuple(self.pseudo_triangle(incidentTriangle))
-                        if incidentTriangle not in lookupSet:
-                            return tuple(self.pseudo_triangle(incidentTriangle))
-
-        # no neighboring triangle found
-        return False
+    def get_all_nodes_in_interval(self, interval):
+        return self.regionNodes[str(interval)]
+
+    # ====================================== #
+    #
+    #   Isobaths
+    #
+    # ====================================== #
 
     def generate_isobaths4(self, edgeIds=[]):
         if len(edgeIds) == 0:
@@ -1915,314 +1441,27 @@ class Hydropolator:
                     isoGeom.append([x, y])
 
             self.graph['edges'][edge]['geom'] = isoGeom
-        # self.export_all_isobaths()
 
-    def get_all_nodes_in_interval(self, interval):
-        return self.regionNodes[str(interval)]
+    def triangle_intersections(self, triangle, isoValue):
+        isPoint = False
+        intersections = 0
+        for vId in triangle:
+            vertexElevation = self.get_z(vId, idOnly=True)
+            if vertexElevation == isoValue:
+                intersections += 1
 
-    def establish_edges(self):
-        self.msg('> establishing edges...', 'info')
+        if intersections == 1:
+            triangleMin, triangleMax = self.minmax_from_triangle(triangle)
+            if triangleMin == isoValue or triangleMax == isoValue:
+                isPoint = True
 
-        for node in self.graph['nodes'].keys():
-            nodeInterval = self.get_interval_from_node(node)
-            # print('----- new node:', node, nodeInterval)
+        return intersections, isPoint
 
-            # finished = False
-            # i = 0
-            # while not finished:
-
-            deepQueue = self.get_triangles(node)
-            if len(self.get_queue(node, 'deep')):
-                # print('resolving deeps')
-                deeperNodes = self.get_all_nodes_in_interval(nodeInterval + 1)
-                # print(deeperNodes)
-                for deeperNode in deeperNodes:
-                    edgeIntersection = deepQueue.intersection(
-                        self.get_triangles(deeperNode))
-                    if len(edgeIntersection):
-                        self.add_new_edge(node, deeperNode)
-                        self.graph['nodes'][node]['deepQueue'].difference_update(
-                            edgeIntersection)
-                        self.graph['nodes'][deeperNode]['shallowQueue'].difference_update(
-                            edgeIntersection)
-
-            shallowQueue = self.get_triangles(node)
-            if len(self.get_queue(node, 'shallow')):
-                # print('resolving shallows')
-                shallowerNodes = self.get_all_nodes_in_interval(nodeInterval - 1)
-                for shallowerNode in shallowerNodes:
-                    edgeIntersection = shallowQueue.intersection(
-                        self.get_triangles(shallowerNode))
-                    if len(edgeIntersection):
-                        self.add_new_edge(shallowerNode, node)
-                        self.graph['nodes'][node]['shallowQueue'].difference_update(
-                            edgeIntersection)
-                        self.graph['nodes'][shallowerNode]['deepQueue'].difference_update(
-                            edgeIntersection)
-
-                # i += 1
-                # if len(self.get_queue(node, 'deep')) == 0 and len(self.get_queue(node, 'shallow')) == 0:
-                #     print('no limit queues left')
-                #     finished = True
-                # if i > 10:
-                #     print('iteration limit exceeded')
-                #     finished = True
-
-        self.msg('> edges established', 'info')
-
-    def classify_nodes(self):
-        classifiedNodes = set()
-        peakQueue = set()
-        pitQueue = set()
-        nrNodes = len(self.graph['nodes'].keys())
-
-        for nodeId in self.graph['nodes'].keys():
-            node = self.graph['nodes'][nodeId]
-            # print(len(node['shallowNeighbors']))
-            if len(node['shallowNeighbors']) == 0:
-                node['classification'] = 'peak'
-                peakQueue.add(nodeId)
-                classifiedNodes.add(nodeId)
-            elif len(node['deepNeighbors']) == 0:
-                node['classification'] = 'pit'
-                pitQueue.add(nodeId)
-                classifiedNodes.add(nodeId)
-
-        finished = True
-        i = 0
-        while not finished:
-            print('============\npQ: ', peakQueue, pitQueue)
-
-            for nodeId in peakQueue.copy():
-                print('nodeId: ', nodeId)
-                for deeperNodeId in self.graph['nodes'][nodeId]['deepNeighbors']:
-                    print('deeperNode: ', deeperNodeId)
-                    deeperNode = self.graph['nodes'][deeperNodeId]
-                    if len(deeperNode['shallowNeighbors'].difference({nodeId})) == 0:
-                        print('only neighboring, im also a peak')
-                        deeperNode['classification'] = 'peak'
-                        peakQueue.add(deeperNodeId)
-                        classifiedNodes.add(deeperNodeId)
-                        peakQueue.remove(nodeId)
-                    else:
-                        print('not the only neighbor')
-                        peakTracker = True
-                        for shallowerNodeId in deeperNode['shallowNeighbors']:
-                            if self.graph['nodes'][shallowerNodeId]['classification'] != 'peak':
-                                peakTracker = False
-                        if len(self.graph['nodes'][deeperNodeId]['deepNeighbors']) > 1:
-                            peakTracker = False
-                        # for deeperNeighborId in self.graph['nodes'][deeperNodeId]['deepNeighbors']:
-                        #     if self.graph['nodes'][deeperNeighborId]['classification'] == 'pit':
-                        #         peakTracker = False
-
-                        if peakTracker:
-                            deeperNode['classification'] = 'peak'
-                            peakQueue.add(deeperNodeId)
-                            classifiedNodes.add(deeperNodeId)
-                            peakQueue.remove(nodeId)
-
-            for nodeId in pitQueue.copy():
-                print('nodeId: ', nodeId)
-                for shallowerNodeId in self.graph['nodes'][nodeId]['shallowNeighbors']:
-                    print('shallowerNode: ', shallowerNodeId)
-                    shallowerNode = self.graph['nodes'][shallowerNodeId]
-                    if len(shallowerNode['deepNeighbors'].difference({nodeId})) == 0:
-                        print('only neighboring, im also a peak')
-                        shallowerNode['classification'] = 'pit'
-                        pitQueue.add(shallowerNodeId)
-                        classifiedNodes.add(shallowerNodeId)
-                        pitQueue.remove(nodeId)
-                    else:
-                        print('not the only neighbor')
-                        pitTracker = True
-                        for deeperNodeId in shallowerNode['deepNeighbors']:
-                            if self.graph['nodes'][deeperNodeId]['classification'] != 'pit':
-                                pitTracker = False
-                        # for shallowerNeighborId in self.graph['nodes'][shallowerNodeId]['shallowNeighbors']:
-                        #     if self.graph['nodes'][shallowerNeighborId]['classification'] == 'peak':
-                        #         pitTracker = False
-                        if len(self.graph['nodes'][shallowerNodeId]['shallowNeighbors']) > 1:
-                            pitTracker = False
-                        if pitTracker:
-                            shallowerNode['classification'] = 'pit'
-                            peakQueue.add(shallowerNodeId)
-                            classifiedNodes.add(shallowerNodeId)
-                            pitQueue.remove(nodeId)
-
-                    # elif len(deeperNode['shallowNeighbors'].difference(peakQueue)) == 0:
-                    #     deeperNode['classification'] = 'peak'
-                    #     peakQueue.add(deeperNodeId)
-                    #     classifiedNodes.add(deeperNodeId)
-                # peakQueue.remove(nodeId)
-
-            i += 1
-            if len(peakQueue) == 0 or len(pitQueue) == 0 or i > 20:
-                finished = True
-                print(peakQueue)
-
-    def build_graph2(self):
-        self.msg('> building triangle region graph...', 'info')
-        self.msg('> splitting all triangles in regions...', 'info')
-        for triangle in self.triangles:
-            if 0 not in triangle:
-                intervals = self.find_intervals(triangle, indexOnly=True)
-                pseudoTriangle = tuple(self.pseudo_triangle(triangle))
-                for interval in intervals:
-                    self.triangleRegionDict[str(interval)].add(pseudoTriangle)
-        self.msg('> all triangles split in regions', 'info')
-
-        self.msg('> splitting regions in touching nodes...', 'info')
-
-        for interval in self.triangleRegionDict.keys():
-            # print(interval)
-            regionTriangles = self.triangleRegionDict[interval]
-            triangleAmount = len(regionTriangles)
-
-            if triangleAmount == 0:
-                self.errors.append(
-                    '{} build_graph2\tno triangles in this interval\tinterval: {}'.format(self.now(), interval))
-                # print('no triangles in this region')
-                break
-
-            indexedTriangles = set()
-            queue = set()
-            finished = False
-            i = 0
-
-            for triangle in regionTriangles:
-                if 0 not in triangle and len(self.find_intervals(triangle)) == 1:
-                    break
-            indexedTriangles.add(triangle)
-            currentNode = self.add_triangle_to_new_node(interval, triangle)
-            queue.add(triangle)
-
-            # for neighboringTriangle in self.adjacent_triangles(triangle):
-            #     if int(interval) in self.find_intervals(neighboringTriangle):
-            #         if neighboringTriangle not in indexedTriangles:
-            #             if not self.saddle_test(triangle, neighboringTriangle, int(interval)):
-            #                 indexedTriangles.add(neighboringTriangle)
-            #                 queue.add(neighboringTriangle)
-            #                 self.add_triangle_to_node(neighboringTriangle, currentNode)
-
-            # print(queue)
-
-            while not finished:
-
-                # for triangle in regionTriangles.copy():
-                #     break
-                additions = 0
-                # print(queue)
-                for triangle in queue.copy():
-                    for neighboringTriangle in self.adjacent_triangles(triangle):
-                        # print(neighboringTriangle)
-                        if 0 not in neighboringTriangle:
-                            neighborIntervals = self.find_intervals(neighboringTriangle)
-                            if int(interval) in neighborIntervals:
-                                if neighboringTriangle not in indexedTriangles:
-                                    if not self.saddle_test(triangle, neighboringTriangle, int(interval)):
-                                        indexedTriangles.add(neighboringTriangle)
-                                        queue.add(neighboringTriangle)
-                                        self.add_triangle_to_node(neighboringTriangle, currentNode)
-                                        additions += 1
-                            if int(interval) + 1 in neighborIntervals:
-                                self.add_triangle_to_queue(
-                                    neighboringTriangle, currentNode, 'deep')
-                            if int(interval) - 1 in neighborIntervals:
-                                self.add_triangle_to_queue(
-                                    neighboringTriangle, currentNode, 'shallow')
-
-                    queue.remove(triangle)
-
-                i += 0
-                if len(indexedTriangles) == triangleAmount:
-                    # print('all triangles in this region visited, ending')
-                    finished = True
-                elif i > 500:
-                    self.errors.append('{} build_graph2\titeration limit exceeded on splitting in touching nodes\tinterval: {}\tcurrent node: {}'.format(self.now(),
-                                                                                                                                                         interval, currentNode))
-                    finished = True
-                elif not additions:
-                    # print('====new node====')
-                    for triangle in regionTriangles.difference(indexedTriangles):
-                        if 0 not in triangle and len(self.find_intervals(triangle)) == 1:
-                            break
-                    indexedTriangles.add(triangle)
-                    # print(triangle)
-                    # print('istriangle: ', self.triangulation.is_triangle(triangle))
-                    # print('neighbors: ', self.adjacent_triangles(triangle))
-
-                    existingTracker = False
-                    neighboringTriangles = self.adjacent_triangles(triangle)
-                    for existingNode in self.get_all_nodes_in_interval(interval):
-                        if existingTracker:
-                            break
-                        # print('\nexistingNode: ', existingNode, interval)
-                        if self.get_triangles(existingNode).intersection(triangle):
-                            self.add_triangle_to_node(triangle, existingNode)
-                            existingTracker = True
-                        else:
-                            for neighboringTriangle in neighboringTriangles:
-                                # print('neighboringTriangle: ', neighboringTriangle)
-                                # print(neighboringTriangle in self.get_triangles(existingNode))
-                                if 0 not in neighboringTriangle:
-                                    neighborIntervals = self.find_intervals(neighboringTriangle)
-                                    # print('neighborIntervals: ', neighborIntervals)
-                                    if int(interval) in neighborIntervals:
-                                        # print('im in the interval')
-                                        # if self.saddle_test(triangle, neighboringTriangle, int(interval)):
-                                        #     # print('im a saddle...')
-                                        if not self.saddle_test(triangle, neighboringTriangle, int(interval)):
-                                            # print('im not a saddle')
-                                            # print(self.get_triangles(
-                                            #     existingNode).intersection(neighboringTriangle))
-                                            # print(neighboringTriangle in self.get_triangles(existingNode))
-                                            if neighboringTriangle in self.get_triangles(existingNode):
-                                                self.add_triangle_to_node(triangle, existingNode)
-                                                existingTracker = True
-                                                break
-
-                    if not existingTracker:
-                        currentNode = self.add_triangle_to_new_node(interval, triangle)
-                        for neighboringTriangle in self.adjacent_triangles(triangle):
-                            if 0 not in neighboringTriangle:
-                                neighborIntervals = self.find_intervals(neighboringTriangle)
-                                if int(interval) in neighborIntervals:
-                                    if neighboringTriangle not in indexedTriangles:
-                                        if not self.saddle_test(triangle, neighboringTriangle, int(interval)):
-                                            indexedTriangles.add(neighboringTriangle)
-                                            queue.add(neighboringTriangle)
-                                            self.add_triangle_to_node(
-                                                neighboringTriangle, currentNode)
-                                if int(interval) + 1 in neighborIntervals:
-                                    self.add_triangle_to_queue(
-                                        neighboringTriangle, currentNode, 'deep')
-                                if int(interval) - 1 in neighborIntervals:
-                                    self.add_triangle_to_queue(
-                                        neighboringTriangle, currentNode, 'shallow')
-
-                    if len(queue) == 0:
-                        finished = True
-                        # print(triangle)
-                        # for vId in triangle:
-                        #     print(self.triangulation.get_point(vId))
-                        # self.msg('no queue left', 'warning')
-                        self.errors.append(
-                            '{} build_graph2\tno queue left\tinterval: {}\tcurrent node: {}'.format(self.now(), interval, currentNode))
-
-            # self.add_triangle_to_new_node(interval, triangle)
-
-        self.msg('> all regions split in adjacent triangles', 'info')
-
-        self.establish_edges()
-
-        self.classify_nodes()
-
-        self.msg('> triangle region graph created', 'info')
-        # self.export_all_node_triangles()
-        # self.export_all_edge_triangles()
-
-        # self.print_graph()
+    # ====================================== #
+    #
+    #   Metrics
+    #
+    # ====================================== #
 
     def angularity(self, ptHead, ptMid, ptTail):
         dx1, dy1 = ptMid[0] - ptHead[0], ptMid[1] - ptHead[1]
@@ -2231,26 +1470,6 @@ class Hydropolator:
         len1 = math.hypot(dx1, dy1)
         len2 = math.hypot(dx2, dy2)
         return round(math.acos(inner_product/(len1*len2)), 4)
-
-    def export_all_angularities(self):
-        pointShpName = 'angularities_{}.shp'.format(self.now())
-        pointShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, pointShpName)
-        # print('invalid/missing isobathsegmentsPoints file: ', pointShpFile)
-
-        with shapefile.Writer(pointShpFile) as wp:
-            wp.field('angle', 'F', decimal=4)
-            # wp.field('id', 'N')
-            # wp.field('segment', 'C')
-            # for point in self.triangulation.all_vertices()[1:]:
-            for edge in self.graph['edges'].keys():
-                # closed = self.graph['edges'][str(edge)]['closed']
-                geom = self.graph['edges'][str(edge)]['geom']
-                pointAngularities = self.graph['edges'][str(edge)]['point_angularities']
-
-                for i in range(len(pointAngularities)):
-                    point = geom[i]
-                    wp.point(point[0], point[1])
-                    wp.record(pointAngularities[i])
 
     def check_isobath_angularity(self, edgeIds=[]):
         if not len(edgeIds):
@@ -2271,4 +1490,852 @@ class Hydropolator:
                 # print(i, geom[i-1], geom[i], geom[i+1])
                 pointAngularities.append(self.angularity(geom[i-1], geom[i], geom[i+1]))
 
-            # print(pointAngularities)
+    # ==================================================================== #
+    #
+    #   NOT IN USE  /  NOT IN USE  /  NOT IN USE  /  NOT IN USE
+    #
+    # ==================================================================== #
+
+    def adjacent_triangles_in_set(self, triangle, lookupSet):
+        adjacentTriangles = []
+        addedVertices = []
+        for vId in triangle:
+            if len(addedVertices) == 3:
+                break
+            else:
+                for incidentTriangle in self.triangulation.incident_triangles_to_vertex(vId):
+                    if len(set(triangle).intersection(incidentTriangle)) == 2 and set(incidentTriangle).difference(triangle) not in addedVertices:
+                        if tuple(self.pseudo_triangle(incidentTriangle)) in lookupSet:
+                            adjacentTriangles.append(self.pseudo_triangle(incidentTriangle))
+                            addedVertices.append(set(incidentTriangle).difference(triangle))
+
+        return adjacentTriangles
+
+    def index_region_triangles(self):
+        self.msg('> indexing region triangles...', 'info')
+        for triangle in self.triangles:
+            min, max = self.minmax_from_triangle(triangle)
+            # print(min, max)
+            for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_left(self.isobathValues, max) + 1):
+                # print(self.regions[index])
+                self.triangleRegions[index].append(triangle)
+        # print(self.triangleRegions)
+        self.msg('> triangles indexed in regions', 'info')
+
+    def locate_point_in_set(self, point, lookupSet):
+        print(self.pseudo_triangle(self.triangulation.locate(point[0], point[1])))
+
+    def create_tr_graph(self):
+        self.trGraph.initialize_graph(self.triangulation)
+        self.trGraph.vertexDict = self.vertexDict
+        self.trGraph.build_graph()
+
+    def generate_walker_graph(self, triangle, interval, nodeId):
+        # NOT IN USE ANYMORE: Max recursion limit
+        for neighbor in self.adjacent_triangles(triangle):
+            if interval in self.find_intervals(neighbor) and not self.triangle_in_node(neighbor, nodeId):
+                # print(neighbor)
+                self.add_triangle_to_node(neighbor, nodeId)
+                self.generate_walker_graph(neighbor, interval, nodeId)
+
+    def iterative_generator(self, triangle, interval, nodeId):
+        print('--itergenerator--', interval)
+        for neighbor in self.adjacent_triangles(triangle):
+            neighborIntervals = self.find_intervals(neighbor)
+            print(neighbor, neighborIntervals)
+
+            if interval in neighborIntervals and not self.triangle_in_node(neighbor, nodeId):
+                self.add_triangle_to_queue(neighbor, nodeId, 'current')
+                print('current')
+
+            if interval+1 in neighborIntervals:
+                alreadyDeeper = False
+                for deeperNeighbor in self.get_neighboring_nodes(nodeId, 'deep'):
+                    if self.triangle_in_node(neighbor, nodeId):
+                        alreadyDeeper = True
+                        print('adeep')
+                        self.remove_triangle_from_queue(neighbor, deeperNeighbor, 'shallow')
+                        self.remove_triangle_from_queue(neighbor, nodeId, 'deep')
+                if not alreadyDeeper:
+                    self.add_triangle_to_queue(neighbor, nodeId, 'deep')
+                    print('deep')
+
+            if interval-1 in neighborIntervals:
+                alreadyShallower = False
+                for shallowerNeighbor in self.get_neighboring_nodes(nodeId, 'shallow'):
+                    if self.triangle_in_node(neighbor, nodeId):
+                        alreadyShallower = True
+                        print('ashallow')
+                        self.remove_triangle_from_queue(neighbor, shallowerNeighbor, 'deep')
+                        self.remove_triangle_from_queue(neighbor, nodeId, 'shallow')
+                if not alreadyShallower:
+                    self.add_triangle_to_queue(neighbor, nodeId, 'shallow')
+                    print('shallow')
+
+    def clean_queues(self, nodeId):
+        deeperNeighbors = self.get_neighboring_nodes(nodeId, 'deep')
+        shallowerNeighbors = self.get_neighboring_nodes(nodeId, 'shallow')
+        deepQueue = self.get_queue(nodeId, 'deep')
+        shallowQueue = self.get_queue(nodeId, 'shallow')
+
+        for deepNeighbor in deeperNeighbors:
+            deepNeighborShallowQueue = self.get_queue(deepNeighbor, 'shallow')
+            for triangle in deepQueue.copy():
+                if triangle in deepNeighborShallowQueue:
+                    self.remove_triangle_from_queue(triangle, deepNeighbor, 'shallow')
+                    self.remove_triangle_from_queue(triangle, nodeId, 'deep')
+        for shallowNeighbor in shallowerNeighbors:
+            shallowNeighborDeepQueue = self.get_queue(shallowNeighbor, 'deep')
+            for triangle in shallowQueue.copy():
+                if triangle in shallowNeighborDeepQueue:
+                    self.remove_triangle_from_queue(triangle, shallowNeighbor, 'deep')
+                    self.remove_triangle_from_queue(triangle, nodeId, 'shallow')
+
+    def expand_node(self, nodeId, interval):
+        while len(self.get_queue(nodeId, 'current')):
+            for triangle in self.get_queue(nodeId, 'current').copy():
+                self.add_triangle_to_node(triangle, nodeId)
+                self.remove_triangle_from_queue(triangle, nodeId, 'current')
+                self.iterative_generator(triangle, interval, nodeId)
+
+        self.clean_queues(nodeId)
+
+    def go_deeper(self, nodeId, interval):
+        for tri in self.get_queue(nodeId, 'deep'):
+            break
+        deeperNode = self.add_triangle_to_new_node(interval+1, tri)
+        self.add_new_edge(nodeId, deeperNode)
+        deeperInterval = self.get_interval_from_node(deeperNode)
+
+        self.iterative_generator(tri, deeperInterval, deeperNode)
+        self.expand_node(deeperNode, deeperInterval)
+
+    def go_shallower(self, nodeId, interval):
+        for tri in self.get_queue(nodeId, 'shallow'):
+            break
+        shallowerNode = self.add_triangle_to_new_node(interval-1, tri)
+        self.add_new_edge(shallowerNode, nodeId)
+        shallowerInterval = self.get_interval_from_node(shallowerNode)
+
+        self.iterative_generator(tri, shallowerInterval, shallowerNode)
+        self.expand_node(shallowerNode, shallowerInterval)
+
+    def grow_node(self, nodeId):
+        nodeInterval = self.get_interval_from_node(nodeId)
+        print('nodeId: ', nodeId, 'nodeInterval: ', nodeInterval)
+        trianglesInNode = self.get_triangles(nodeId)
+
+        additions = True
+        visitedTriangles = set()
+        while additions:
+            addedTriangles = 0
+            for triangle in trianglesInNode.copy():
+                if triangle:  # not in visitedTriangles:
+                    for neighbor in self.adjacent_triangles(triangle):
+                        if 0 in neighbor:
+                            break
+                        if tuple(self.pseudo_triangle(neighbor)) not in visitedTriangles:
+                            visitedTriangles.add(tuple(self.pseudo_triangle(neighbor)))
+
+                            deepTracker = False
+                            shallowTracker = False
+
+                            # same interval
+                            if nodeInterval in self.find_intervals(neighbor) and not self.triangle_in_node(neighbor, nodeId):
+                                self.add_triangle_to_node(neighbor, nodeId)
+                                addedTriangles += 1
+
+                            # deeper interval
+                            # and not self.triangle_in_queue(neighbor, nodeId, 'deep'):
+                            if nodeInterval + 1 in self.find_intervals(neighbor):
+                                for deeperNode in self.get_neighboring_nodes(nodeId, 'deep'):
+                                    if self.triangle_in_queue(neighbor, deeperNode, 'shallow'):
+                                        self.remove_triangle_from_queue(
+                                            neighbor, deeperNode, 'shallow')
+                                        # self.remove_triangle_from_queue(neighbor, nodeId, 'deep')
+                                        deepTracker = True
+                                        # print('remove')
+                                if not deepTracker:
+                                    self.add_triangle_to_queue(neighbor, nodeId, 'deep')
+                                    self.unfinishedDeep.add(nodeId)
+                                    addedTriangles += 1
+                                    # print('not remove')
+
+                            # shallower interval
+                            # and not self.triangle_in_queue(neighbor, nodeId, 'shallow'):
+                            if nodeInterval - 1 in self.find_intervals(neighbor):
+                                for shallowerNode in self.get_neighboring_nodes(nodeId, 'shallow'):
+                                    if self.triangle_in_queue(neighbor, shallowerNode, 'deep'):
+                                        self.remove_triangle_from_queue(
+                                            neighbor, shallowerNode, 'deep')
+                                        # self.remove_triangle_from_queue(neighbor, nodeId, 'shallow')
+                                        shallowTracker = True
+                                        # print('remove')
+                                if not shallowTracker:
+                                    self.add_triangle_to_queue(neighbor, nodeId, 'shallow')
+                                    self.unfinishedShallow.add(nodeId)
+                                    addedTriangles += 1
+                                    # print('not remove')
+            # print(addedTriangles)
+            if not addedTriangles:
+                additions = False
+
+    def grow_deeper(self, nodeId):
+        for triangle in self.get_queue(nodeId, 'deep'):
+            break
+        currentInterval = self.get_interval_from_node(nodeId)
+        deeperInterval = currentInterval + 1
+
+        nodeTracker = False
+        neighbors = self.get_neighboring_nodes(nodeId, 'deep')
+        for neighbor in neighbors:
+            if self.triangle_in_node(triangle, neighbor):
+                nodeTracker = True
+        if not nodeTracker:
+            deeperNode = self.add_triangle_to_new_node(deeperInterval, triangle)
+            self.remove_triangle_from_queue(triangle, nodeId, 'deep')
+            self.add_new_edge(nodeId, deeperNode)
+
+            self.grow_node(deeperNode)
+
+    def grow_shallower(self, nodeId):
+        for triangle in self.get_queue(nodeId, 'shallow'):
+            break
+        currentInterval = self.get_interval_from_node(nodeId)
+        shallowerInterval = currentInterval - 1
+
+        nodeTracker = False
+        neighbors = self.get_neighboring_nodes(nodeId, 'shallow')
+        for neighbor in neighbors:
+            if self.triangle_in_node(triangle, neighbor):
+                nodeTracker = True
+        if not nodeTracker:
+            shallowerNode = self.add_triangle_to_new_node(shallowerInterval, triangle)
+            self.remove_triangle_from_queue(triangle, nodeId, 'shallow')
+            self.add_new_edge(shallowerNode, nodeId)
+
+            self.grow_node(shallowerNode)
+
+    def adjacent_triangle_in_set_with_edge(self, triangle, lookupSet, edge):
+        # print(triangle, edge)
+        adjacentTriangles = []
+        addedVertices = []
+
+        for vertex in edge:
+            for incidentTriangle in self.triangulation.incident_triangles_to_vertex(vertex):
+                # print(incidentTriangle)
+                if len(set(incidentTriangle).intersection(edge)) == 2:
+                    # print(incidentTriangle)
+                    if len(set(incidentTriangle).intersection(triangle)) != 3:
+                        if tuple(self.pseudo_triangle(incidentTriangle)) in lookupSet:
+                            # print(incidentTriangle)
+                            return tuple(self.pseudo_triangle(incidentTriangle))
+
+        return False
+
+        # for vId in triangle:
+        #     if len(addedVertices) == 3:
+        #         break
+        #     else:
+        #         for incidentTriangle in self.triangulation.incident_triangles_to_vertex(vId):
+        #             # print('inc: ', incidentTriangle)
+        #             if len(set(triangle).intersection(incidentTriangle)) == 2 and set(incidentTriangle).difference(triangle) not in addedVertices:
+        #                 if tuple(self.pseudo_triangle(incidentTriangle)) in lookupSet:
+        #                     adjacentTriangles.append(self.pseudo_triangle(incidentTriangle))
+        #                     addedVertices.append(set(incidentTriangle).difference(triangle))
+        #
+        # for triangle in adjacentTriangles:
+        #     # print('adj:', triangle)
+        #     if len(set(triangle).intersection(edge)) == 2:
+        #         return tuple(self.pseudo_triangle(triangle))
+
+        # return False
+
+        # return adjacentTriangles
+        pass
+
+    def generate_isobaths3(self, edgeIds=[]):
+        if len(edgeIds) == 0:
+            edgeIds = list(self.graph['edges'].keys())
+
+        for edge in edgeIds:
+            self.msg('--new edge', 'header')
+            isoValue = self.graph['edges'][edge]['value']
+            print('isoValue: ', isoValue)
+
+            edgeTriangles = self.get_edge_triangles(edge)
+            for triangle in edgeTriangles:
+                intersections, isPoint = self.check_triangle_vertex_intersections_with_value(
+                    triangle, isoValue)
+                if intersections == 0:
+                    startingTriangle = triangle
+                    break
+            print(startingTriangle)
+
+            isobathSegments = []
+            visitedTriangles = set()
+
+            segmentIntersections = self.get_intersected_segments(startingTriangle, isoValue, 'full')
+            isobathSegments.append(segmentIntersections[0])
+            isobathSegments.append(segmentIntersections[1])
+            visitedTriangles.add(startingTriangle)
+            nextTriangle = startingTriangle
+
+            # print(isobathSegments)
+
+            finished = False
+            i = 0
+            while not finished:
+                # print('---New Loop')
+                if len(segmentIntersections) == 2:
+                    # print('find neighboring edge')
+                    nextTriangle = self.adjacent_triangle_in_set_with_edge(
+                        nextTriangle, edgeTriangles.difference(visitedTriangles), segmentIntersections[1])
+                    if not nextTriangle:
+                        # couldnt find a satisfying neighbor (end of sequence)
+                        print('end of sequence')
+                        # finished = True
+                        break
+
+                    # print(nextTriangle)
+                    intersections, isPoint = self.check_triangle_vertex_intersections_with_value(
+                        nextTriangle, isoValue)
+                    # print(intersections, isPoint, nextTriangle)
+
+                    if intersections == 0:
+                        segmentIntersections = self.get_intersected_segments(
+                            nextTriangle, isoValue, 'full')
+                        isobathSegments.append(segmentIntersections[1])
+                        visitedTriangles.add(nextTriangle)
+                    elif intersections == 1:
+                        segmentIntersections == self.get_intersected_segments(
+                            nextTriangle, isoValue, 'nextPoint')
+                        isobathSegments.append(segmentIntersections[0])
+                        visitedTriangles.add(nextTriangle)
+
+                elif len(segmentIntersections) == 1:
+                    print('finding neighboring points')
+
+                    # print(isobathSegments)
+
+                if len(edgeTriangles.difference(visitedTriangles)) == 0:
+                    print('every edge triangle visited')
+                    finished = True
+                i += 0
+                if i > 2:
+                    finished = True
+
+            isoGeom = []
+            for intersection in isobathSegments:
+                # print(intersection)
+                if len(intersection) == 1:
+                    geom = self.triangulation.get_point(intersection[0])
+                    isoGeom.append([geom[0], geom[1]])
+                else:
+                    geomOne = self.triangulation.get_point(intersection[0])
+                    geomTwo = self.triangulation.get_point(intersection[1])
+                    xOne, yOne, zOne = geomOne[0], geomOne[1], self.get_z(
+                        intersection[0], idOnly=True)
+                    xTwo, yTwo, zTwo = geomTwo[0], geomTwo[1], self.get_z(
+                        intersection[1], idOnly=True)
+                    if xOne == xTwo:
+                        x = round(xOne, 3)
+                        y = round(yOne + ((isoValue-zOne)/(zTwo-zOne)) * (yTwo-yOne), 3)
+                    else:
+                        x = round((isoValue*xTwo-isoValue*xOne-zOne*xTwo+zTwo*xOne)/(zTwo-zOne), 3)
+                        y = round((x*(yTwo-yOne)-xOne*yTwo+xTwo*yOne)/(xTwo-xOne), 3)
+                    isoGeom.append([x, y])
+
+            self.graph['edges'][edge]['geom'] = isoGeom
+        self.export_all_isobaths()
+
+    def establish_node(self, nodeId):
+        nodeInterval = self.get_interval_from_node(nodeId)
+        # print('nodeId: ', nodeId, 'nodeInterval: ', nodeInterval)
+        trianglesInNode = self.get_triangles(nodeId)
+
+        visitedTriangles = set()
+        adding = True
+        while adding:
+            addedTriangles = 0
+            for triangle in trianglesInNode.copy():
+                for neighbor in self.adjacent_triangles(triangle):
+                    if 0 in neighbor:
+                        continue
+                    # if len(self.find_intervals(neighbor)) != 1:
+                    #     continue
+                    if tuple(neighbor) not in visitedTriangles:
+                        visitedTriangles.add(tuple(neighbor))
+                        # print(neighbor)
+
+                        # same interval
+                        if nodeInterval in self.find_intervals(neighbor) and not self.triangle_in_node(neighbor, nodeId):
+                            # if not self.saddle_test(triangle, neighbor, nodeInterval):
+                            self.add_triangle_to_node(neighbor, nodeId)
+                            addedTriangles += 1
+                            # else:
+                            #     visitedTriangles.remove(tuple(neighbor))
+
+                        # deeper interval
+                        deepTracker = False
+                        if nodeInterval + 1 in self.find_intervals(neighbor):
+                            for deeperNode in self.get_neighboring_nodes(nodeId, 'deep'):
+                                if self.triangle_in_queue(neighbor, deeperNode, 'shallow'):
+                                    self.remove_triangle_from_queue(neighbor, deeperNode, 'shallow')
+                                    deepTracker = True
+                            if not deepTracker:
+                                self.add_triangle_to_queue(neighbor, nodeId, 'deep')
+                                addedTriangles += 1
+                                # visitedTriangles.add(tuple(neighbor))
+
+                        # shallower interval
+                        shallowTracker = False
+                        if nodeInterval - 1 in self.find_intervals(neighbor):
+                            for shallowerNode in self.get_neighboring_nodes(nodeId, 'shallow'):
+                                if self.triangle_in_queue(neighbor, shallowerNode, 'deep'):
+                                    self.remove_triangle_from_queue(neighbor, shallowerNode, 'deep')
+                                    shallowTracker = True
+                            if not shallowTracker:
+                                self.add_triangle_to_queue(neighbor, nodeId, 'shallow')
+                                addedTriangles += 1
+                                # visitedTriangles.add(tuple(neighbor))
+
+                        # for neighboringNode in self.get_neighboring_nodes(nodeId, 'deep'):
+                        #     if self.triangle_in_queue(neighbor, neighboringNode, 'shallow'):
+                        #         self.remove_triangle_from_queue(
+                        #             neighbor, neighboringNode, 'shallow')
+                        #
+                        # for neighboringNode in self.get_neighboring_nodes(nodeId, 'shallow'):
+                        #     if self.triangle_in_queue(neighbor, neighboringNode, 'deep'):
+                        #         self.remove_triangle_from_queue(neighbor, neighboringNode, 'deep')
+
+            if not addedTriangles:
+                adding = False
+
+        self.check_unfinished(nodeId)
+
+    def resolve_queues(self, nodeId):
+        nodeInterval = self.get_interval_from_node(nodeId)
+        deeperInterval = nodeInterval + 1
+        shallowerInterval = nodeInterval - 1
+        # deeperNodes = self.get_neighboring_nodes(nodeId, 'deep')
+        # shallowerNodes = self.get_neighboring_nodes(nodeId, 'shallow')
+
+        resolved = False
+        while not resolved:
+            # print('deepQueue: ', len(self.get_queue(nodeId, 'deep')))
+            if not len(self.get_queue(nodeId, 'deep')):
+                # print('resolveTrigger')
+                resolved = True
+
+            triangle = 0
+            for triangle in self.get_queue(nodeId, 'deep'):
+                break
+            if triangle:
+                triangleTracker = False
+                for neighboringNode in self.get_neighboring_nodes(nodeId, 'deep'):
+                    if self.triangle_in_node(triangle, neighboringNode):
+                        self.remove_triangle_from_queue(triangle, nodeId, 'deep')
+                        triangleTracker = True
+                if not triangleTracker:
+                    deeperNode = self.add_triangle_to_new_node(deeperInterval, triangle)
+                    self.remove_triangle_from_queue(triangle, nodeId, 'deep')
+                    self.add_new_edge(nodeId, deeperNode)
+                    self.establish_node(deeperNode)
+
+                # print('deepQueue: ', len(self.get_queue(nodeId, 'deep')))
+                # if not len(self.get_queue(nodeId, 'deep')):
+                #     # print('resolveTrigger')
+                #     resolved = True
+            else:
+                # print('resolveTrigger')
+                resolved = True
+
+        resolved = False
+        while not resolved:
+            # print('shallowQueue: ', len(self.get_queue(nodeId, 'deep')))
+            if not len(self.get_queue(nodeId, 'shallow')):
+                # print('resolveTrigger')
+                resolved = True
+
+            triangle = 0
+            for triangle in self.get_queue(nodeId, 'shallow'):
+                break
+            if triangle:
+                triangleTracker = False
+                for neighboringNode in self.get_neighboring_nodes(nodeId, 'shallow'):
+                    if self.triangle_in_node(triangle, neighboringNode):
+                        self.remove_triangle_from_queue(triangle, nodeId, 'shallow')
+                        triangleTracker = True
+                if not triangleTracker:
+                    shallowerNode = self.add_triangle_to_new_node(shallowerInterval, triangle)
+                    self.remove_triangle_from_queue(triangle, nodeId, 'shallow')
+                    self.add_new_edge(shallowerNode, nodeId)
+                    self.establish_node(shallowerNode)
+
+                # print('shallowQueue: ', len(self.get_queue(nodeId, 'deep')))
+                # if not len(self.get_queue(nodeId, 'shallow')):
+                #     print('resolveTrigger')
+                #     resolved = True
+            else:
+                # print('resolveTrigger')
+                resolved = True
+
+        self.check_unfinished(nodeId)
+
+    def build_graph(self):
+        self.msg('> building triangle region graph...', 'info')
+        for startingTriangle in self.triangles:
+            if len(self.find_intervals(startingTriangle)) == 1:
+                break
+        # startingTriangle = self.triangles[23]
+        # startingTriangle = self.triangles[0]
+
+        print('\n=======starter=======')
+        # print(self.minmax_from_triangle(startingTriangle))
+        print('starting triangle: ', startingTriangle)
+        print('starting interval: ', self.find_intervals(startingTriangle))
+        print('=====================')
+
+        intervalStart = self.find_intervals(startingTriangle)[0]
+        currentNodeId = self.add_triangle_to_new_node(intervalStart, startingTriangle)
+
+        self.establish_node(currentNodeId)
+        self.check_unfinished(currentNodeId)
+
+        finished = False
+        i = 0
+        while not finished:
+            for node in self.nodeQueue.copy():
+                print('==============\nresolving node: ', node)
+                print('nodeQueue: ', self.nodeQueue)
+                self.resolve_queues(node)
+                # i += 1
+                # if i == 30:
+                #     finished = True
+            if not len(self.nodeQueue):
+                finished = True
+
+        # self.clean_nodes()
+
+        # self.load_node_queues(currentNodeId)
+
+        ###################
+        # self.grow_node(currentNodeId)
+        #
+        # unfinished = True
+        # i = 0
+        # while unfinished:
+        #     # deepsTracker = len(self.unfinishedDeep)
+        #     #
+        #     # for unfinishedDeep in self.unfinishedDeep.copy():
+        #     #     self.grow_deeper(unfinishedDeep)
+        #     #
+        #     # if len(self.unfinishedDeep) == deepsTracker:
+        #     #     unfinished = False
+        #     shallowsTracker = len(self.unfinishedShallow)
+        #     deepsTracker = len(self.unfinishedDeep)
+        #
+        #     for unfinishedShallow in self.unfinishedShallow.copy():
+        #         self.grow_shallower(unfinishedShallow)
+        #         if not len(self.get_queue(unfinishedShallow, 'shallow')):
+        #             self.unfinishedShallow.remove(unfinishedShallow)
+        #
+        #     for unfinishedDeep in self.unfinishedDeep.copy():
+        #         self.grow_deeper(unfinishedDeep)
+        #         if not len(self.get_queue(unfinishedDeep, 'deep')):
+        #             self.unfinishedDeep.remove(unfinishedDeep)
+        #
+        #     if len(self.unfinishedShallow) == shallowsTracker and len(self.unfinishedDeep) == deepsTracker:
+        #         print('triggered')
+        #         unfinished = False
+        #     # if i == 1:
+        #     #     unfinished = False
+        #
+        #     print(self.unfinishedShallow)
+        #     print(self.unfinishedDeep)
+        #     i += 1
+        #
+        #     # unfinished = False
+        #
+        # print(self.unfinishedShallow)
+        # print(self.unfinishedDeep)
+        # interval = self.get_interval_from_node(currentNodeId)
+        ###################
+
+        ###################
+        # self.iterative_generator(startingTriangle, interval, currentNodeId)
+        # self.expand_node(currentNodeId, interval)
+        # self.go_deeper(currentNodeId, interval)
+        # self.go_shallower(currentNodeId, interval)
+        ###################
+
+        # self.generate_walker_graph(startingTriangle, interval, currentNodeId)
+        # for interval in self.find_intervals(startingTriangle):
+        #     currentNodeId = self.add_triangle_to_new_node(interval, startingTriangle)
+        #     # self.generate_walker_graph(startingTriangle, interval, currentNodeId)
+        #     self.iterative_generator(startingTriangle, interval, currentNodeId)
+        #     while len(self.get_queue(currentNodeId, 'current')):
+        #         for triangle in self.get_queue(currentNodeId, 'current').copy():
+        #             self.add_triangle_to_node(list(triangle), currentNodeId)
+        #             self.remove_triangle_from_queue(list(triangle), currentNodeId, 'current')
+        #             self.iterative_generator(triangle, interval, currentNodeId)
+
+        # print('----neighbors----')
+        # for neighbor in self.adjacent_triangles(startingTriangle):
+        #     # print(neighbor, self.find_intervals(neighbor))
+        #     # print('pseudo: ', self.pseudo_triangle(neighbor))
+        #     print(self.pseudo_triangle(neighbor), self.find_intervals(self.pseudo_triangle(neighbor)))
+
+        # self.add_new_edge(0, 1)
+
+        self.print_graph()
+        print('nodeQueue: ', self.nodeQueue)
+        self.msg('> triangle region graph created', 'info')
+        self.export_all_node_triangles()
+
+    def check_triangle_vertex_intersections_with_value(self, triangle, isoValue):
+        isPoint = False
+
+        pointZees = []
+        for vId in triangle:
+            pointZees.append(self.get_z(vId, idOnly=True))
+        intersections = len(set(pointZees).intersection([isoValue]))
+        # print(intersections)
+
+        if intersections == 1:
+            min, max = self.minmax_from_triangle(triangle)
+            print(min, max)
+            if min == isoValue or max == isoValue:
+                isPoint = True
+
+        return intersections, isPoint
+
+    def check_unfinished(self, nodeId):
+        if len(self.get_queue(nodeId, 'deep')):
+            self.unfinishedDeep.add(nodeId)
+            self.nodeQueue.add(nodeId)
+        else:
+            if nodeId in self.unfinishedDeep:
+                self.unfinishedDeep.remove(nodeId)
+
+        if len(self.get_queue(nodeId, 'shallow')):
+            self.unfinishedShallow.add(nodeId)
+            self.nodeQueue.add(nodeId)
+        else:
+            if nodeId in self.unfinishedShallow:
+                self.unfinishedShallow.remove(nodeId)
+
+        if not len(self.get_queue(nodeId, 'deep')) and not len(self.get_queue(nodeId, 'shallow')):
+            if nodeId in self.nodeQueue:
+                self.nodeQueue.remove(nodeId)
+
+    def clean_nodes(self):
+        for nodeId in self.graph['nodes'].keys():
+            conflictingTris = set()
+            saddleTris = set()
+            print(nodeId)
+            interval = self.get_interval_from_node(nodeId)
+            region = self.regions[interval]
+            print(region)
+            for triangle in self.get_triangles(nodeId):
+                print(triangle)
+                outsiders = 0
+                conflictingVids = []
+                for vId in triangle:
+                    vertexElevation = self.get_z(vId, True)
+                    if vertexElevation < region[0] or vertexElevation > region[1]:
+                        outsiders += 1
+                        conflictingVids.append(vId)
+                        print(vertexElevation)
+
+                if outsiders == 2:
+                    conflictingTris.add((min(conflictingVids), max(conflictingVids)))
+
+                    if (min(conflictingVids), max(conflictingVids)) in conflictingTris:
+                        saddleTris.add(self.pseudo_triangle(triangle))
+            # print(saddleTris)
+            # self.msg('I contain a saddle', 'warning')
+        pass
+
+    def generate_isobaths2(self, edgeIds=[]):
+        if len(edgeIds) == 0:
+            edgeIds = list(self.graph['edges'].keys())
+
+        for edge in edgeIds:
+            self.msg('--new edge', 'header')
+            isoValue = self.graph['edges'][edge]['value']
+            print('isoValue: ', isoValue)
+
+            linePoints = []
+            edgeTriangles = self.get_edge_triangles(edge)
+
+            for triangle in edgeTriangles:
+                triangleLine = self.contour_triangle(triangle, isoValue)
+                if triangleLine != [0, 0]:
+                    # linePoints.append(triangleLine)
+                    linePoints.append(geometry.LineString(
+                        [[triangleLine[0][0], triangleLine[0][1]], [triangleLine[1][0], triangleLine[1][1]]]))
+            # print(linePoints)
+            multiLine = geometry.MultiLineString(linePoints)
+            mergedLine = ops.linemerge(multiLine)
+            self.graph['edges'][edge]['geom'] = mergedLine
+
+        self.export_all_isobaths()
+
+    def generate_isobaths(self, edgeIds=[]):
+        # deep=left of the line
+        if len(edgeIds) == 0:
+            edgeIds = list(self.graph['edges'].keys())
+
+        for edge in edgeIds:
+            self.msg('--new edge', 'header')
+            isoValue = self.graph['edges'][edge]['value']
+            print('isoValue: ', isoValue)
+
+            linePoints = []
+            visitedTriangles = set()
+
+            edgeTriangles = self.get_edge_triangles(edge)
+            for startingTriangle in edgeTriangles:
+                break
+            print(startingTriangle)
+
+            # for vId in startingTriangle:
+            #     print(self.triangulation.get_point(vId))
+
+            trianglePoints = self.contour_triangle(startingTriangle, isoValue)
+            linePoints.append(trianglePoints[0])
+            linePoints.append(trianglePoints[1])
+            visitedTriangles.add(self.pseudo_triangle(startingTriangle))
+            # print(linePoints)
+
+            nextTriangle = startingTriangle
+
+            finished = False
+            while not finished:
+                additions = 0
+
+                for neighbor in self.adjacent_triangles_in_set(nextTriangle, edgeTriangles.difference(visitedTriangles)):
+                    tri = [self.triangulation.get_point(vId) for vId in neighbor]
+                    # print('neighbor: ', neighbor)
+                    # print('tri: ', tri)
+                    # print(point_in_triangle(linePoints[-1], tri))
+                    # print(linePoints)
+                    if point_in_triangle(linePoints[-1], tri):
+                        trianglePoints = self.contour_triangle(neighbor, isoValue)
+                        # linePoints.append(trianglePoints[0])
+                        linePoints.append(trianglePoints[1])
+                        visitedTriangles.add(tuple(self.pseudo_triangle(neighbor)))
+                        # print(linePoints)
+                        # print(len(edgeTriangles.difference(visitedTriangles)))
+                        nextTriangle = neighbor
+                        additions += 1
+
+                if len(edgeTriangles.difference(visitedTriangles)) == 0 or additions == 0:
+                    finished = True
+                # print(self.triangulation.locate(linePoints[-1][0], linePoints[-1][1]))
+                # print(point_in_triangle(linePoints[0], tri))
+
+            self.graph['edges'][edge]['geom'] = linePoints
+
+        self.export_all_isobaths()
+        # closedLine = True
+        # if not closedLine:
+        #     pass
+
+        # for vId in startingTriangle:
+        #     print(self.get_z(vId, idOnly=True))
+
+        # print(edgeTriangles)
+        pass
+
+    def contour_triangle(self, triangle, isoValue):
+
+        triangleVertexZero = self.triangulation.get_point(triangle[0])
+        triangleVertexOne = self.triangulation.get_point(triangle[1])
+        triangleVertexTwo = self.triangulation.get_point(triangle[2])
+        triangleSegments = [[triangleVertexZero, triangleVertexOne],
+                            [triangleVertexOne, triangleVertexTwo],
+                            [triangleVertexTwo, triangleVertexZero]]
+        triangleLine = [0, 0]
+        for i, segment in enumerate(triangleSegments):
+            xOne, yOne, zOne = segment[0][0], segment[0][1], self.get_z(segment[0])
+            xTwo, yTwo, zTwo = segment[1][0], segment[1][1], self.get_z(segment[1])
+            # print(xOne, yOne, zOne)
+            # print(xTwo, yTwo, zTwo)
+            sMin, sMax = min(zOne, zTwo), max(zOne, zTwo)
+            if xTwo-xOne == 0:
+                xTwo += 0.0001
+            if sMin <= isoValue <= sMax:
+                x = round((isoValue*xTwo-isoValue*xOne-zOne*xTwo+zTwo*xOne)/(zTwo-zOne), 3)
+                y = round((x*(yTwo-yOne)-xOne*yTwo+xTwo*yOne)/(xTwo-xOne), 3)
+                # print(x, y)
+                if zOne > zTwo:
+                    triangleLine[0] = (x, y)
+                else:
+                    triangleLine[1] = (x, y)
+                    nextSegment = i
+
+        # nextSegment = {triangle[nextSegment], triangle[(nextSegment+1) % 2]}
+        # print(nextSegment)
+
+        return triangleLine
+
+    def get_intersected_segments(self, triangle, isoValue, type):
+        if type == 'full':
+            # full intersection model
+            segmentIntersections = [0, 0]
+            for i in range(3):
+                # print('segment: ', i)
+                segment = [triangle[i], triangle[(i+1) % 3]]
+                zOne, zTwo = self.get_z(segment[0], idOnly=True), self.get_z(
+                    segment[1], idOnly=True)
+                sMin, sMax = min(zOne, zTwo), max(zOne, zTwo)
+                if sMin < isoValue < sMax:
+                    # print('intersects!')
+                    if zOne > zTwo:
+                        # print('start segment')
+                        segmentIntersections[0] = segment
+                    else:
+                        # print('end segment')
+                        segmentIntersections[1] = segment
+            # print(segmentIntersections)
+            return segmentIntersections
+
+        if type == 'nextPoint':
+            for vId in triangle:
+                vertexZ = self.get_z(vId, idOnly=True)
+                if vertexZ == isoValue:
+                    return [vId]
+
+    def intersected_triangle_segments(self, triangle, isoValue, type):
+        if type == 'full':
+            triangleSegment = ['start', 'end']
+            for i in range(3):
+                segment = [triangle[i], triangle[(i + 1) % 3]]
+                zOne = self.get_z(segment[0], idOnly=True)
+                zTwo = self.get_z(segment[1], idOnly=True)
+                if min(zOne, zTwo) < isoValue < max(zOne, zTwo):
+                    if zOne > zTwo:
+                        # deep is on the left
+                        triangleSegment[0] = segment
+                    else:
+                        triangleSegment[1] = segment
+            return triangleSegment
+
+    def find_next_edge_triangle(self, currentTriangle, edge, lookupSet):
+
+        for vId in edge:
+            incidentTriangles = self.triangulation.incident_triangles_to_vertex(vId)
+            for incidentTriangle in incidentTriangles:
+                if len(set(incidentTriangle).intersection(edge)) == 2:
+                    if len(set(incidentTriangle).intersection(currentTriangle)) != 3:
+                        incidentTriangle = tuple(self.pseudo_triangle(incidentTriangle))
+                        if incidentTriangle not in lookupSet:
+                            return tuple(self.pseudo_triangle(incidentTriangle))
+
+        # no neighboring triangle found
+        return False
+
+    # ================
