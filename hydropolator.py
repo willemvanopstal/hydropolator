@@ -946,6 +946,7 @@ class Hydropolator:
         self.msg('> edges established', 'info')
 
     def classify_nodes(self):
+        self.msg('> classifying nodes...', 'info')
         classifiedNodes = set()
         peakQueue = set()
         pitQueue = set()
@@ -969,72 +970,43 @@ class Hydropolator:
             print('============\npQ: ', peakQueue, pitQueue)
 
             for nodeId in peakQueue.copy():
-                print('nodeId: ', nodeId)
-                for deeperNodeId in self.graph['nodes'][nodeId]['deepNeighbors']:
-                    print('deeperNode: ', deeperNodeId)
-                    deeperNode = self.graph['nodes'][deeperNodeId]
-                    if len(deeperNode['shallowNeighbors'].difference({nodeId})) == 0:
-                        print('only neighboring, im also a peak')
-                        deeperNode['classification'] = 'peak'
-                        peakQueue.add(deeperNodeId)
-                        classifiedNodes.add(deeperNodeId)
-                        peakQueue.remove(nodeId)
-                    else:
-                        print('not the only neighbor')
-                        peakTracker = True
-                        for shallowerNodeId in deeperNode['shallowNeighbors']:
+                node = self.graph['nodes'][nodeId]
+                deeperNodeIds = self.get_neighboring_nodes(nodeId, 'deep')
+                print(nodeId, deeperNodeIds)
+                if len(deeperNodeIds) == 1:
+                    peakTracker = True
+                    for deeperNodeId in deeperNodeIds:
+                        for shallowerNodeId in self.get_neighboring_nodes(deeperNodeId, 'shallow'):
                             if self.graph['nodes'][shallowerNodeId]['classification'] != 'peak':
                                 peakTracker = False
-                        if len(self.graph['nodes'][deeperNodeId]['deepNeighbors']) > 1:
-                            peakTracker = False
-                        # for deeperNeighborId in self.graph['nodes'][deeperNodeId]['deepNeighbors']:
-                        #     if self.graph['nodes'][deeperNeighborId]['classification'] == 'pit':
-                        #         peakTracker = False
-
                         if peakTracker:
-                            deeperNode['classification'] = 'peak'
-                            peakQueue.add(deeperNodeId)
-                            classifiedNodes.add(deeperNodeId)
-                            peakQueue.remove(nodeId)
+                            if len(self.get_neighboring_nodes(deeperNodeId, 'deep')) == 1:
+                                self.graph['nodes'][deeperNodeId]['classification'] = 'peak'
+                                peakQueue.add(deeperNodeId)
+                peakQueue.remove(nodeId)
 
             for nodeId in pitQueue.copy():
-                print('nodeId: ', nodeId)
-                for shallowerNodeId in self.graph['nodes'][nodeId]['shallowNeighbors']:
-                    print('shallowerNode: ', shallowerNodeId)
-                    shallowerNode = self.graph['nodes'][shallowerNodeId]
-                    if len(shallowerNode['deepNeighbors'].difference({nodeId})) == 0:
-                        print('only neighboring, im also a peak')
-                        shallowerNode['classification'] = 'pit'
-                        pitQueue.add(shallowerNodeId)
-                        classifiedNodes.add(shallowerNodeId)
-                        pitQueue.remove(nodeId)
-                    else:
-                        print('not the only neighbor')
-                        pitTracker = True
-                        for deeperNodeId in shallowerNode['deepNeighbors']:
+                node = self.graph['nodes'][nodeId]
+                shallowerNodeIds = self.get_neighboring_nodes(nodeId, 'shallow')
+                print(nodeId, shallowerNodeIds)
+                if len(shallowerNodeIds) == 1:
+                    pitTracker = True
+                    for shallowerNodeId in shallowerNodeIds:
+                        for deeperNodeId in self.get_neighboring_nodes(shallowerNodeId, 'deep'):
                             if self.graph['nodes'][deeperNodeId]['classification'] != 'pit':
                                 pitTracker = False
-                        # for shallowerNeighborId in self.graph['nodes'][shallowerNodeId]['shallowNeighbors']:
-                        #     if self.graph['nodes'][shallowerNeighborId]['classification'] == 'peak':
-                        #         pitTracker = False
-                        if len(self.graph['nodes'][shallowerNodeId]['shallowNeighbors']) > 1:
-                            pitTracker = False
                         if pitTracker:
-                            shallowerNode['classification'] = 'pit'
-                            peakQueue.add(shallowerNodeId)
-                            classifiedNodes.add(shallowerNodeId)
-                            pitQueue.remove(nodeId)
-
-                    # elif len(deeperNode['shallowNeighbors'].difference(peakQueue)) == 0:
-                    #     deeperNode['classification'] = 'peak'
-                    #     peakQueue.add(deeperNodeId)
-                    #     classifiedNodes.add(deeperNodeId)
-                # peakQueue.remove(nodeId)
+                            if len(self.get_neighboring_nodes(shallowerNodeId, 'shallow')) == 1:
+                                self.graph['nodes'][shallowerNodeId]['classification'] = 'pit'
+                                pitQueue.add(shallowerNodeId)
+                pitQueue.remove(nodeId)
 
             i += 1
-            if len(peakQueue) == 0 or len(pitQueue) == 0 or i > 20:
+            if len(peakQueue) == 0 and len(pitQueue) == 0 or i > 20:
                 finished = True
-                print(peakQueue)
+                print(peakQueue, pitQueue)
+
+        self.msg('> nodes classified', 'info')
 
     # --------------- #
     #   UPDATING
@@ -1552,7 +1524,6 @@ class Hydropolator:
             node['full_area'] = 0
             for triangle in nodeTriangles:
                 node['full_area'] += self.triangle_area(triangle)
-            print(nodeId, node['full_area'])
 
     # ==================================================================== #
     #

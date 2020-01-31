@@ -166,6 +166,7 @@ if args.triangleregiongraph:
     else:
         projectObject.build_graph2()
 
+    projectObject.make_network_graph()
     # projectObject.export_shapefile('outputting')
 
 
@@ -174,7 +175,6 @@ if args.isobaths:
     projectObject.generate_isobaths4()
     msg('> isobaths generated', 'info')
     projectObject.export_all_isobaths()
-    # projectObject.make_network_graph()
 
 if args.angularity:
     msg('> checking angularity in isobaths...', 'info')
