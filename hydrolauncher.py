@@ -39,6 +39,12 @@ parser.add_argument('-project',
                     default=None,
                     help='open an existing project')
 
+parser.add_argument('-clean',
+                    metavar='',
+                    type=str,
+                    default=None,
+                    help='clean files older then hh:mm')
+
 parser.add_argument('-pointfile',
                     metavar='input_point_file.csv',
                     type=str,
@@ -92,6 +98,12 @@ parser.add_argument('-angularity',
                     default=False,
                     help='check for angularity')
 
+parser.add_argument('-nodearea',
+                    metavar=' ',
+                    type=str,
+                    default=False,
+                    help='computes full node areas')
+
 args = parser.parse_args()
 cwd = os.getcwd()
 projectDir = os.path.join(cwd, 'projects')
@@ -108,6 +120,13 @@ elif args.project:
         msg('> loaded project', 'header')
         projectObject.summarize_project()
         print(projectObject.insertions)
+
+if args.clean:
+    hours = int(args.clean.split(':')[0])
+    minutes = int(args.clean.split(':')[1])
+    msg('> removing files older than: {} hours, {} minutes'.format(hours, minutes), 'warning')
+    projectObject.clean_files(60*hours + minutes)
+    msg('> removed all older files', 'info')
 
 if args.flip:
     flip = True
@@ -162,6 +181,12 @@ if args.angularity:
     projectObject.check_isobath_angularity()
     msg('> checked angulariy in isobaths', 'info')
     projectObject.export_all_angularities()
+
+if args.nodearea:
+    msg('> computing area of nodes...', 'info')
+    projectObject.compute_node_area()
+    msg('> computed area of nodes', 'info')
+    # projectObject.export_all_angularities()
 
 if args.graph:
     msg('> visualizing graph...', 'info')

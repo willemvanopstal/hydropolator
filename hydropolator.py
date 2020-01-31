@@ -1,4 +1,5 @@
 
+from decimal import *
 import math
 import networkx as nx
 from matplotlib import cm, colors
@@ -322,6 +323,41 @@ class Hydropolator:
         boundsListFloat = [float(value) for value in boundsList]
         return boundsListFloat
 
+    def clean_files(self, minutes):
+        currentTime = datetime.now()
+        projectDir = os.path.join(os.getcwd(), 'projects', self.projectName)
+        print(projectDir)
+
+        filesToKeep = ['metafile', 'triangulationTracker',
+                       'triangulationVertices', 'vertexElevations', 'triangleRegionGraph', '.DS_Store']
+        filesToRemove = []
+        for file in os.listdir(projectDir):
+            if file not in filesToKeep:
+                # print(file)
+                dateIndicationList = file.split('.')[0].split('_')
+                dateIndication = dateIndicationList[-2] + '_' + dateIndicationList[-1]
+                datetimeObject = datetime.strptime(dateIndication, '%Y%m%d_%H%M%S')
+                minutesDiff = (currentTime - datetimeObject).total_seconds() / 60.0
+
+                # print(datetimeObject, currentTime, minutesDiff)
+                if minutesDiff > minutes:
+                    self.msg('> file: {}'.format(file), 'warning')
+                    filePath = os.path.join(projectDir, file)
+                    # os.remove(filePath)
+                    filesToRemove.append(filePath)
+
+        if len(filesToRemove):
+            self.msg('Are you sure to remove these files?', 'warning')
+            confirmation = input('Y/n')
+            if confirmation == 'Y':
+                for filePath in filesToRemove:
+                    os.remove(filePath)
+                self.msg('> {} files removed'.format(len(filesToRemove)), 'header')
+            else:
+                self.msg('> No files removed', 'header')
+        else:
+            self.msg('> No files removed', 'header')
+
     # ====================================== #
     #
     #   Exporting
@@ -396,6 +432,7 @@ class Hydropolator:
             wt.field('interval', 'C')
             wt.field('shallowNbs', 'C')
             wt.field('deepNbs', 'C')
+            wt.field('full_area', 'F', decimal=3)
             for node in nodeIds:
                 geom = []
                 for triangle in self.graph['nodes'][node]['triangles']:
@@ -405,9 +442,10 @@ class Hydropolator:
                 interval = str(self.regions[region])
                 shallowNeighbors = str(self.get_neighboring_nodes(node, 'shallow'))
                 deepNeighbors = str(self.get_neighboring_nodes(node, 'deep'))
+                nodeArea = self.graph['nodes'][node]['full_area']
 
                 wt.poly(geom)
-                wt.record(int(node), region, interval, shallowNeighbors, deepNeighbors)
+                wt.record(int(node), region, interval, shallowNeighbors, deepNeighbors, nodeArea)
 
         self.msg('> selected node triangles saved', 'info')
 
@@ -1011,7 +1049,7 @@ class Hydropolator:
         #     tuple(self.pseudo_triangle(triangle))}, 'edges': set()}
         nodeId = str(self.nrNodes)
         self.graph['nodes'][nodeId] = {'region': interval, 'triangles': {tuple(self.pseudo_triangle(
-            triangle))}, 'deepNeighbors': set(), 'shallowNeighbors': set(), 'currentQueue': set(), 'shallowQueue': set(), 'deepQueue': set(), 'classification': None}
+            triangle))}, 'deepNeighbors': set(), 'shallowNeighbors': set(), 'currentQueue': set(), 'shallowQueue': set(), 'deepQueue': set(), 'classification': None, 'full_area': None}
         self.nrNodes += 1
         # print('new node: ', nodeId)
 
@@ -1490,12 +1528,39 @@ class Hydropolator:
                 # print(i, geom[i-1], geom[i], geom[i+1])
                 pointAngularities.append(self.angularity(geom[i-1], geom[i], geom[i+1]))
 
+    def triangle_area(self, triangle):
+        ptOne = self.triangulation.get_point(triangle[0])
+        ptTwo = self.triangulation.get_point(triangle[1])
+        ptThree = self.triangulation.get_point(triangle[2])
+
+        a = math.hypot(ptTwo[0] - ptOne[0], ptTwo[1] - ptOne[1])
+        b = math.hypot(ptThree[0] - ptTwo[0], ptThree[1] - ptTwo[1])
+        c = math.hypot(ptOne[0] - ptThree[0], ptOne[1] - ptThree[1])
+
+        s = (a + b + c) / 2
+        area = math.sqrt(s * (s - a) * (s - b) * (s - c))
+
+        return Decimal(str(round(area, 3)))
+
+    def compute_node_area(self, nodeIds=[]):
+        if not len(nodeIds):
+            nodeIds = self.graph['edges'].keys()
+
+        for nodeId in nodeIds:
+            node = self.graph['nodes'][nodeId]
+            nodeTriangles = self.get_triangles(nodeId)
+            node['full_area'] = 0
+            for triangle in nodeTriangles:
+                node['full_area'] += self.triangle_area(triangle)
+            print(nodeId, node['full_area'])
+
     # ==================================================================== #
     #
     #   NOT IN USE  /  NOT IN USE  /  NOT IN USE  /  NOT IN USE
     #
     # ==================================================================== #
 
+    '''
     def adjacent_triangles_in_set(self, triangle, lookupSet):
         adjacentTriangles = []
         addedVertices = []
@@ -2007,7 +2072,7 @@ class Hydropolator:
         i = 0
         while not finished:
             for node in self.nodeQueue.copy():
-                print('==============\nresolving node: ', node)
+                print('==============resolving node: ', node)
                 print('nodeQueue: ', self.nodeQueue)
                 self.resolve_queues(node)
                 # i += 1
@@ -2337,5 +2402,7 @@ class Hydropolator:
 
         # no neighboring triangle found
         return False
+
+    '''
 
     # ================
