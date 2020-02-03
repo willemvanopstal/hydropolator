@@ -4,6 +4,7 @@ import math
 import networkx as nx
 from matplotlib import cm, colors
 import matplotlib.pyplot as plt
+import numpy as np
 from ElevationDict import ElevationDict
 # from PointInTriangle import point_in_triangle
 import os
@@ -477,9 +478,11 @@ class Hydropolator:
         with shapefile.Writer(lineShpFile) as wt:
             wt.field('value', 'F', decimal=4)
             wt.field('id', 'N')
+            wt.field('iso_area', 'F', decimal=3)
             for edgeId in self.graph['edges'].keys():
                 # geom = [[list(value) for value in self.graph['edges'][edgeId]['geom']]]
                 geom = self.graph['edges'][edgeId]['geom']
+                isoArea = self.graph['edges'][edgeId]['iso_area']
                 # print(geom)
                 # geom = []
                 # print(self.graph['edges'][edgeId]['geom'])
@@ -490,7 +493,7 @@ class Hydropolator:
                 #     geom.append(self.poly_from_triangle(triangle))
                 wt.line([geom])
                 isoValue = self.graph['edges'][edgeId]['value']
-                wt.record(isoValue, int(edgeId))
+                wt.record(isoValue, int(edgeId), isoArea)
 
         self.msg('> isobaths saved', 'info')
 
@@ -1087,6 +1090,7 @@ class Hydropolator:
             self.graph['nodes'][str(deepNode)]['shallowNeighbors'].add(shallowNode)
             self.graph['edges'][edgeId]['value'] = self.get_edge_value(edgeId)
             self.graph['edges'][edgeId]['closed'] = None
+            self.graph['edges'][edgeId]['iso_area'] = None
             self.nrEdges += 1
 
     def get_edge_value(self, edgeId):
@@ -1516,14 +1520,39 @@ class Hydropolator:
 
     def compute_node_area(self, nodeIds=[]):
         if not len(nodeIds):
-            nodeIds = self.graph['edges'].keys()
+            nodeIds = self.graph['nodes'].keys()
 
         for nodeId in nodeIds:
+            print(nodeId, 'node_area ')
             node = self.graph['nodes'][nodeId]
             nodeTriangles = self.get_triangles(nodeId)
             node['full_area'] = 0
             for triangle in nodeTriangles:
                 node['full_area'] += self.triangle_area(triangle)
+
+    def compute_isobath_area(self, edgeIds=[]):
+        if not len(edgeIds):
+            edgeIds = self.graph['edges'].keys()
+
+        for edgeId in edgeIds:
+            if self.graph['edges'][edgeId]['closed'] == True:
+                print(edgeId, 'im closed isobath, calculating area')
+
+                ptArray = np.array([[p[0], p[1]] for p in self.graph['edges'][edgeId]['geom']])
+                x = ptArray[:, 0]
+                y = ptArray[:, 1]
+
+                # https://stackoverflow.com/a/53864271
+                # coordinate shift
+                x_ = x - x.mean()
+                y_ = y - y.mean()
+                # everything else is the same as maxb's code
+                correction = x_[-1] * y_[0] - y_[-1] * x_[0]
+                main_area = np.dot(x_[:-1], y_[1:]) - np.dot(y_[:-1], x_[1:])
+                isoArea = 0.5*np.abs(main_area + correction)
+                print(round(isoArea, 3))
+
+                self.graph['edges'][edgeId]['iso_area'] = round(isoArea, 3)
 
     # ==================================================================== #
     #

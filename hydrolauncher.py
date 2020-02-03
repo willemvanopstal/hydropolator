@@ -174,6 +174,7 @@ if args.isobaths:
     msg('> generating isobaths...', 'info')
     projectObject.generate_isobaths4()
     msg('> isobaths generated', 'info')
+    projectObject.compute_isobath_area()
     projectObject.export_all_isobaths()
 
 if args.angularity:
