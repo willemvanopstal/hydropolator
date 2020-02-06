@@ -1500,25 +1500,45 @@ class Hydropolator:
                 for vId in triangle:
                     # print(vId)
                     i += 0
-                    indexedVertices.add(vId)
+                    if vId != 0:
+                        indexedVertices.add(vId)
 
-                if i > 10:  # only for testing
+                if i > 30:  # only for testing
                     break
             print('added vertices: ', len(indexedVertices)-prevLen)
 
         return indexedVertices
 
     def smooth_vertices(self, vertexSet):
+        # disabled the convex hull vertices
+
         print('smoothing ...')
 
         triangleCenters = dict()
 
         for vertex in vertexSet:
+
             print('---- ', vertex)
+
+            handleConvex = False
+            if self.triangulation.is_vertex_convex_hull(vertex):
+                # handle different...
+                # discard at all, too few information
+                print('im on the hull! skipping')
+                handleConvex = True
+                continue
+
+            adjacentVertices = self.triangulation.adjacent_vertices_to_vertex(vertex)
+            if 0 in adjacentVertices:
+                # some kind of convex hull. Not sure how to handle this one yet.
+                print('Im a neighbor of vertex 0, some sort of convex hull, SKIPPING')
+                continue
+
             vertexLocation = self.triangulation.get_point(vertex)
             originalZ = self.get_z(vertex, idOnly=True)
             # print(self.triangulation.get_point(vertex))
-            adjacentVertices = self.triangulation.adjacent_vertices_to_vertex(vertex)
+            nrAdjacentVertices = len(adjacentVertices)
+            # print(nrAdjacentVertices)
             incidentTriangles = self.triangulation.incident_triangles_to_vertex(vertex)
             # print(adjacentVertices)
             # print(incidentTriangles)
@@ -1527,10 +1547,6 @@ class Hydropolator:
             sumOfWeightedAvg = 0
             for i, adjacentVertex in enumerate(adjacentVertices):
                 # print(adjacentVertex)
-                leftTriangle = incidentTriangles[i]
-                rightTriangle = incidentTriangles[i-1]
-                leftPseudoTriangle = tuple(self.pseudo_triangle(leftTriangle))
-                rightPseudoTriangle = tuple(self.pseudo_triangle(rightTriangle))
 
                 # delaunay distances
                 adjacentVertexLocation = self.triangulation.get_point(adjacentVertex)
@@ -1538,6 +1554,35 @@ class Hydropolator:
                 dyT = vertexLocation[1] - adjacentVertexLocation[1]
                 dtDist = math.hypot(dxT, dyT)
                 # print(dtDist)
+
+                leftTriangle = incidentTriangles[i]
+                rightTriangle = incidentTriangles[i-1]
+                leftPseudoTriangle = tuple(self.pseudo_triangle(leftTriangle))
+                rightPseudoTriangle = tuple(self.pseudo_triangle(rightTriangle))
+
+                # print('original: ', leftPseudoTriangle, rightPseudoTriangle)
+
+                if 0 in leftTriangle:
+                    print('leftTriangle contains 0')
+                elif 0 in rightTriangle:
+                    print('rightTriangle contains 0')
+
+                # if handleConvex:
+                #     if self.triangulation.is_vertex_convex_hull(adjacentVertex):
+                #         print('adjacent vertex is hull')
+                #         if self.triangulation.is_vertex_convex_hull(adjacentVertices[i-1]):
+                #             print('right is empty')
+                #             leftTriangle = [vertex, adjacentVertex,
+                #                             adjacentVertices[(i+1) % nrAdjacentVertices]]
+                #             leftPseudoTriangle = tuple(self.pseudo_triangle(leftTriangle))
+                #             rightPseudoTriangle = None
+                #         elif self.triangulation.is_vertex_convex_hull(adjacentVertices[(i+1) % nrAdjacentVertices]):
+                #             print('left is empty')
+                #             rightTriangle = [vertex, adjacentVertices[i-1], adjacentVertex]
+                #             rightPseudoTriangle = tuple(self.pseudo_triangle(rightTriangle))
+                #             leftPseudoTriangle = None
+
+                # print('new triangles: ', leftPseudoTriangle, rightPseudoTriangle)
 
                 # voronoi distances
                 if not leftPseudoTriangle in triangleCenters:
@@ -1567,10 +1612,10 @@ class Hydropolator:
             # print(originalZ, interpolatedZ, interpolatedZ < originalZ)
 
             if interpolatedZ < originalZ:
-                print('updated vertex')
+                print('updated vertex', interpolatedZ)
                 self.add_vertex_to_queue(vertex, interpolatedZ, idOnly=True)
 
-        self.vertexDict.update_values_from_queue()
+        # self.vertexDict.update_values_from_queue()
         # print(adjacentVertex, leftPseudoTriangle, rightPseudoTriangle)
 
     def circumcenter(self, triangle):
