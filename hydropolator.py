@@ -377,10 +377,12 @@ class Hydropolator:
         with shapefile.Writer(pointShpFile) as wp:
             wp.field('depth', 'F', decimal=4)
             wp.field('id', 'N')
+            wp.field('diff', 'F', decimal=4)
             # for point in self.triangulation.all_vertices()[1:]:
             for i, point in enumerate(self.vertices[1:]):  # remove the infinite vertex in startTIN
+                actualZ = self.get_z(point, idOnly=False)
                 wp.point(point[0], point[1])
-                wp.record(point[2], i)
+                wp.record(point[2], i, point[2]-actualZ)
             self.msg('> points written to shapefile', 'info')
 
         with shapefile.Writer(triangleShpFile) as wt:
@@ -654,6 +656,14 @@ class Hydropolator:
         else:
             parsedVertex = self.triangulation.get_point(vertex)
             return self.vertexDict.get_z(parsedVertex)
+
+    def add_vertex_to_queue(self, vertex, new_z, idOnly=False):
+        # return self.vertexDict[tuple(vertex)]['z']
+        if not idOnly:
+            self.vertexDict.add_to_queue(vertex, new_z)
+        else:
+            parsedVertex = self.triangulation.get_point(vertex)
+            self.vertexDict.add_to_queue(parsedVertex, new_z)
 
     # ====================================== #
     #
@@ -1470,6 +1480,119 @@ class Hydropolator:
                 isPoint = True
 
         return intersections, isPoint
+
+    # ====================================== #
+    #
+    #   Interpolation
+    #
+    # ====================================== #
+
+    def get_vertices_from_node(self, nodeIds):
+        print(nodeIds)
+        indexedVertices = set()
+
+        for nodeId in nodeIds:
+            prevLen = len(indexedVertices)
+            print('nodeId: ', nodeId)
+            triangles = self.get_triangles(nodeId)
+            i = 0
+            for triangle in triangles:
+                for vId in triangle:
+                    # print(vId)
+                    i += 0
+                    indexedVertices.add(vId)
+
+                if i > 10:  # only for testing
+                    break
+            print('added vertices: ', len(indexedVertices)-prevLen)
+
+        return indexedVertices
+
+    def smooth_vertices(self, vertexSet):
+        print('smoothing ...')
+
+        triangleCenters = dict()
+
+        for vertex in vertexSet:
+            print('---- ', vertex)
+            vertexLocation = self.triangulation.get_point(vertex)
+            originalZ = self.get_z(vertex, idOnly=True)
+            # print(self.triangulation.get_point(vertex))
+            adjacentVertices = self.triangulation.adjacent_vertices_to_vertex(vertex)
+            incidentTriangles = self.triangulation.incident_triangles_to_vertex(vertex)
+            # print(adjacentVertices)
+            # print(incidentTriangles)
+
+            sumOfWeights = 0
+            sumOfWeightedAvg = 0
+            for i, adjacentVertex in enumerate(adjacentVertices):
+                # print(adjacentVertex)
+                leftTriangle = incidentTriangles[i]
+                rightTriangle = incidentTriangles[i-1]
+                leftPseudoTriangle = tuple(self.pseudo_triangle(leftTriangle))
+                rightPseudoTriangle = tuple(self.pseudo_triangle(rightTriangle))
+
+                # delaunay distances
+                adjacentVertexLocation = self.triangulation.get_point(adjacentVertex)
+                dxT = vertexLocation[0] - adjacentVertexLocation[0]
+                dyT = vertexLocation[1] - adjacentVertexLocation[1]
+                dtDist = math.hypot(dxT, dyT)
+                # print(dtDist)
+
+                # voronoi distances
+                if not leftPseudoTriangle in triangleCenters:
+                    leftCenter = self.circumcenter(leftPseudoTriangle)
+                    triangleCenters[leftPseudoTriangle] = leftCenter
+                else:
+                    leftCenter = triangleCenters[leftPseudoTriangle]
+                if not rightPseudoTriangle in triangleCenters:
+                    rightCenter = self.circumcenter(rightPseudoTriangle)
+                    triangleCenters[rightPseudoTriangle] = rightCenter
+                else:
+                    rightCenter = triangleCenters[rightPseudoTriangle]
+
+                dxV = rightCenter[0] - leftCenter[0]
+                dyV = rightCenter[1] - leftCenter[1]
+                vdDist = math.hypot(dxV, dyV)
+                # print(vdDist)
+
+                # weighted average
+                vertexZ = self.get_z(adjacentVertex, idOnly=True)
+                vertexWeight = vdDist / dtDist
+                vertexWeightedAvg = vertexWeight * vertexZ
+                sumOfWeights += vertexWeight
+                sumOfWeightedAvg += vertexWeightedAvg
+
+            interpolatedZ = round(sumOfWeightedAvg / sumOfWeights, 3)
+            # print(originalZ, interpolatedZ, interpolatedZ < originalZ)
+
+            if interpolatedZ < originalZ:
+                print('updated vertex')
+                self.add_vertex_to_queue(vertex, interpolatedZ, idOnly=True)
+
+        self.vertexDict.update_values_from_queue()
+        # print(adjacentVertex, leftPseudoTriangle, rightPseudoTriangle)
+
+    def circumcenter(self, triangle):
+        # https://stackoverflow.com/a/56225021
+        ptA = self.triangulation.get_point(triangle[0])
+        ptB = self.triangulation.get_point(triangle[1])
+        ptC = self.triangulation.get_point(triangle[2])
+        ax, ay = ptA[0], ptA[1]
+        bx, by = ptB[0], ptB[1]
+        cx, cy = ptC[0], ptC[1]
+        # ax = float(input('What is x of point 1?'))
+        # ay = float(input('What is y of point 1?'))
+        # bx = float(input('What is x of point 2?'))
+        # by = float(input('What is y of point 2?'))
+        # cx = float(input('What is x of point 3?'))
+        # cy = float(input('What is y of point 3?'))
+        d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+        ux = ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by)
+              * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / d
+        uy = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by)
+              * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / d
+        return (ux, uy)
 
     # ====================================== #
     #

@@ -98,6 +98,13 @@ parser.add_argument('-angularity',
                     default=False,
                     help='check for angularity')
 
+parser.add_argument('-smooth_node',
+                    metavar=' ',
+                    type=str,
+                    nargs='+',
+                    default=False,
+                    help='smooth a node with id')
+
 parser.add_argument('-nodearea',
                     metavar=' ',
                     type=str,
@@ -140,11 +147,6 @@ if args.pointfile:
     else:
         projectObject.load_pointfile(args.pointfile, args.filetype, args.delimiter, flip)
     projectObject.summarize_project()
-
-if args.exportshp:
-    msg('> exporting shapefiles', 'info')
-    projectObject.summarize_project()
-    projectObject.export_shapefile(args.exportshp)
 
 if args.regions:
     msg('> generating regions', 'info')
@@ -189,15 +191,27 @@ if args.nodearea:
     msg('> computed area of nodes', 'info')
     # projectObject.export_all_angularities()
 
+if args.smooth_node:
+    msg('> smoothing node...', 'info')
+    projectObject.smooth_vertices(projectObject.get_vertices_from_node(args.smooth_node))
+    msg('> node smoothened', 'info')
+    # projectObject.export_all_angularities()
+
 if args.graph:
     msg('> visualizing graph...', 'info')
     projectObject.make_network_graph()
     msg('> visualized graph', 'info')
 
+
+if args.exportshp:
+    msg('> exporting shapefiles', 'info')
+    projectObject.summarize_project()
+    projectObject.export_shapefile(args.exportshp)
+
 if projectObject:
     projectObject.export_all_edge_triangles()
     projectObject.export_all_node_triangles()
-    projectObject.print_graph()
+    # projectObject.print_graph()
     projectObject.print_errors()
 
     msg('\n> shutting down...', 'header')
