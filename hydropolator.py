@@ -1113,6 +1113,7 @@ class Hydropolator:
 
     def insert_triangles_into_region_graph(self, trianglesWithInterval, oldTriangleInventory):
         self.msg('inserting triangles again...', 'info')
+        print(len(trianglesWithInterval.keys()))
 
         tempTriangleRegionDict = {}
 
@@ -1125,6 +1126,12 @@ class Hydropolator:
                 else:
                     tempTriangleRegionDict[str(interval)].add(triangle)
 
+        tempDebugging = set()
+        # for inter in tempTriangleRegionDict.keys():
+        #     for tri in tempTriangleRegionDict[inter]:
+        #         tempDebugging.add(tri)
+        # print(len(tempDebugging))
+
         tempNodes = dict()
         insertedTriangles = 0
         updates = 0
@@ -1133,6 +1140,7 @@ class Hydropolator:
         for interval in tempTriangleRegionDict.keys():
             # print(interval)
             regionTriangles = tempTriangleRegionDict[interval]
+            tempDebugging.update(regionTriangles)
             triangleAmount = len(regionTriangles)
             print('----- new interval\n', interval, triangleAmount)
 
@@ -1180,7 +1188,7 @@ class Hydropolator:
                                                 oldTriangleInventory[triangle])
                                             additions += 1
                                             insertedTriangles += 1
-                                            insertedTrianglesSet.add(triangle)
+                                            insertedTrianglesSet.add(neighboringTriangle)
                                 if int(interval) + 1 in neighborIntervals:
                                     self.add_triangle_to_queue(
                                         neighboringTriangle, currentNode, 'deep')
@@ -1193,6 +1201,7 @@ class Hydropolator:
                 i += 0
                 if len(indexedTriangles) == triangleAmount:
                     print('all triangles in this region visited, ending')
+                    print(len(indexedTriangles))
                     finished = True
                 elif i > 500:
                     self.errors.append('{} insert_triangles_into_region_graph\titeration limit exceeded on splitting in touching nodes\tinterval: {}\tcurrent node: {}'.format(
@@ -1267,7 +1276,7 @@ class Hydropolator:
                                                 self.add_triangle_to_node(
                                                     neighboringTriangle, currentNode)
                                                 insertedTriangles += 1
-                                                insertedTrianglesSet.add(triangle)
+                                                insertedTrianglesSet.add(neighboringTriangle)
                                                 tempNodes[currentNode]['previous_nodes'].update(
                                                     oldTriangleInventory[triangle])
                                     if int(interval) + 1 in neighborIntervals:
@@ -1282,8 +1291,17 @@ class Hydropolator:
                         print('no queue left: ', len(indexedTriangles), triangleAmount)
                         for triangle in regionTriangles.difference(indexedTriangles):
                             if 0 not in triangle:  # and len(self.find_intervals(triangle)) == 1:
-                                queue.add(triangle)
+
                                 break
+                        indexedTriangles.add(triangle)
+                        currentNode = self.add_triangle_to_new_node(interval, triangle)
+                        tempNodes[currentNode] = {'previous_nodes': set()}
+                        tempNodes[currentNode]['previous_nodes'].update(
+                            oldTriangleInventory[triangle])
+                        insertedTriangles += 1
+                        updates += 1
+                        insertedTrianglesSet.add(triangle)
+                        queue.add(triangle)
 
                         # print(triangle)
                         # for vId in triangle:
@@ -1294,7 +1312,9 @@ class Hydropolator:
 
             # self.add_triangle_to_new_node(interval, triangle)
 
-        print('inserted triangles: ', insertedTriangles, len(insertedTrianglesSet))
+        print('tempDebug: ', len(tempDebugging))
+        print('inserted triangles: ', insertedTriangles, len(
+            insertedTrianglesSet), len(indexedTriangles))
         print('remove/insert diff: ', set(trianglesWithInterval.keys()).difference(insertedTrianglesSet))
 
         print('======\ntempNodes')
