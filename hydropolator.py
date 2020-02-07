@@ -42,6 +42,7 @@ class Hydropolator:
     # Graph
     # trGraph = TriangleRegionGraph()
     graph = {'nodes': {}, 'edges': {}, 'shallowestNodes': set(), 'deepestNodes': set()}
+    triangleInventory = dict()
     nrNodes = 0
     nrEdges = 0
     unfinishedDeep = set()
@@ -621,8 +622,33 @@ class Hydropolator:
             # print(vertex[2], self.vertexDict[tuple(vertex)]['z'])
         return min(elevations), max(elevations)
 
+    def previous_minmax_from_triangle(self, vertex_list):
+        # vertices = self.triangulation.all_vertices()
+        # vertices = self.vertices
+        elevations = []
+        for vId in vertex_list:
+            elevations.append(self.get_previous_z(self.triangulation.get_point(vId)))
+            # elevations.append(self.triangulation.get_point(vId)[2])
+            # vertex = self.triangulation.get_point(vId)
+            # print('--')
+            # print(vertex[2], self.vertexDict[tuple(vertex)]['z'])
+        return min(elevations), max(elevations)
+
     def find_intervals(self, triangle, indexOnly=True):
         min, max = self.minmax_from_triangle(triangle)
+        intervals = []
+        for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_left(self.isobathValues, max) + 1):
+            if indexOnly:
+                intervals.append(index)
+            else:
+                intervals.append(self.regions[index])
+        if indexOnly:
+            return intervals
+        else:
+            return intervals
+
+    def find_previous_intervals(self, triangle, indexOnly=True):
+        min, max = self.previous_minmax_from_triangle(triangle)
         intervals = []
         for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_left(self.isobathValues, max) + 1):
             if indexOnly:
@@ -656,6 +682,14 @@ class Hydropolator:
         else:
             parsedVertex = self.triangulation.get_point(vertex)
             return self.vertexDict.get_z(parsedVertex)
+
+    def get_previous_z(self, vertex, idOnly=False):
+        # return self.vertexDict[tuple(vertex)]['z']
+        if not idOnly:
+            return self.vertexDict.get_previous_z(vertex)
+        else:
+            parsedVertex = self.triangulation.get_point(vertex)
+            return self.vertexDict.get_previous_z(parsedVertex)
 
     def add_vertex_to_queue(self, vertex, new_z, idOnly=False):
         # return self.vertexDict[tuple(vertex)]['z']
@@ -1025,6 +1059,34 @@ class Hydropolator:
     #   UPDATING
     # --------------- #
 
+    def update_region_graph(self, updatedVertices):
+        # simple approach, just delete all of the incident triangles and rebuild
+        updatedTriangles = dict()
+        for updatedVertex in updatedVertices:
+            # print('=== updated vertex: ', updatedVertex)
+            incidentTriangles = self.triangulation.incident_triangles_to_vertex(updatedVertex)
+            for incidentTriangle in incidentTriangles:
+                # check whether the vertical intervals actually changed, otherwise updating is not needed
+                previousIntervals = self.find_previous_intervals(incidentTriangle)
+                updatedIntervals = self.find_intervals(incidentTriangle, indexOnly=True)
+                if previousIntervals != updatedIntervals:
+                    # print(incidentTriangle, previousIntervals, updatedIntervals)
+                    pseudoTriangle = tuple(self.pseudo_triangle(incidentTriangle))
+                    updatedTriangles[pseudoTriangle] = dict()
+                    updatedTriangles[pseudoTriangle]['previous_intervals'] = previousIntervals
+                    updatedTriangles[pseudoTriangle]['updated_intervals'] = updatedIntervals
+                    # updatedTriangles.add(tuple(self.pseudo_triangle(incidentTriangle)))
+
+        for updatedVertex in updatedVertices:
+            self.vertexDict.remove_previous_z(self.triangulation.get_point(updatedVertex))
+
+        print('updated triangles:')
+        for updatedTriangle in updatedTriangles.keys():
+            pseudoTriangle = tuple(self.pseudo_triangle(updatedTriangle))
+            print(updatedTriangle,
+                  updatedTriangles[updatedTriangle]['previous_intervals'], updatedTriangles[updatedTriangle]['updated_intervals'])
+            print(self.triangleInventory[pseudoTriangle])
+
     # --------------- #
     #   HELPERS
     # --------------- #
@@ -1032,18 +1094,30 @@ class Hydropolator:
     def add_triangle_to_new_node(self, interval, triangle):
         # self.graph['nodes'][str(self.nrNodes)] = {'region': tuple(interval), 'triangles': {
         #     tuple(self.pseudo_triangle(triangle))}, 'edges': set()}
+        pseudoTriangle = tuple(self.pseudo_triangle(triangle))
         nodeId = str(self.nrNodes)
-        self.graph['nodes'][nodeId] = {'region': interval, 'triangles': {tuple(self.pseudo_triangle(
-            triangle))}, 'deepNeighbors': set(), 'shallowNeighbors': set(), 'currentQueue': set(), 'shallowQueue': set(), 'deepQueue': set(), 'classification': None, 'full_area': None}
+        self.graph['nodes'][nodeId] = {'region': interval, 'triangles': {pseudoTriangle}, 'deepNeighbors': set(), 'shallowNeighbors': set(
+        ), 'currentQueue': set(), 'shallowQueue': set(), 'deepQueue': set(), 'classification': None, 'full_area': None}
         self.nrNodes += 1
         # print('new node: ', nodeId)
 
         self.regionNodes[interval].add(nodeId)
 
+        if pseudoTriangle in self.triangleInventory.keys():
+            self.triangleInventory[pseudoTriangle].add(nodeId)
+        else:
+            self.triangleInventory[pseudoTriangle] = {nodeId}
+
         return nodeId
 
     def add_triangle_to_node(self, triangle, nodeId):
-        self.graph['nodes'][nodeId]['triangles'].add(tuple(self.pseudo_triangle(triangle)))
+        pseudoTriangle = tuple(self.pseudo_triangle(triangle))
+        self.graph['nodes'][nodeId]['triangles'].add(pseudoTriangle)
+
+        if pseudoTriangle in self.triangleInventory.keys():
+            self.triangleInventory[pseudoTriangle].add(nodeId)
+        else:
+            self.triangleInventory[pseudoTriangle] = {nodeId}
 
     def add_triangle_to_queue(self, triangle, nodeId, type):
         queueType = type + 'Queue'
@@ -1515,29 +1589,31 @@ class Hydropolator:
         print('smoothing ...')
 
         triangleCenters = dict()
+        updatedVertices = set()
+        updates = 0
 
         for vertex in vertexSet:
 
-            print('---- ', vertex)
+            # print('---- ', vertex)
 
             handleConvex = False
             if self.triangulation.is_vertex_convex_hull(vertex):
                 # handle different...
                 # discard at all, too few information
-                print('im on the hull! skipping')
+                # print('im on the hull! skipping')
                 handleConvex = True
                 continue
 
             adjacentVertices = self.triangulation.adjacent_vertices_to_vertex(vertex)
             if 0 in adjacentVertices:
                 # some kind of convex hull. Not sure how to handle this one yet.
-                print('Im a neighbor of vertex 0, some sort of convex hull, SKIPPING')
+                # print('Im a neighbor of vertex 0, some sort of convex hull, SKIPPING')
                 continue
 
             vertexLocation = self.triangulation.get_point(vertex)
             originalZ = self.get_z(vertex, idOnly=True)
             # print(self.triangulation.get_point(vertex))
-            nrAdjacentVertices = len(adjacentVertices)
+            # nrAdjacentVertices = len(adjacentVertices)
             # print(nrAdjacentVertices)
             incidentTriangles = self.triangulation.incident_triangles_to_vertex(vertex)
             # print(adjacentVertices)
@@ -1562,10 +1638,10 @@ class Hydropolator:
 
                 # print('original: ', leftPseudoTriangle, rightPseudoTriangle)
 
-                if 0 in leftTriangle:
-                    print('leftTriangle contains 0')
-                elif 0 in rightTriangle:
-                    print('rightTriangle contains 0')
+                # if 0 in leftTriangle:
+                #     print('leftTriangle contains 0')
+                # elif 0 in rightTriangle:
+                #     print('rightTriangle contains 0')
 
                 # if handleConvex:
                 #     if self.triangulation.is_vertex_convex_hull(adjacentVertex):
@@ -1612,10 +1688,14 @@ class Hydropolator:
             # print(originalZ, interpolatedZ, interpolatedZ < originalZ)
 
             if interpolatedZ < originalZ:
-                print('updated vertex', interpolatedZ)
+                # print('updated vertex', interpolatedZ)
+                updates += 1
                 self.add_vertex_to_queue(vertex, interpolatedZ, idOnly=True)
+                updatedVertices.add(vertex)
 
-        # self.vertexDict.update_values_from_queue()
+        print('{} vertices added to update queue'.format(updates))
+        self.vertexDict.update_values_from_queue()
+        self.update_region_graph(updatedVertices)
         # print(adjacentVertex, leftPseudoTriangle, rightPseudoTriangle)
 
     def circumcenter(self, triangle):
