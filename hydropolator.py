@@ -1067,7 +1067,10 @@ class Hydropolator:
         possibleDeletedNodes = set()
 
         # print('updated triangles:')
+        updates = 0
+        deletedTriangles = 0
         for updatedTriangle in trianglesWithInterval.keys():
+            deletedTriangles += 1
             pseudoTriangle = tuple(self.pseudo_triangle(updatedTriangle))
             previousIntervals = trianglesWithInterval[updatedTriangle]['previous_intervals']
             updatedIntervals = trianglesWithInterval[updatedTriangle]['updated_intervals']
@@ -1081,6 +1084,7 @@ class Hydropolator:
                 # print(self.triangle_in_node(pseudoTriangle, nodeId))
 
                 self.delete_triangle_from_node(pseudoTriangle, nodeId)
+                updates += 1
                 possibleDeletedNodes.add(nodeId)
 
                 if (nodeInterval - 1) in previousIntervals:
@@ -1103,6 +1107,8 @@ class Hydropolator:
 
             del self.triangleInventory[pseudoTriangle]
 
+        print('removed triangles: ', deletedTriangles, 'updates: ', updates)
+
         return possibleDeletedNodes, possibleDeletedEdges
 
     def insert_triangles_into_region_graph(self, trianglesWithInterval, oldTriangleInventory):
@@ -1120,12 +1126,15 @@ class Hydropolator:
                     tempTriangleRegionDict[str(interval)].add(triangle)
 
         tempNodes = dict()
+        insertedTriangles = 0
+        updates = 0
+        insertedTrianglesSet = set()
 
         for interval in tempTriangleRegionDict.keys():
             # print(interval)
             regionTriangles = tempTriangleRegionDict[interval]
             triangleAmount = len(regionTriangles)
-            print(interval, triangleAmount)
+            print('----- new interval\n', interval, triangleAmount)
 
             if triangleAmount == 0:
                 self.errors.append(
@@ -1145,6 +1154,9 @@ class Hydropolator:
             currentNode = self.add_triangle_to_new_node(interval, triangle)
             tempNodes[currentNode] = {'previous_nodes': set()}
             tempNodes[currentNode]['previous_nodes'].update(oldTriangleInventory[triangle])
+            insertedTriangles += 1
+            updates += 1
+            insertedTrianglesSet.add(triangle)
             queue.add(triangle)
 
             while not finished:
@@ -1167,6 +1179,8 @@ class Hydropolator:
                                             tempNodes[currentNode]['previous_nodes'].update(
                                                 oldTriangleInventory[triangle])
                                             additions += 1
+                                            insertedTriangles += 1
+                                            insertedTrianglesSet.add(triangle)
                                 if int(interval) + 1 in neighborIntervals:
                                     self.add_triangle_to_queue(
                                         neighboringTriangle, currentNode, 'deep')
@@ -1178,11 +1192,11 @@ class Hydropolator:
 
                 i += 0
                 if len(indexedTriangles) == triangleAmount:
-                    # print('all triangles in this region visited, ending')
+                    print('all triangles in this region visited, ending')
                     finished = True
                 elif i > 500:
-                    self.errors.append('{} insert_triangles_into_region_graph\titeration limit exceeded on splitting in touching nodes\tinterval: {}\tcurrent node: {}'.format(self.now(),
-                                                                                                                                                                               interval, currentNode))
+                    self.errors.append('{} insert_triangles_into_region_graph\titeration limit exceeded on splitting in touching nodes\tinterval: {}\tcurrent node: {}'.format(
+                        self.now(), interval, currentNode))
                     finished = True
                 elif not additions:
                     # print('====new node====')
@@ -1205,6 +1219,8 @@ class Hydropolator:
                             tempNodes[currentNode]['previous_nodes'].update(
                                 oldTriangleInventory[triangle])
                             existingTracker = True
+                            insertedTriangles += 1
+                            insertedTrianglesSet.add(triangle)
                         else:
                             for neighboringTriangle in neighboringTriangles:
                                 # print('neighboringTriangle: ', neighboringTriangle)
@@ -1228,13 +1244,17 @@ class Hydropolator:
                                                     tempNodes[currentNode]['previous_nodes'].update(
                                                         oldTriangleInventory[triangle])
                                                     existingTracker = True
-                                                    break
+                                                    insertedTriangles += 1
+                                                    insertedTrianglesSet.add(triangle)
+                                                    # break
 
                     if not existingTracker:
                         currentNode = self.add_triangle_to_new_node(interval, triangle)
                         tempNodes[currentNode] = {'previous_nodes': set()}
                         tempNodes[currentNode]['previous_nodes'].update(
                             oldTriangleInventory[triangle])
+                        insertedTriangles += 1
+                        insertedTrianglesSet.add(triangle)
                         for neighboringTriangle in self.adjacent_triangles(triangle):
                             if 0 not in neighboringTriangle:
                                 if neighboringTriangle in trianglesWithInterval.keys():
@@ -1246,6 +1266,8 @@ class Hydropolator:
                                                 queue.add(neighboringTriangle)
                                                 self.add_triangle_to_node(
                                                     neighboringTriangle, currentNode)
+                                                insertedTriangles += 1
+                                                insertedTrianglesSet.add(triangle)
                                                 tempNodes[currentNode]['previous_nodes'].update(
                                                     oldTriangleInventory[triangle])
                                     if int(interval) + 1 in neighborIntervals:
@@ -1256,7 +1278,13 @@ class Hydropolator:
                                             neighboringTriangle, currentNode, 'shallow')
 
                     if len(queue) == 0:
-                        finished = True
+                        finished = False
+                        print('no queue left: ', len(indexedTriangles), triangleAmount)
+                        for triangle in regionTriangles.difference(indexedTriangles):
+                            if 0 not in triangle:  # and len(self.find_intervals(triangle)) == 1:
+                                queue.add(triangle)
+                                break
+
                         # print(triangle)
                         # for vId in triangle:
                         #     print(self.triangulation.get_point(vId))
@@ -1265,6 +1293,9 @@ class Hydropolator:
                             '{} insert_triangles_in_region_graph\tno queue left\tinterval: {}\tcurrent node: {}'.format(self.now(), interval, currentNode))
 
             # self.add_triangle_to_new_node(interval, triangle)
+
+        print('inserted triangles: ', insertedTriangles, len(insertedTrianglesSet))
+        print('remove/insert diff: ', set(trianglesWithInterval.keys()).difference(insertedTrianglesSet))
 
         print('======\ntempNodes')
         for tempNode in tempNodes.keys():
