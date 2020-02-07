@@ -1074,7 +1074,7 @@ class Hydropolator:
             # print('----\n', updatedTriangle, previousIntervals, updatedIntervals)
             # print(self.triangleInventory[pseudoTriangle])
 
-            for previousNode in self.triangleInventory[pseudoTriangle]:
+            for previousNode in self.triangleInventory[pseudoTriangle].copy():
                 nodeId = previousNode
                 nodeInterval = int(self.get_interval_from_node(nodeId))
                 # print('previous node: ', nodeId, '\tinterval: ', nodeInterval)
@@ -1086,6 +1086,7 @@ class Hydropolator:
                 if (nodeInterval - 1) in previousIntervals:
                     # print('possible shallow edge')
                     shallowNeighbors = self.get_neighboring_nodes(nodeId, 'shallow')
+                    self.graph['nodes'][nodeId]['shallowNeighbors'].discard(pseudoTriangle)
                     # print(shallowNeighbors)
                     for shallowNeighbor in shallowNeighbors:
                         possibleDeletedEdges.add((shallowNeighbor, nodeId))
@@ -1094,12 +1095,241 @@ class Hydropolator:
                 if (nodeInterval + 1) in previousIntervals:
                     # print('possible deep edge')
                     deepNeighbors = self.get_neighboring_nodes(nodeId, 'deep')
+                    self.graph['nodes'][nodeId]['deepNeighbors'].discard(pseudoTriangle)
                     for deepNeighbor in deepNeighbors:
                         possibleDeletedEdges.add((nodeId, deepNeighbor))
                     # print(nodeInterval+1)
                     # print('also in deep queue', pseudoTriangle in self.get_queue(nodeId, 'deep'))
 
+            del self.triangleInventory[pseudoTriangle]
+
         return possibleDeletedNodes, possibleDeletedEdges
+
+    def insert_triangles_into_region_graph(self, trianglesWithInterval, oldTriangleInventory):
+        self.msg('inserting triangles again...', 'info')
+
+        tempTriangleRegionDict = {}
+
+        # first grouping all new triangles in regions of equal depth
+        for triangle in trianglesWithInterval.keys():
+            print(triangle, oldTriangleInventory[triangle])
+            for interval in trianglesWithInterval[triangle]['updated_intervals']:
+                if str(interval) not in tempTriangleRegionDict.keys():
+                    tempTriangleRegionDict[str(interval)] = {triangle}
+                else:
+                    tempTriangleRegionDict[str(interval)].add(triangle)
+
+        tempNodes = dict()
+
+        for interval in tempTriangleRegionDict.keys():
+            # print(interval)
+            regionTriangles = tempTriangleRegionDict[interval]
+            triangleAmount = len(regionTriangles)
+            print(interval, triangleAmount)
+
+            if triangleAmount == 0:
+                self.errors.append(
+                    '{} insert_triangles_into_region_graph\tno triangles in this interval\tinterval: {}'.format(self.now(), interval))
+                # print('no triangles in this region')
+                break
+
+            indexedTriangles = set()
+            queue = set()
+            finished = False
+            i = 0
+
+            for triangle in regionTriangles:
+                if 0 not in triangle:  # and len(self.find_intervals(triangle)) == 1:
+                    break
+            indexedTriangles.add(triangle)
+            currentNode = self.add_triangle_to_new_node(interval, triangle)
+            tempNodes[currentNode] = {'previous_nodes': set()}
+            tempNodes[currentNode]['previous_nodes'].update(oldTriangleInventory[triangle])
+            queue.add(triangle)
+
+            while not finished:
+
+                additions = 0
+                # print(queue)
+                for triangle in queue.copy():
+                    for neighboringTriangle in self.adjacent_triangles(triangle):
+                        # print(neighboringTriangle)
+                        if 0 not in neighboringTriangle:
+                            if neighboringTriangle in trianglesWithInterval.keys():
+                                neighborIntervals = self.find_intervals(neighboringTriangle)
+                                if int(interval) in neighborIntervals:
+                                    if neighboringTriangle not in indexedTriangles:
+                                        if not self.saddle_test(triangle, neighboringTriangle, int(interval)):
+                                            indexedTriangles.add(neighboringTriangle)
+                                            queue.add(neighboringTriangle)
+                                            self.add_triangle_to_node(
+                                                neighboringTriangle, currentNode)
+                                            tempNodes[currentNode]['previous_nodes'].update(
+                                                oldTriangleInventory[triangle])
+                                            additions += 1
+                                if int(interval) + 1 in neighborIntervals:
+                                    self.add_triangle_to_queue(
+                                        neighboringTriangle, currentNode, 'deep')
+                                if int(interval) - 1 in neighborIntervals:
+                                    self.add_triangle_to_queue(
+                                        neighboringTriangle, currentNode, 'shallow')
+
+                    queue.remove(triangle)
+
+                i += 0
+                if len(indexedTriangles) == triangleAmount:
+                    # print('all triangles in this region visited, ending')
+                    finished = True
+                elif i > 500:
+                    self.errors.append('{} insert_triangles_into_region_graph\titeration limit exceeded on splitting in touching nodes\tinterval: {}\tcurrent node: {}'.format(self.now(),
+                                                                                                                                                                               interval, currentNode))
+                    finished = True
+                elif not additions:
+                    # print('====new node====')
+                    for triangle in regionTriangles.difference(indexedTriangles):
+                        if 0 not in triangle:  # and len(self.find_intervals(triangle)) == 1:
+                            break
+                    indexedTriangles.add(triangle)
+                    # print(triangle)
+                    # print('istriangle: ', self.triangulation.is_triangle(triangle))
+                    # print('neighbors: ', self.adjacent_triangles(triangle))
+
+                    existingTracker = False
+                    neighboringTriangles = self.adjacent_triangles(triangle)
+                    for existingNode in self.get_all_nodes_in_interval(interval):
+                        if existingTracker:
+                            break
+                        # print('\nexistingNode: ', existingNode, interval)
+                        if self.get_triangles(existingNode).intersection(triangle):
+                            self.add_triangle_to_node(triangle, existingNode)
+                            tempNodes[currentNode]['previous_nodes'].update(
+                                oldTriangleInventory[triangle])
+                            existingTracker = True
+                        else:
+                            for neighboringTriangle in neighboringTriangles:
+                                # print('neighboringTriangle: ', neighboringTriangle)
+                                # print(neighboringTriangle in self.get_triangles(existingNode))
+                                if 0 not in neighboringTriangle:
+                                    if neighboringTriangle in trianglesWithInterval.keys():
+                                        neighborIntervals = self.find_intervals(neighboringTriangle)
+                                        # print('neighborIntervals: ', neighborIntervals)
+                                        if int(interval) in neighborIntervals:
+                                            # print('im in the interval')
+                                            # if self.saddle_test(triangle, neighboringTriangle, int(interval)):
+                                            #     # print('im a saddle...')
+                                            if not self.saddle_test(triangle, neighboringTriangle, int(interval)):
+                                                # print('im not a saddle')
+                                                # print(self.get_triangles(
+                                                #     existingNode).intersection(neighboringTriangle))
+                                                # print(neighboringTriangle in self.get_triangles(existingNode))
+                                                if neighboringTriangle in self.get_triangles(existingNode):
+                                                    self.add_triangle_to_node(
+                                                        triangle, existingNode)
+                                                    tempNodes[currentNode]['previous_nodes'].update(
+                                                        oldTriangleInventory[triangle])
+                                                    existingTracker = True
+                                                    break
+
+                    if not existingTracker:
+                        currentNode = self.add_triangle_to_new_node(interval, triangle)
+                        tempNodes[currentNode] = {'previous_nodes': set()}
+                        tempNodes[currentNode]['previous_nodes'].update(
+                            oldTriangleInventory[triangle])
+                        for neighboringTriangle in self.adjacent_triangles(triangle):
+                            if 0 not in neighboringTriangle:
+                                if neighboringTriangle in trianglesWithInterval.keys():
+                                    neighborIntervals = self.find_intervals(neighboringTriangle)
+                                    if int(interval) in neighborIntervals:
+                                        if neighboringTriangle not in indexedTriangles:
+                                            if not self.saddle_test(triangle, neighboringTriangle, int(interval)):
+                                                indexedTriangles.add(neighboringTriangle)
+                                                queue.add(neighboringTriangle)
+                                                self.add_triangle_to_node(
+                                                    neighboringTriangle, currentNode)
+                                                tempNodes[currentNode]['previous_nodes'].update(
+                                                    oldTriangleInventory[triangle])
+                                    if int(interval) + 1 in neighborIntervals:
+                                        self.add_triangle_to_queue(
+                                            neighboringTriangle, currentNode, 'deep')
+                                    if int(interval) - 1 in neighborIntervals:
+                                        self.add_triangle_to_queue(
+                                            neighboringTriangle, currentNode, 'shallow')
+
+                    if len(queue) == 0:
+                        finished = True
+                        # print(triangle)
+                        # for vId in triangle:
+                        #     print(self.triangulation.get_point(vId))
+                        # self.msg('no queue left', 'warning')
+                        self.errors.append(
+                            '{} insert_triangles_in_region_graph\tno queue left\tinterval: {}\tcurrent node: {}'.format(self.now(), interval, currentNode))
+
+            # self.add_triangle_to_new_node(interval, triangle)
+
+        print('======\ntempNodes')
+        for tempNode in tempNodes.keys():
+            tempNodeInterval = self.get_interval_from_node(tempNode)
+            previousNodes = tempNodes[tempNode]['previous_nodes']
+            tempNodeTriangles = self.get_triangles(tempNode)
+            print('------', tempNode, tempNodeInterval)
+            print(previousNodes)
+            match = False
+            for previousNode in previousNodes:
+                # print(self.get_interval_from_node(previousNode))
+                if self.get_interval_from_node(previousNode) == tempNodeInterval and previousNode not in tempNodes.keys():
+                    # print(previousNode)
+                    for tempNodeTriangle in tempNodeTriangles:
+                        for adjacentTriangle in self.adjacent_triangles(tempNodeTriangle):
+                            if not self.saddle_test(tempNodeTriangle, adjacentTriangle, tempNodeInterval):
+                                # print(oldTriangleInventory[adjacentTriangle])
+                                if previousNode in oldTriangleInventory[adjacentTriangle]:
+                                    if self.is_node(previousNode):
+                                        match = True
+                                        self.merge_nodes(previousNode, tempNode)
+                                        break
+                            if match:
+                                break
+                        if match:
+                            break
+                if match:
+                    break
+
+            if match is False:
+                print('need searching..')
+                # TODO first try to search the shallow/deeper nodes of the previous nodes, probably it is adjacent to that
+                for sameIntervalNode in self.regionNodes[str(tempNodeInterval)]:
+                    if self.is_node(sameIntervalNode):
+                        print(sameIntervalNode)
+                        for tempNodeTriangle in tempNodeTriangles:
+                            for adjacentTriangle in self.adjacent_triangles(tempNodeTriangle):
+                                if not self.saddle_test(tempNodeTriangle, adjacentTriangle, tempNodeInterval):
+                                    if sameIntervalNode in oldTriangleInventory[adjacentTriangle]:
+                                        match = True
+                                        self.merge_nodes(sameIntervalNode, tempNode)
+                                        break
+                            if match:
+                                break
+                    if match:
+                        break
+
+            if match is False:
+                print('im a completely new node')
+
+    def merge_nodes(self, keepNode, mergeNode):
+        print('mergin nodes:', keepNode, mergeNode)
+
+        trianglesToAdd = self.get_triangles(mergeNode)
+        deepsToAdd = self.get_queue(mergeNode, 'deep')
+        shallowsToAdd = self.get_queue(mergeNode, 'shallow')
+
+        for triangle in trianglesToAdd:
+            self.add_triangle_to_node(triangle, keepNode)
+        for triangle in deepsToAdd:
+            self.add_triangle_to_queue(triangle, keepNode, 'deep')
+        for triangle in shallowsToAdd:
+            self.add_triangle_to_queue(triangle, keepNode, 'shallow')
+
+        self.delete_node(mergeNode)
 
     def check_deleted_nodes(self, listOfPossibleNodes):
         deletedNodes = set()
@@ -1153,7 +1383,10 @@ class Hydropolator:
             del self.graph['edges'][edgeIdToRemove]
 
         # remove from regionNodes dict
-        self.regionNodes[nodeInterval].remove(nodeId)
+        self.regionNodes[str(nodeInterval)].remove(nodeId)
+
+        # remove node itself
+        del self.graph['nodes'][nodeId]
 
     def update_region_graph(self, updatedVertices):
         # simple approach, just delete all of the incident triangles and rebuild
@@ -1176,6 +1409,7 @@ class Hydropolator:
         for updatedVertex in updatedVertices:
             self.vertexDict.remove_previous_z(self.triangulation.get_point(updatedVertex))
 
+        oldTriangleInventory = self.triangleInventory.copy()
         possibleDeletedNodes, possibleDeletedEdges = self.remove_triangles_from_graph(
             updatedTriangles)
 
@@ -1209,6 +1443,9 @@ class Hydropolator:
                     if len(shallowTriangles.intersection(deepTriangles)) == 0:
                         # no intersection anymore, delete edge
                         self.delete_edge(possibleDeletedEdge)
+
+        self.insert_triangles_into_region_graph(updatedTriangles, oldTriangleInventory)
+        self.print_graph()
 
     # --------------- #
     #   HELPERS
@@ -1279,6 +1516,12 @@ class Hydropolator:
 
     def triangle_in_node(self, triangle, nodeId):
         if tuple(self.pseudo_triangle(triangle)) in self.graph['nodes'][nodeId]['triangles']:
+            return True
+        else:
+            return False
+
+    def is_node(self, nodeId):
+        if nodeId in self.graph['nodes'].keys():
             return True
         else:
             return False
