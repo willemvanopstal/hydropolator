@@ -1059,6 +1059,102 @@ class Hydropolator:
     #   UPDATING
     # --------------- #
 
+    def remove_triangles_from_graph(self, trianglesWithInterval):
+
+        self.print_graph()
+
+        possibleDeletedEdges = set()
+        possibleDeletedNodes = set()
+
+        # print('updated triangles:')
+        for updatedTriangle in trianglesWithInterval.keys():
+            pseudoTriangle = tuple(self.pseudo_triangle(updatedTriangle))
+            previousIntervals = trianglesWithInterval[updatedTriangle]['previous_intervals']
+            updatedIntervals = trianglesWithInterval[updatedTriangle]['updated_intervals']
+            # print('----\n', updatedTriangle, previousIntervals, updatedIntervals)
+            # print(self.triangleInventory[pseudoTriangle])
+
+            for previousNode in self.triangleInventory[pseudoTriangle]:
+                nodeId = previousNode
+                nodeInterval = int(self.get_interval_from_node(nodeId))
+                # print('previous node: ', nodeId, '\tinterval: ', nodeInterval)
+                # print(self.triangle_in_node(pseudoTriangle, nodeId))
+
+                self.delete_triangle_from_node(pseudoTriangle, nodeId)
+                possibleDeletedNodes.add(nodeId)
+
+                if (nodeInterval - 1) in previousIntervals:
+                    # print('possible shallow edge')
+                    shallowNeighbors = self.get_neighboring_nodes(nodeId, 'shallow')
+                    # print(shallowNeighbors)
+                    for shallowNeighbor in shallowNeighbors:
+                        possibleDeletedEdges.add((shallowNeighbor, nodeId))
+                    # print(nodeInterval-1)
+                    # print('also in shallow queue', pseudoTriangle in self.get_queue(nodeId, 'shallow'))
+                if (nodeInterval + 1) in previousIntervals:
+                    # print('possible deep edge')
+                    deepNeighbors = self.get_neighboring_nodes(nodeId, 'deep')
+                    for deepNeighbor in deepNeighbors:
+                        possibleDeletedEdges.add((nodeId, deepNeighbor))
+                    # print(nodeInterval+1)
+                    # print('also in deep queue', pseudoTriangle in self.get_queue(nodeId, 'deep'))
+
+        return possibleDeletedNodes, possibleDeletedEdges
+
+    def check_deleted_nodes(self, listOfPossibleNodes):
+        deletedNodes = set()
+        for nodeId in listOfPossibleNodes:
+            if len(self.get_triangles(nodeId)) == 0:
+                deletedNodes.add(nodeId)
+        return deletedNodes
+
+    def delete_edge(self, edgeCombination):
+        self.msg('deleting edge from graph: {}'.format(edgeCombination), 'warning')
+
+        shallowNode = edgeCombination[0]
+        deepNode = edgeCombination[1]
+        # remove pointers
+        if shallowNode in self.graph['nodes'].keys():
+            self.graph['nodes'][shallowNode]['deepNeighbors'].discard(deepNode)
+        if deepNode in self.graph['nodes'].keys():
+            self.graph['nodes'][deepNode]['shallowNeighbors'].discard(shallowNode)
+
+        # remove edge itself
+        for edgeId in self.graph['edges'].keys():
+            if self.graphp['edges'][edgeId]['edge'] == [shallowNode, deepNode]:
+                del self.graph['edges'][edgeId]
+                print('removed edge')
+                break
+
+    def delete_node(self, nodeId):
+        # from graph, from edges, pointers of neighbors
+        self.msg('deleting node from graph: {}'.format(nodeId), 'warning')
+        nodeInterval = self.get_interval_from_node(nodeId)
+
+        edgesToRemove = []
+
+        # remove pointers from neighboring nodes
+        shallowNeighbors = self.get_neighboring_nodes(nodeId, 'shallow')
+        for shallowNeighbor in shallowNeighbors:
+            self.graph['nodes'][shallowNeighbor]['deepNeighbors'].remove(nodeId)
+            edgesToRemove.append((shallowNeighbor, nodeId))
+        deepNeighbors = self.get_neighboring_nodes(nodeId, 'deep')
+        for deepNeighbor in deepNeighbors:
+            self.graph['nodes'][deepNeighbor]['shallowNeighbors'].remove(nodeId)
+            edgesToRemove.append((nodeId, deepNeighbor))
+
+        # remove edges
+        # for edge in edgesToRemove:
+        edgeIdsToRemove = set()
+        for edgeId in self.graph['edges'].keys():
+            if self.graph['edges'][edgeId]['edge'] in edgesToRemove:
+                edgeIdsToRemove.add(edgeId)
+        for edgeIdToRemove in edgeIdsToRemove:
+            del self.graph['edges'][edgeIdToRemove]
+
+        # remove from regionNodes dict
+        self.regionNodes[nodeInterval].remove(nodeId)
+
     def update_region_graph(self, updatedVertices):
         # simple approach, just delete all of the incident triangles and rebuild
         updatedTriangles = dict()
@@ -1080,12 +1176,39 @@ class Hydropolator:
         for updatedVertex in updatedVertices:
             self.vertexDict.remove_previous_z(self.triangulation.get_point(updatedVertex))
 
-        print('updated triangles:')
-        for updatedTriangle in updatedTriangles.keys():
-            pseudoTriangle = tuple(self.pseudo_triangle(updatedTriangle))
-            print(updatedTriangle,
-                  updatedTriangles[updatedTriangle]['previous_intervals'], updatedTriangles[updatedTriangle]['updated_intervals'])
-            print(self.triangleInventory[pseudoTriangle])
+        possibleDeletedNodes, possibleDeletedEdges = self.remove_triangles_from_graph(
+            updatedTriangles)
+
+        if possibleDeletedNodes or possibleDeletedEdges:
+            print(possibleDeletedNodes, '\n', possibleDeletedEdges)
+            deletedNodes = self.check_deleted_nodes(possibleDeletedNodes)
+            if deletedNodes:
+                for deletedNode in deletedNodes:
+
+                    # TODO, delete a node!
+
+                    shallowNeighbors = self.get_neighboring_nodes(nodeId, 'shallow')
+                    for shallowNeighbor in shallowNeighbors:
+                        possibleDeletedEdges.add((shallowNeighbor, deletedNode))
+                    deepNeighbors = self.get_neighboring_nodes(nodeId, 'deep')
+                    for deepNeighbor in deepNeighbors:
+                        possibleDeletedEdges.add((deletedNode, deepNeighbor))
+
+                    self.delete_node(deletedNode)
+
+            print(possibleDeletedEdges)
+            for possibleDeletedEdge in possibleDeletedEdges:
+                if possibleDeletedEdge[0] not in self.graph['nodes'].keys() or possibleDeletedEdge[1] not in self.graph['nodes'].keys():
+                    # node already deleted, so need to delete the edge as well
+                    self.delete_edge(possibleDeletedEdge)
+                else:
+                    shallowNode = possibleDeletedEdge[0]
+                    shallowTriangles = self.get_triangles(shallowNode)
+                    deepNode = possibleDeletedEdge[1]
+                    deepTriangles = self.get_triangles(deepNode)
+                    if len(shallowTriangles.intersection(deepTriangles)) == 0:
+                        # no intersection anymore, delete edge
+                        self.delete_edge(possibleDeletedEdge)
 
     # --------------- #
     #   HELPERS
@@ -1118,6 +1241,9 @@ class Hydropolator:
             self.triangleInventory[pseudoTriangle].add(nodeId)
         else:
             self.triangleInventory[pseudoTriangle] = {nodeId}
+
+    def delete_triangle_from_node(self, triangle, nodeId):
+        self.graph['nodes'][nodeId]['triangles'].remove(triangle)
 
     def add_triangle_to_queue(self, triangle, nodeId, type):
         queueType = type + 'Queue'
