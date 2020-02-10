@@ -172,13 +172,6 @@ if args.triangleregiongraph:
     # projectObject.export_shapefile('outputting')
 
 
-if args.isobaths:
-    msg('> generating isobaths...', 'info')
-    projectObject.generate_isobaths4()
-    msg('> isobaths generated', 'info')
-    projectObject.compute_isobath_area()
-    projectObject.export_all_isobaths()
-
 if args.angularity:
     msg('> checking angularity in isobaths...', 'info')
     projectObject.check_isobath_angularity()
@@ -193,7 +186,8 @@ if args.nodearea:
 
 if args.smooth_node:
     msg('> smoothing node...', 'info')
-    projectObject.smooth_vertices_helper2(projectObject.get_vertices_from_node(args.smooth_node))
+    # projectObject.smooth_vertices_helper2(projectObject.get_vertices_from_node(args.smooth_node))
+    projectObject.simple_smooth_and_rebuild(projectObject.get_vertices_from_node(args.smooth_node))
     msg('> node smoothened', 'info')
     # projectObject.export_all_angularities()
 
@@ -202,10 +196,16 @@ if args.graph:
     projectObject.make_network_graph()
     msg('> visualized graph', 'info')
 
+if args.isobaths:
+    msg('> generating isobaths...', 'info')
+    projectObject.generate_isobaths4()
+    msg('> isobaths generated', 'info')
+    projectObject.compute_isobath_area()
+    projectObject.export_all_isobaths()
 
 if args.exportshp:
     msg('> exporting shapefiles', 'info')
-    projectObject.summarize_project()
+    # projectObject.summarize_project()
     projectObject.export_shapefile(args.exportshp)
 
 if projectObject:

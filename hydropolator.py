@@ -1227,7 +1227,8 @@ class Hydropolator:
                         if existingTracker:
                             break
                         # print('\nexistingNode: ', existingNode, interval)
-                        if self.get_triangles(existingNode).intersection(triangle):
+                        # self.get_triangles(existingNode).intersection(triangle):
+                        if triangle in self.get_triangles(existingNode):
                             self.add_triangle_to_node(triangle, existingNode)
                             # tempNodes[currentNode]['previous_nodes'].update(
                             #     oldTriangleInventory[triangle])
@@ -1264,6 +1265,8 @@ class Hydropolator:
                     if not existingTracker:
                         currentNode = self.add_triangle_to_new_node(interval, triangle)
                         tempNodes.add(currentNode)
+                        # indexedTriangles.add(currentNode)
+
                         # tempNodes[currentNode] = {'previous_nodes': set()}
                         # tempNodes[currentNode]['previous_nodes'].update(
                         #     oldTriangleInventory[triangle])
@@ -1297,7 +1300,9 @@ class Hydropolator:
                         for triangle in regionTriangles.difference(indexedTriangles):
                             if 0 not in triangle:  # and len(self.find_intervals(triangle)) == 1:
                                 break
+                        # print(triangle in indexedTriangles)
                         indexedTriangles.add(triangle)
+
                         currentNode = self.add_triangle_to_new_node(interval, triangle)
                         tempNodes.add(currentNode)
                         # tempNodes[currentNode] = {'previous_nodes': set()}
@@ -1848,7 +1853,7 @@ class Hydropolator:
             nodeTriangles = self.get_triangles(nodeId)
 
             for otherNodeId in affectedNodes:
-                print(nodeId, otherNodeId)
+                # print(nodeId, otherNodeId)
                 otherNodeInterval = self.get_interval_from_node(otherNodeId)
                 if (nodeInterval + 1) == otherNodeInterval:
                     # deeper node
@@ -2534,6 +2539,35 @@ class Hydropolator:
 
         # print(adjacentVertex, leftPseudoTriangle, rightPseudoTriangle)
 
+    def simple_smooth_and_rebuild(self, vertexSet):
+
+        self.print_graph()
+
+        allChangedVertices = set()
+        for i in range(50):
+            changedVertices = self.smooth_vertices(vertexSet)
+            allChangedVertices.update(changedVertices)
+            # print(allChangedVertices)
+            self.vertexDict.update_previous_z_from_queue()  # stored the old zvalue in previous_z
+            self.vertexDict.update_values_from_queue()  # updates the working z-value in z
+            # queue is now empty again
+        # may again smooth the vertices?
+
+        # remove previous_z because region graph is built again
+        for changedVertex in allChangedVertices:
+            self.vertexDict.remove_previous_z(self.triangulation.get_point(
+                changedVertex))
+
+        # delete entire graph
+        self.graph = {'nodes': {}, 'edges': {}, 'shallowestNodes': set(), 'deepestNodes': set()}
+        self.triangleInventory = dict()
+        self.nrNodes = 0
+        self.nrEdges = 0
+        self.generate_regions()
+
+        self.build_graph2()
+        self.print_graph()
+
     def smooth_vertices_helper2(self, vertexSet):
         # self.print_graph()
         # self.make_network_graph()
@@ -2589,6 +2623,8 @@ class Hydropolator:
         for changedVertex in allChangedVertices:
             self.vertexDict.remove_previous_z(self.triangulation.get_point(
                 changedVertex))
+
+        # self.build_graph2()
 
         # insert all deleted triangles back in the graph
         affectedNodes = self.insert_triangles_into_region_graph2(
