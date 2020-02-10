@@ -12,8 +12,11 @@ class ElevationDict:
             'z': vertex_tuple[2], 'z_original': vertex_tuple[2], 'previous_z': None}
 
     def update_z(self, vertex_tuple, new_z):
-        self.elevationDict[tuple(vertex_tuple)]['previous_z'] = self.get_z(vertex_tuple)
+        # self.elevationDict[tuple(vertex_tuple)]['previous_z'] = self.get_z(vertex_tuple)
         self.elevationDict[tuple(vertex_tuple)]['z'] = new_z
+
+    def update_previous_z(self, vertex_tuple):
+        self.elevationDict[tuple(vertex_tuple)]['previous_z'] = self.get_z(vertex_tuple)
 
     def get_z(self, vertex_tuple):
         return self.elevationDict[tuple(vertex_tuple)]['z']
@@ -33,6 +36,12 @@ class ElevationDict:
 
     def add_to_queue(self, vertex_tuple, new_z):
         self.updateQueue[tuple(vertex_tuple)] = new_z
+
+    def update_previous_z_from_queue(self):
+        for vertex in self.updateQueue.keys():
+            if not self.elevationDict[tuple(vertex)]['previous_z']:
+                # print('previous updating! ', vertex)
+                self.update_previous_z(vertex)
 
     def update_values_from_queue(self):
         for vertex in self.updateQueue.keys():

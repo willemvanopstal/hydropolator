@@ -123,7 +123,7 @@ if args.init:
 elif args.project:
     msg('> opening existing project', 'info')
     projectObject = Hydropolator()
-    if projectObject.load_project(args.project) == True:
+    if projectObject.load_project(args.project) is True:
         msg('> loaded project', 'header')
         projectObject.summarize_project()
         print(projectObject.insertions)
@@ -168,7 +168,7 @@ if args.triangleregiongraph:
     else:
         projectObject.build_graph2()
 
-    projectObject.make_network_graph()
+    # projectObject.make_network_graph()
     # projectObject.export_shapefile('outputting')
 
 
@@ -193,7 +193,7 @@ if args.nodearea:
 
 if args.smooth_node:
     msg('> smoothing node...', 'info')
-    projectObject.smooth_vertices(projectObject.get_vertices_from_node(args.smooth_node))
+    projectObject.smooth_vertices_helper2(projectObject.get_vertices_from_node(args.smooth_node))
     msg('> node smoothened', 'info')
     # projectObject.export_all_angularities()
 
@@ -209,6 +209,7 @@ if args.exportshp:
     projectObject.export_shapefile(args.exportshp)
 
 if projectObject:
+    projectObject.triangulation.write_obj('objectfile.obj')
     projectObject.export_all_edge_triangles()
     projectObject.export_all_node_triangles()
     # projectObject.print_graph()
