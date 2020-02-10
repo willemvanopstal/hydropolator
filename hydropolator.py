@@ -2398,6 +2398,32 @@ class Hydropolator:
     #
     # ====================================== #
 
+    def get_vertices_around_point(self, point_tuple, rings=1):
+        locatedTriangle = tuple(self.pseudo_triangle(
+            self.triangulation.locate(point_tuple[0], point_tuple[1])))
+        # print(locatedTriangle)
+
+        trianglesOfInterest = {locatedTriangle}
+        triangleQueue = {locatedTriangle}
+        verticesOfInterest = set()
+
+        for i in range(rings):
+            # print('ring: ', i)
+            for triangle in triangleQueue.copy():
+                for neighboringTriangle in self.adjacent_triangles(triangle):
+                    if neighboringTriangle not in trianglesOfInterest:
+                        trianglesOfInterest.add(tuple(neighboringTriangle))
+                        triangleQueue.add(tuple(neighboringTriangle))
+                triangleQueue.remove(tuple(triangle))
+            # print(trianglesOfInterest)
+
+        for triangle in trianglesOfInterest:
+            for i in range(3):
+                verticesOfInterest.add(triangle[i])
+        # print(verticesOfInterest)
+
+        return verticesOfInterest
+
     def get_vertices_from_node(self, nodeIds):
         print(nodeIds)
         indexedVertices = set()
@@ -2691,10 +2717,11 @@ class Hydropolator:
         len2 = math.hypot(dx2, dy2)
         return round(math.acos(inner_product/(len1*len2)), 4)
 
-    def check_isobath_angularity(self, edgeIds=[]):
+    def check_isobath_angularity(self, edgeIds=[], threshold=3.14):
         if not len(edgeIds):
             edgeIds = self.graph['edges'].keys()
 
+        turningPoints = set()
         for edge in edgeIds:
             closed = self.graph['edges'][str(edge)]['closed']
             geom = self.graph['edges'][str(edge)]['geom']
@@ -2705,10 +2732,18 @@ class Hydropolator:
 
             if closed:
                 # print('0', geom[-2], geom[0], geom[1])
-                pointAngularities.append(self.angularity(geom[-2], geom[0], geom[1]))
+                angularity = self.angularity(geom[-2], geom[0], geom[1])
+                pointAngularities.append(angularity)
+                if angularity > threshold:
+                    turningPoints.add(tuple(geom[0]))
             for i in range(1, len(geom)-1):
                 # print(i, geom[i-1], geom[i], geom[i+1])
-                pointAngularities.append(self.angularity(geom[i-1], geom[i], geom[i+1]))
+                angularity = self.angularity(geom[i-1], geom[i], geom[i+1])
+                pointAngularities.append(angularity)
+                if angularity > threshold:
+                    turningPoints.add(tuple(geom[i]))
+
+        return turningPoints
 
     def triangle_area(self, triangle):
         ptOne = self.triangulation.get_point(triangle[0])
