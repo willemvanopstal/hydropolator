@@ -29,6 +29,7 @@ print('getId: ', getId)
 edge = projectObject.graph['edges'][getId]
 
 edgeBends = BendDetector(getId, edge, projectName)
+edgeBends.write_poly_file()
 
 
 ###########################################
