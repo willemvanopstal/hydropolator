@@ -2398,7 +2398,7 @@ class Hydropolator:
     #
     # ====================================== #
 
-    def get_vertices_around_point(self, point_tuple, rings=1):
+    def get_vertices_around_point(self, point_tuple, rings=3):
         locatedTriangle = tuple(self.pseudo_triangle(
             self.triangulation.locate(point_tuple[0], point_tuple[1])))
         # print(locatedTriangle)

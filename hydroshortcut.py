@@ -38,6 +38,7 @@ projectObject = Hydropolator()
 # projectObject.init_project(projectName)
 # projectObject.load_pointfile(surveyData, 'csv', ' ', flip=True)
 
+# comment this if initiating
 if projectObject.load_project(projectName) is True:
     msg('> loaded project', 'header')
     projectObject.summarize_project()
