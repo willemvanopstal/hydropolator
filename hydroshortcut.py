@@ -20,6 +20,7 @@ def msg(string, type):
 print('\n\n')
 
 # ======================== #
+# surveyData = 'simulated_surface_points.txt'
 surveyData = '../Data/operatorimplications/simulated_surface_points.txt'
 # ======================== #
 
@@ -32,6 +33,11 @@ projectDir = os.path.join(cwd, 'projects')
 projectName = 'regiongraphtesttttp'
 
 projectObject = Hydropolator()
+
+# # possibly initiatie new project
+# projectObject.init_project(projectName)
+# projectObject.load_pointfile(surveyData, 'csv', ' ', flip=True)
+
 if projectObject.load_project(projectName) is True:
     msg('> loaded project', 'header')
     projectObject.summarize_project()
@@ -47,10 +53,9 @@ msg('> generating triangle region graph', 'info')
 projectObject.generate_regions()
 projectObject.build_graph2()
 
-projectObject.generate_isobaths4()
 
 ########
-
+projectObject.generate_isobaths4()
 sharpPoints = projectObject.check_isobath_angularity(edgeIds=[], threshold=0.6)
 projectObject.export_all_angularities()
 projectObject.export_all_isobaths()

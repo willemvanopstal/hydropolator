@@ -2570,7 +2570,7 @@ class Hydropolator:
         self.print_graph()
 
         allChangedVertices = set()
-        for i in range(50):
+        for i in range(10):
             changedVertices = self.smooth_vertices(vertexSet)
             allChangedVertices.update(changedVertices)
             # print(allChangedVertices)

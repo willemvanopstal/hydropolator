@@ -26,3 +26,6 @@ TriangleRegionGraph.py
 
 # Ignore SASS config files
 .sass-cache
+
+# add some example data
+!simulated_surface_points.txt
