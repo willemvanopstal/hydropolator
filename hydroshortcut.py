@@ -43,12 +43,12 @@ if projectObject.load_project(projectName) is True:
     msg('> loaded project', 'header')
     projectObject.summarize_project()
 
-# # cleaning files
-# hours = 48
-# minutes = 0
-# msg('> removing files older than: {} hours, {} minutes'.format(hours, minutes), 'warning')
-# projectObject.clean_files(60*hours + minutes)
-# msg('> removed all older files', 'info')
+# cleaning files
+hours = 12
+minutes = 0
+msg('> removing files older than: {} hours, {} minutes'.format(hours, minutes), 'warning')
+projectObject.clean_files(60*hours + minutes)
+msg('> removed all older files', 'info')
 
 msg('> generating triangle region graph', 'info')
 projectObject.generate_regions()

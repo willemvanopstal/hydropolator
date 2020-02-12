@@ -30,6 +30,8 @@ edge = projectObject.graph['edges'][getId]
 
 edgeBends = BendDetector(getId, edge, projectName)
 edgeBends.write_poly_file()
+edgeBends.triangulate()
+edgeBends.export_triangles_shp()
 
 
 ###########################################
