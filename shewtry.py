@@ -33,6 +33,8 @@ edgeBends.write_poly_file()
 edgeBends.triangulate()
 edgeBends.export_triangles_shp()
 
+edgeBends.classify_bends()
+
 
 ###########################################
 

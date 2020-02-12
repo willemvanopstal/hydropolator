@@ -23,6 +23,92 @@ class BendDetector():
 
         self.projectPath = os.path.join(os.getcwd(), 'projects', project_name)
 
+    # ====================================== #
+    #
+    #   Exports
+    #
+    # ====================================== #
+
+    def export_triangles_shp(self):
+
+        triangleShpFile = os.path.join(
+            self.projectPath, 'constrained_triangles_{}.shp'.format(self.edgeId))
+
+        with shapefile.Writer(triangleShpFile) as wt:
+            wt.field('triid', 'C')
+            for triangle in self.triangles.keys():
+                geom = self.triangle_geom(triangle)
+                wt.poly([geom])
+                wt.record(triangle)
+
+    # ====================================== #
+    #
+    #   Triangulation
+    #
+    # ====================================== #
+
+    def get_point(self, vertex_id):
+        return self.vertices[vertex_id]  # tuple (x,y)
+
+    def triangle_geom(self, triangle_id):
+        # vertices = self.triangulation.all_vertices()
+        triPoly = []
+        for vId in self.triangles[triangle_id]['vertices']:
+            vertex = self.get_point(vId)
+            triPoly.append([vertex[0], vertex[1]])
+            # elevations.append(vertex[2])
+        triPoly.append(list(self.get_point(self.triangles[triangle_id]['vertices'][0])))
+
+        return triPoly
+
+    def adjacent_triangles(self, triangle_id):
+        pass
+
+    # ====================================== #
+    #
+    #   Detection
+    #
+    # ====================================== #
+
+    def classify_bends(self):
+
+        allTriangles = self.triangles.keys()
+        visitedTriangles = set()
+        queue = set()
+
+        foundThree = False
+        for triangle in allTriangles:
+            if len(self.triangles[triangle]['neighbors']) == 3:
+                print(triangle)
+                foundThree = True
+                break
+
+        if not foundThree:
+            for triangle in allTriangles:
+                if len(self.triangles[triangle]['neighbors']) == 2:
+                    print(triangle)
+                    break
+
+        queue.add(triangle)
+        finished = False
+        i = 0
+
+        while not finished:
+            for triangle in queue.copy():
+                neighboringTriangles = self.triangles[triangle]['neighbors']
+                for neighboringTriangle in neighboringTriangles:
+                    print(neighboringTriangle)
+
+            i += 1
+            if i > 10:
+                finished = True
+
+    # ====================================== #
+    #
+    #   Shewchuk
+    #
+    # ====================================== #
+
     def write_poly_file(self):
         # only takes into account one simple closed isobath
         polyName = '{}.poly'.format(self.edgeId)
@@ -65,31 +151,18 @@ class BendDetector():
         print(segmentHeader)
         print(segmentList)
 
-    def export_triangles_shp(self):
+    def triangulate(self):
+        # only takes into account one simple closed isobath
+        polyName = '{}.poly'.format(self.edgeId)
+        polyPath = os.path.join(self.projectPath, polyName)
+        print(polyPath)
 
-        triangleShpFile = os.path.join(
-            self.projectPath, 'constrained_triangles_{}.shp'.format(self.edgeId))
+        self.execute_constrained(polyPath)
 
-        with shapefile.Writer(triangleShpFile) as wt:
-            wt.field('triid', 'C')
-            for triangle in self.triangles.keys():
-                geom = self.triangle_geom(triangle)
-                wt.poly([geom])
-                wt.record(triangle)
-
-    def get_point(self, vertex_id):
-        return self.vertices[vertex_id]  # tuple (x,y)
-
-    def triangle_geom(self, triangleId):
-        # vertices = self.triangulation.all_vertices()
-        triPoly = []
-        for vId in self.triangles[triangleId]['vertices']:
-            vertex = self.get_point(vId)
-            triPoly.append([vertex[0], vertex[1]])
-            # elevations.append(vertex[2])
-        triPoly.append(list(self.get_point(self.triangles[triangleId]['vertices'][0])))
-
-        return triPoly
+        self.parse_output(polyPath)
+        # print(self.vertices)
+        # print(self.triangles)
+        pass
 
     def execute_constrained(self, pathToFile):
         print(pathToFile)
@@ -122,16 +195,3 @@ class BendDetector():
                     for i in [1, 2, 3]:
                         if neigh[i] != '-1':
                             triangleNeighbors.append(neigh[i])
-
-    def triangulate(self):
-        # only takes into account one simple closed isobath
-        polyName = '{}.poly'.format(self.edgeId)
-        polyPath = os.path.join(self.projectPath, polyName)
-        print(polyPath)
-
-        self.execute_constrained(polyPath)
-
-        self.parse_output(polyPath)
-        # print(self.vertices)
-        # print(self.triangles)
-        pass
