@@ -1,6 +1,8 @@
 import subprocess
 import shapefile
 import os
+import math
+from datetime import datetime
 
 
 class BendDetector():
@@ -29,17 +31,26 @@ class BendDetector():
     #
     # ====================================== #
 
-    def export_triangles_shp(self):
+    def now(self):
+        return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    def export_triangles_shp(self, triangle_ids=[]):
+        if len(triangle_ids) == 0:
+            triangle_ids = self.triangles.keys()
 
         triangleShpFile = os.path.join(
-            self.projectPath, 'constrained_triangles_{}.shp'.format(self.edgeId))
+            self.projectPath, 'constrained_triangles_{}_{}.shp'.format(self.edgeId, self.now()))
 
         with shapefile.Writer(triangleShpFile) as wt:
             wt.field('triid', 'C')
-            for triangle in self.triangles.keys():
+            wt.field('vertices', 'C')
+            wt.field('neighbors', 'C')
+            for triangle in triangle_ids:
                 geom = self.triangle_geom(triangle)
+                vertices = str(self.triangles[triangle]['vertices'])
+                neighbors = str(self.triangles[triangle]['neighbors'])
                 wt.poly([geom])
-                wt.record(triangle)
+                wt.record(triangle, vertices, neighbors)
 
     # ====================================== #
     #
@@ -62,7 +73,48 @@ class BendDetector():
         return triPoly
 
     def adjacent_triangles(self, triangle_id):
-        pass
+        neighboringTriangles = self.triangles[triangle_id]['neighbors']
+        finalNeighbors = []
+        for tri in neighboringTriangles:
+            if tri != '-1':
+                finalNeighbors.append(tri)
+
+        return finalNeighbors
+
+    def has_three_neighbors(self, triangle_id):
+        neighboringTriangles = self.triangles[triangle_id]['neighbors']
+        for tri in neighboringTriangles:
+            if tri == '-1':
+                return False
+
+        return True
+
+    def number_neighbors(self, triangle_id):
+        neighboringTriangles = self.triangles[triangle_id]['neighbors']
+        validCounter = 0
+        for tri in neighboringTriangles:
+            if tri != '-1':
+                validCounter += 1
+
+        return validCounter
+
+    def shared_edge(self, triangle_one_id, triangle_two_id):
+        verticesOne = self.triangles[triangle_one_id]['vertices']
+        verticesTwo = self.triangles[triangle_two_id]['vertices']
+        # tuples
+
+        sharedVertices = set(verticesOne).intersection(verticesTwo)
+
+        return list(sharedVertices)
+
+    def edge_length(self, edge_vertices):
+        vertexOne = self.vertices[edge_vertices[0]]
+        vertexTwo = self.vertices[edge_vertices[1]]
+
+        dX = vertexTwo[0] - vertexOne[0]
+        dY = vertexTwo[1] - vertexTwo[1]
+
+        return math.hypot(dX, dY)
 
     # ====================================== #
     #
@@ -70,38 +122,154 @@ class BendDetector():
     #
     # ====================================== #
 
-    def classify_bends(self):
+    def all_sides_valid(self, triangle_id, length_threshold):
+        vertices = self.triangles[triangle_id]['vertices']
+        for i in [0, 1, 2]:
+            edgeVertices = [vertices[i-1], vertices[i]]
+            edgeLength = self.edge_length(edgeVertices)
+            if edgeLength < length_threshold:
+                return False
+
+        return True
+
+    def classify_bends(self, length_threshold):
 
         allTriangles = self.triangles.keys()
         visitedTriangles = set()
         queue = set()
+        validQueue = set()
+        invalidQueue = set()
+        validTriangles = set()
+        invalidTriangles = set()
+
+        # special case, isobath only has three vertices
+        if len(allTriangles) == 1:
+            triangleId = allTriangles[0]
+            if self.all_sides_valid(triangleId, length_threshold):
+                validTriangles.add(triangleId)
+            elif not self.all_sides_valid(triangleId, length_threshold):
+                invalidTriangles.add(triangleId)
+
+            return invalidTriangles
+        # special case, isobath has four vertices, two adjacent triangles
+        # all triangles should be large enough
+        elif len(allTriangles) == 2:
+            validCounter = 0
+            for triangleId in allTriangles:
+                if self.all_sides_valid(triangleId, length_threshold):
+                    validCounter += 1
+            if validCounter == 2:
+                validTriangles = set(allTriangles)
+            else:
+                invalidTriangles = set(allTriangles)
+
+            return invalidTriangles
+        # end special cases
 
         foundThree = False
-        for triangle in allTriangles:
-            if len(self.triangles[triangle]['neighbors']) == 3:
-                print(triangle)
+        for triangleId in allTriangles:
+            if self.has_three_neighbors(triangleId):
+                print(triangleId)
+                # three-side tri is always valid, no overlap with isobath
+                validTriangles.add(triangleId)
+                validQueue.add(triangleId)
+                visitedTriangles.add(triangleId)
                 foundThree = True
                 break
 
         if not foundThree:
-            for triangle in allTriangles:
-                if len(self.triangles[triangle]['neighbors']) == 2:
-                    print(triangle)
+            for triangleId in allTriangles:
+                if self.number_neighbors(triangleId) == 2:
+                    print(triangleId)
+                    validQueue.add(triangleId)
                     break
 
-        queue.add(triangle)
         finished = False
         i = 0
 
         while not finished:
-            for triangle in queue.copy():
-                neighboringTriangles = self.triangles[triangle]['neighbors']
-                for neighboringTriangle in neighboringTriangles:
-                    print(neighboringTriangle)
 
-            i += 1
-            if i > 10:
+            for triangle in validQueue.copy():
+                for adjacentTriangle in self.adjacent_triangles(triangle):
+                    if adjacentTriangle in visitedTriangles:
+                        continue
+                    elif self.has_three_neighbors(adjacentTriangle):
+                        validTriangles.add(adjacentTriangle)
+                        validQueue.add(adjacentTriangle)
+                        visitedTriangles.add(adjacentTriangle)
+                    else:
+                        sharedEdge = self.shared_edge(triangle, adjacentTriangle)
+                        if self.edge_length(sharedEdge) < length_threshold:
+                            invalidTriangles.add(adjacentTriangle)
+                            invalidQueue.add(adjacentTriangle)
+                            visitedTriangles.add(adjacentTriangle)
+                        else:
+                            validTriangles.add(adjacentTriangle)
+                            validQueue.add(adjacentTriangle)
+                            visitedTriangles.add(adjacentTriangle)
+
+                validQueue.discard(triangle)
+
+            for triangle in invalidQueue.copy():
+                for adjacentTriangle in self.adjacent_triangles(triangle):
+                    if adjacentTriangle in visitedTriangles:
+                        continue
+                    elif self.has_three_neighbors(adjacentTriangle):
+                        validTriangles.add(adjacentTriangle)
+                        validQueue.add(adjacentTriangle)
+                        visitedTriangles.add(adjacentTriangle)
+                    else:
+                        sharedEdge = self.shared_edge(triangle, adjacentTriangle)
+                        if self.edge_length(sharedEdge) < length_threshold:
+                            invalidTriangles.add(adjacentTriangle)
+                            invalidQueue.add(adjacentTriangle)
+                            visitedTriangles.add(adjacentTriangle)
+                        else:
+                            validTriangles.add(adjacentTriangle)
+                            validQueue.add(adjacentTriangle)
+                            visitedTriangles.add(adjacentTriangle)
+
+                invalidQueue.discard(triangle)
+
+                # for triangle in queue.copy():
+                #     neighboringTriangles = self.triangles[triangle]['neighbors']
+                #     for neighboringTriangle in neighboringTriangles:
+                #         sharedEdge = self.shared_edge(triangle, neighboringTriangle)
+                #         print(neighboringTriangle, sharedEdge, self.edge_length(sharedEdge))
+
+            if len(visitedTriangles) == len(allTriangles):
                 finished = True
+            i += 1
+            if i > 200:
+                print('iter limit')
+                finished = True
+
+        return invalidTriangles
+
+        # for triangle in allTriangles:
+        #     neighboringTriangles = self.triangles[triangle]['neighbors']
+        #     vertices = self.triangles[triangle]['vertices']
+        #     print(triangle, vertices, neighboringTriangles)
+        #
+        #     edgesToTest = []
+        #     for i, neighboringTriangle in enumerate(neighboringTriangles):
+        #         if neighboringTriangle != '-1':
+        #             # print(i)
+        #             edgesToTest.append(i)
+        #
+        #     # print(edgesToTest)
+        #     for edgeIndex in edgesToTest:
+        #         # print('edgeIndex: ', edgeIndex)
+        #         edge = vertices.copy()
+        #         del edge[edgeIndex]
+        #         # print('edge: ', edge)
+        #
+        #         if self.edge_length(edge) < length_threshold:
+        #             print('im exceeding threshold!', self.edge_length(edge))
+        #             invalidTriangles.add(triangle)
+        #             continue
+        #
+        # self.export_triangles_shp(triangle_ids=invalidTriangles)
 
     # ====================================== #
     #
@@ -176,16 +344,16 @@ class BendDetector():
         self.triangles = dict()
 
         with open(self.elePath) as elef:
-            print('\nele file:')
+            # print('\nele file:')
             for line in elef.readlines()[1:]:
                 if not line.startswith('#'):
                     tri = line.split()
                     # print(line.split())
-                    self.triangles[tri[0]] = {'vertices': (
-                        tri[1], tri[2], tri[3]), 'neighbors': []}
+                    self.triangles[tri[0]] = {'vertices': [
+                        tri[1], tri[2], tri[3]], 'neighbors': []}
 
         with open(self.neighPath) as neighf:
-            print('neighFile: ')
+            # print('neighFile: ')
             for line in neighf.readlines()[1:]:
                 if not line.startswith('#'):
                     neigh = line.split()
@@ -193,5 +361,5 @@ class BendDetector():
                     triangleNeighbors = self.triangles[neigh[0]]['neighbors']
 
                     for i in [1, 2, 3]:
-                        if neigh[i] != '-1':
-                            triangleNeighbors.append(neigh[i])
+                        # if neigh[i] != '-1':
+                        triangleNeighbors.append(neigh[i])
