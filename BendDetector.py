@@ -112,9 +112,20 @@ class BendDetector():
         vertexTwo = self.vertices[edge_vertices[1]]
 
         dX = vertexTwo[0] - vertexOne[0]
-        dY = vertexTwo[1] - vertexTwo[1]
+        dY = vertexTwo[1] - vertexOne[1]
+        # print(dX, dY)
 
         return math.hypot(dX, dY)
+
+    def get_vertices_from_triangles(self, triangle_ids):
+        allVertices = set()
+
+        for tri in triangle_ids:
+            for vertex in self.triangles[tri]['vertices']:
+                vertexValue = self.vertices[vertex]
+                allVertices.add(vertexValue)
+
+        return allVertices
 
     # ====================================== #
     #
@@ -189,45 +200,67 @@ class BendDetector():
 
         while not finished:
 
+            # print('\nvalidQueue: ', validQueue)
+
             for triangle in validQueue.copy():
                 for adjacentTriangle in self.adjacent_triangles(triangle):
+                    # print('------\nValids', triangle, adjacentTriangle)
                     if adjacentTriangle in visitedTriangles:
+                        # print('indexed')
                         continue
                     elif self.has_three_neighbors(adjacentTriangle):
+                        # print('3 neighbors')
                         validTriangles.add(adjacentTriangle)
                         validQueue.add(adjacentTriangle)
                         visitedTriangles.add(adjacentTriangle)
                     else:
                         sharedEdge = self.shared_edge(triangle, adjacentTriangle)
                         if self.edge_length(sharedEdge) < length_threshold:
+                            # print('smaller threshold', self.edge_length(sharedEdge))
                             invalidTriangles.add(adjacentTriangle)
                             invalidQueue.add(adjacentTriangle)
                             visitedTriangles.add(adjacentTriangle)
                         else:
+                            # print('larger threshold')
                             validTriangles.add(adjacentTriangle)
                             validQueue.add(adjacentTriangle)
                             visitedTriangles.add(adjacentTriangle)
 
                 validQueue.discard(triangle)
 
+            # print('invalidQueue:, ', invalidQueue)
             for triangle in invalidQueue.copy():
                 for adjacentTriangle in self.adjacent_triangles(triangle):
+                    # print('------\nInvalids', triangle, adjacentTriangle)
                     if adjacentTriangle in visitedTriangles:
+                        # print('indexed')
                         continue
                     elif self.has_three_neighbors(adjacentTriangle):
+                        # print('3 neighbors')
                         validTriangles.add(adjacentTriangle)
                         validQueue.add(adjacentTriangle)
                         visitedTriangles.add(adjacentTriangle)
                     else:
                         sharedEdge = self.shared_edge(triangle, adjacentTriangle)
                         if self.edge_length(sharedEdge) < length_threshold:
+                            # print('smaller threshold', self.edge_length(sharedEdge))
                             invalidTriangles.add(adjacentTriangle)
                             invalidQueue.add(adjacentTriangle)
                             visitedTriangles.add(adjacentTriangle)
                         else:
-                            validTriangles.add(adjacentTriangle)
-                            validQueue.add(adjacentTriangle)
-                            visitedTriangles.add(adjacentTriangle)
+                            # print('larger threshold')
+                            for neighboringTriangle in self.adjacent_triangles(adjacentTriangle):
+                                if neighboringTriangle != triangle:
+                                    sharedEdge = self.shared_edge(
+                                        adjacentTriangle, neighboringTriangle)
+                                    if self.edge_length(sharedEdge) < length_threshold:
+                                        invalidTriangles.add(adjacentTriangle)
+                                        invalidQueue.add(adjacentTriangle)
+                                        visitedTriangles.add(adjacentTriangle)
+                                    else:
+                                        validTriangles.add(adjacentTriangle)
+                                        validQueue.add(adjacentTriangle)
+                                        visitedTriangles.add(adjacentTriangle)
 
                 invalidQueue.discard(triangle)
 
@@ -239,10 +272,11 @@ class BendDetector():
 
             if len(visitedTriangles) == len(allTriangles):
                 finished = True
-            i += 1
-            if i > 200:
-                print('iter limit')
-                finished = True
+
+            # i += 1
+            # if i > 200:
+            #     print('iter limit')
+            #     finished = True
 
         return invalidTriangles
 

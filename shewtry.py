@@ -33,8 +33,11 @@ edgeBends.write_poly_file()
 edgeBends.triangulate()
 edgeBends.export_triangles_shp()
 
-invalidTriangles = edgeBends.classify_bends(10.0)
+invalidTriangles = edgeBends.classify_bends(35.0)
+invalidVertices = edgeBends.get_vertices_from_triangles(triangle_ids=invalidTriangles)
 edgeBends.export_triangles_shp(triangle_ids=invalidTriangles)
+
+print(invalidVertices)
 
 
 ###########################################
