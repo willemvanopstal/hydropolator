@@ -27,17 +27,26 @@ projectObject.generate_isobaths4()
 getId = '21'
 print('getId: ', getId)
 edge = projectObject.graph['edges'][getId]
+shallowerNodeId = edge['edge'][0]
+deeperNodeId = edge['edge'][1]
+shallowerNode = projectObject.graph['nodes'][shallowerNodeId]
+deeperNode = projectObject.graph['nodes'][deeperNodeId]
+
+# print(shallowerNodeId, shallowerNode)
+# print(deeperNodeId, deeperNode)
 
 edgeBends = BendDetector(getId, edge, projectName)
 edgeBends.write_poly_file()
 edgeBends.triangulate()
 edgeBends.export_triangles_shp()
 
-invalidTriangles = edgeBends.classify_bends(35.0)
-invalidVertices = edgeBends.get_vertices_from_triangles(triangle_ids=invalidTriangles)
-edgeBends.export_triangles_shp(triangle_ids=invalidTriangles)
-
-print(invalidVertices)
+# invalidTriangles = edgeBends.classify_bends(35.0)
+spurs, gullys = edgeBends.get_spurs_and_gullys(20.0)
+edgeBends.export_triangles_shp(triangle_ids=spurs, name='spurs')
+edgeBends.export_triangles_shp(triangle_ids=gullys, name='gullys')
+# invalidVertices = edgeBends.get_vertices_from_triangles(triangle_ids=invalidTriangles)
+# edgeBends.export_triangles_shp(triangle_ids=invalidTriangles)
+# print(invalidVertices)
 
 
 ###########################################

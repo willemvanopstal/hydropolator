@@ -24,6 +24,29 @@ class BendDetector():
             self.nrSegments += 1
 
         self.projectPath = os.path.join(os.getcwd(), 'projects', project_name)
+        self.get_bounds()
+
+    def get_bounds(self):
+        xMin = 10e9
+        xMax = -10e9
+        yMin = 10e9
+        yMax = -10e9
+
+        for vertex in self.geom:
+            vX, vY = vertex[0], vertex[1]
+            if vX > xMax:
+                xMax = vX
+            if vX < xMin:
+                xMin = vX
+            if vY > yMax:
+                yMax = vY
+            if vY < yMin:
+                yMin = vY
+
+        self.xMin = xMin
+        self.xMax = xMax
+        self.yMin = yMin
+        self.yMax = yMax
 
     # ====================================== #
     #
@@ -34,12 +57,12 @@ class BendDetector():
     def now(self):
         return datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    def export_triangles_shp(self, triangle_ids=[]):
+    def export_triangles_shp(self, triangle_ids=[], name='tris'):
         if len(triangle_ids) == 0:
             triangle_ids = self.triangles.keys()
 
         triangleShpFile = os.path.join(
-            self.projectPath, 'constrained_triangles_{}_{}.shp'.format(self.edgeId, self.now()))
+            self.projectPath, 'constrained_triangles_{}_{}_{}.shp'.format(name, self.edgeId, self.now()))
 
         with shapefile.Writer(triangleShpFile) as wt:
             wt.field('triid', 'C')
@@ -108,6 +131,10 @@ class BendDetector():
         return list(sharedVertices)
 
     def edge_length(self, edge_vertices):
+
+        if type(edge_vertices[0]) == int:
+            edge_vertices = [str(value) for value in edge_vertices]
+
         vertexOne = self.vertices[edge_vertices[0]]
         vertexTwo = self.vertices[edge_vertices[1]]
 
@@ -142,6 +169,52 @@ class BendDetector():
                 return False
 
         return True
+
+    def get_spurs_and_gullys(self, length_threshold, nrInvalidEdges=1):
+
+        allTriangles = self.triangles.keys()
+        spurTriangles = set()
+        gullyTriangles = set()
+
+        for triangleId in allTriangles:
+            print(triangleId, self.triangles[triangleId])
+            triangleVertices = self.triangles[triangleId]['vertices']
+
+            leftOfSegment = False
+            rightOfSegment = False
+            edgeLengths = []
+            for i in [0, 1, 2]:
+                # edgeIndices = [i, (i+1)%3]
+                edge = (int(triangleVertices[i]), int(triangleVertices[(i+1) % 3]))
+                # print(edge)
+                if not leftOfSegment and edge in self.segments:
+                    rightOfSegment = True
+                elif not rightOfSegment and tuple(reversed(edge)) in self.segments:
+                    leftOfSegment = True
+                else:
+                    edgeLength = self.edge_length(edge)
+                    edgeLengths.append(edgeLength)
+            # print(rightOfSegment, leftOfSegment)
+
+            if leftOfSegment or rightOfSegment:
+                print('im directly adjacent to isobath')
+                invalidCounter = 0
+                for l in edgeLengths:
+                    if l < length_threshold:
+                        invalidCounter += 1
+
+                if invalidCounter >= nrInvalidEdges:  # input amount of invalid edges needed to trigger
+                    print('im invalid triangle')
+                    if leftOfSegment:
+                        print('left, deeper, gully')
+                        gullyTriangles.add(triangleId)
+                    elif rightOfSegment:
+                        print('right, shallower, spur')
+                        spurTriangles.add(triangleId)
+
+            # print(edgeLengths)
+
+        return spurTriangles, gullyTriangles
 
     def classify_bends(self, length_threshold):
 
@@ -305,6 +378,8 @@ class BendDetector():
         #
         # self.export_triangles_shp(triangle_ids=invalidTriangles)
 
+        pass
+
     # ====================================== #
     #
     #   Shewchuk
@@ -327,6 +402,7 @@ class BendDetector():
             segmentList = ''
 
             self.vertices = dict()
+            self.segments = set()
 
             for v in self.geom[:-1]:
                 vertexEntry = '{} {} {} 2\n'.format(counter, v[0], v[1])
@@ -338,6 +414,8 @@ class BendDetector():
                     segmentEnd = 1
                 segmentEntry = '{} {} {} 2\n'.format(
                     counter, counter, segmentEnd)
+                self.segments.add((counter, segmentEnd))
+                print((counter, segmentEnd))
                 segmentList = segmentList + segmentEntry
 
                 counter += 1
@@ -368,7 +446,7 @@ class BendDetector():
 
     def execute_constrained(self, pathToFile):
         print(pathToFile)
-        subprocess.run('./triangle -pn "{}"'.format(pathToFile), shell=True)
+        subprocess.run('./triangle -pcn "{}"'.format(pathToFile), shell=True)
 
     def parse_output(self, inputPath):
         outputFilePart = os.path.splitext(inputPath)[0]
