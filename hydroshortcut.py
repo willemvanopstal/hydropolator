@@ -47,17 +47,20 @@ if projectObject.load_project(projectName) is True:
 hours = 12
 minutes = 0
 msg('> removing files older than: {} hours, {} minutes'.format(hours, minutes), 'warning')
-projectObject.clean_files(60*hours + minutes)
+# projectObject.clean_files(60*hours + minutes)
 msg('> removed all older files', 'info')
 
 msg('> generating triangle region graph', 'info')
 projectObject.generate_regions()
 projectObject.build_graph2()
 
+projectObject.generate_isobaths4()
 
 ########
-projectObject.generate_isobaths4()
 sharpPoints = projectObject.check_isobath_angularity(edgeIds=[], threshold=0.6)
+spurgullyPoints = projectObject.check_spurs_gullys(
+    edgeIds=['2', '5', '6', '27'], threshold=10, spurThreshold=None, gullyThreshold=None)
+
 projectObject.export_all_angularities()
 projectObject.export_all_isobaths()
 
@@ -68,15 +71,15 @@ for point in sharpPoints:
     verticesToSmooth.update(projectObject.get_vertices_around_point(point, rings=1))
 print('nr vertices: ', len(verticesToSmooth))
 
-projectObject.simple_smooth_and_rebuild(verticesToSmooth)
+# projectObject.simple_smooth_and_rebuild(verticesToSmooth)
 
 
 ########
-projectObject.generate_isobaths4()
-projectObject.check_isobath_angularity()
-projectObject.export_all_angularities()
-
-projectObject.export_all_isobaths()
+# projectObject.generate_isobaths4()
+# projectObject.check_isobath_angularity()
+# projectObject.export_all_angularities()
+#
+# projectObject.export_all_isobaths()
 projectObject.export_all_node_triangles()
 projectObject.export_all_edge_triangles()
 projectObject.export_shapefile('output')

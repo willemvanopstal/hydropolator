@@ -17,11 +17,15 @@ class BendDetector():
         # print('closed: ', self.closed)
         # print('geom: ', self.geom)
 
-        self.nrVertices = len(self.geom)
-        self.nrSegments = len(self.geom) - 2
+        geomLength = len(self.geom)
+        # self.nrVertices = len(self.geom)
+        # self.nrSegments = len(self.geom) - 1
         if self.closed:
-            self.nrVertices -= 1
-            self.nrSegments += 1
+            self.nrVertices = geomLength - 1
+            self.nrSegments = geomLength - 1
+        if not self.closed:
+            self.nrVertices = geomLength
+            self.nrSegments = geomLength - 1
 
         self.projectPath = os.path.join(os.getcwd(), 'projects', project_name)
         self.get_bounds()
@@ -47,6 +51,18 @@ class BendDetector():
         self.xMax = xMax
         self.yMin = yMin
         self.yMax = yMax
+
+    def clean_output_files(self):
+        outputFiles = ['ele', 'neigh', 'node', 'poly']
+        for fileType in outputFiles:
+            fileName = '{}.1.{}'.format(self.edgeId, fileType)
+            filePath = os.path.join(self.projectPath, fileName)
+            os.remove(filePath)
+
+    def clean_input_file(self):
+        fileName = '{}.poly'.format(self.edgeId)
+        filePath = os.path.join(self.projectPath, fileName)
+        os.remove(filePath)
 
     # ====================================== #
     #
@@ -176,7 +192,7 @@ class BendDetector():
 
         return True
 
-    def get_spurs_and_gullys(self, length_threshold, nrInvalidEdges=1):
+    def get_spurs_and_gullys(self, gully_threshold=0, spur_threshold=0, nrInvalidEdges=1):
 
         allTriangles = self.triangles.keys()
         spurTriangles = set()
@@ -202,21 +218,38 @@ class BendDetector():
                     edgeLengths.append(edgeLength)
             # print(rightOfSegment, leftOfSegment)
 
-            if leftOfSegment or rightOfSegment:
-                # print('im directly adjacent to isobath')
+            if leftOfSegment:
+                # deeper than contour, gully
                 invalidCounter = 0
                 for l in edgeLengths:
-                    if l < length_threshold:
+                    if l < gully_threshold:
                         invalidCounter += 1
+                if invalidCounter >= nrInvalidEdges:
+                    gullyTriangles.add(triangleId)
+            elif rightOfSegment:
+                # shallower than contour, spur
+                invalidCounter = 0
+                for l in edgeLengths:
+                    if l < spur_threshold:
+                        invalidCounter += 1
+                if invalidCounter >= nrInvalidEdges:
+                    spurTriangles.add(triangleId)
 
-                if invalidCounter >= nrInvalidEdges:  # input amount of invalid edges needed to trigger
-                    # print('im invalid triangle')
-                    if leftOfSegment:
-                        # print('left, deeper, gully')
-                        gullyTriangles.add(triangleId)
-                    elif rightOfSegment:
-                        # print('right, shallower, spur')
-                        spurTriangles.add(triangleId)
+            # if leftOfSegment or rightOfSegment:
+            #     # print('im directly adjacent to isobath')
+            #     invalidCounter = 0
+            #     for l in edgeLengths:
+            #         if l < length_threshold:
+            #             invalidCounter += 1
+            #
+            #     if invalidCounter >= nrInvalidEdges:  # input amount of invalid edges needed to trigger
+            #         # print('im invalid triangle')
+            #         if leftOfSegment:
+            #             # print('left, deeper, gully')
+            #             gullyTriangles.add(triangleId)
+            #         elif rightOfSegment:
+            #             # print('right, shallower, spur')
+            #             spurTriangles.add(triangleId)
 
             # print(edgeLengths)
 
@@ -398,6 +431,36 @@ class BendDetector():
         polyPath = os.path.join(self.projectPath, polyName)
         # print(polyPath)
 
+        if not self.closed:
+            print(self.geom, self.nrVertices, self.nrSegments)
+            vertexHeader = '{} 2 0 1\n'.format(self.nrVertices)
+            segmentHeader = '{} 1\n'.format(self.nrSegments)
+            holeHeader = '{}\n'.format(0)
+
+            counter = 1
+            vertexList = ''
+            segmentList = ''
+
+            self.vertices = dict()
+            self.segments = set()
+
+            for v in self.geom:
+                vertexEntry = '{} {} {} 2\n'.format(counter, v[0], v[1])
+                self.vertices[str(counter)] = (v[0], v[1])
+                vertexList = vertexList + vertexEntry
+
+                # segmentEnd = (counter + 1) % (self.nrVertices + 1)
+                # if segmentEnd == 0:
+                #     segmentEnd = 1
+                if not counter == self.nrSegments:
+                    segmentEntry = '{} {} {} 2\n'.format(
+                        counter, counter, counter + 1)
+                    self.segments.add((counter, counter + 1))
+                    # print((counter, segmentEnd))
+                    segmentList = segmentList + segmentEntry
+
+                counter += 1
+
         if self.closed:
             vertexHeader = '{} 2 0 1\n'.format(self.nrVertices)
             segmentHeader = '{} 1\n'.format(self.nrSegments)
@@ -483,3 +546,5 @@ class BendDetector():
                     for i in [1, 2, 3]:
                         # if neigh[i] != '-1':
                         triangleNeighbors.append(neigh[i])
+
+        self.clean_output_files()
