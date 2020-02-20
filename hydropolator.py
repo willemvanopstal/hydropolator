@@ -674,7 +674,7 @@ class Hydropolator:
     def find_intervals(self, triangle, indexOnly=True):
         min, max = self.minmax_from_triangle(triangle)
         intervals = []
-        for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_right(self.isobathValues, max) + 1):
+        for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_left(self.isobathValues, max) + 1):
             if indexOnly:
                 intervals.append(index)
             else:
@@ -687,7 +687,7 @@ class Hydropolator:
     def find_previous_intervals(self, triangle, indexOnly=True):
         min, max = self.previous_minmax_from_triangle(triangle)
         intervals = []
-        for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_right(self.isobathValues, max) + 1):
+        for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_left(self.isobathValues, max) + 1):
             if indexOnly:
                 intervals.append(index)
             else:
@@ -1970,7 +1970,7 @@ class Hydropolator:
                 break
 
         self.graph['nodes'][nodeId] = {'region': interval, 'triangles': {pseudoTriangle}, 'deepNeighbors': set(), 'shallowNeighbors': set(
-        ), 'currentQueue': set(), 'shallowQueue': set(), 'deepQueue': set(), 'classification': None, 'full_area': None}
+        ), 'currentQueue': set(), 'shallowQueue': set(), 'deepQueue': set(), 'classification': None, 'full_area': None, 'edges': []}
         self.nrNodes += 1
         # print('new node: ', nodeId)
 
@@ -2056,6 +2056,8 @@ class Hydropolator:
             edge['edge'] = [shallowNode, deepNode]
             self.graph['nodes'][str(shallowNode)]['deepNeighbors'].add(deepNode)
             self.graph['nodes'][str(deepNode)]['shallowNeighbors'].add(shallowNode)
+            self.graph['nodes'][str(shallowNode)]['edges'].append(edgeId)
+            self.graph['nodes'][str(deepNode)]['edges'].append(edgeId)
             edge['value'] = self.get_edge_value(edgeId)
             edge['closed'] = None
             edge['iso_area'] = None
@@ -2836,7 +2838,7 @@ class Hydropolator:
             edgeIds = self.graph['edges'].keys()
 
         for edgeId in edgeIds:
-            if self.graph['edges'][edgeId]['closed'] == True:
+            if self.graph['edges'][edgeId]['closed'] is True:
                 print(edgeId, 'im closed isobath, calculating area')
 
                 ptArray = np.array([[p[0], p[1]] for p in self.graph['edges'][edgeId]['geom']])
@@ -2850,7 +2852,7 @@ class Hydropolator:
                 # everything else is the same as maxb's code
                 correction = x_[-1] * y_[0] - y_[-1] * x_[0]
                 main_area = np.dot(x_[:-1], y_[1:]) - np.dot(y_[:-1], x_[1:])
-                isoArea = 0.5*np.abs(main_area + correction)
+                isoArea = 0.5 * np.abs(main_area + correction)
                 print(round(isoArea, 3))
 
                 self.graph['edges'][edgeId]['iso_area'] = round(isoArea, 3)
