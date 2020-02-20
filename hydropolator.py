@@ -81,6 +81,10 @@ class Hydropolator:
     #
     # ====================================== #
 
+    def ___MISC___(self):
+        # placeholder for Atom symbol-tree-view
+        pass
+
     def now(self):
         return datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -89,6 +93,10 @@ class Hydropolator:
     #   Messaging / Notifications
     #
     # ====================================== #
+
+    def ___MESSAGING___(self):
+        # placeholder for Atom symbol-tree-view
+        pass
 
     def msg(self, string, type):
         if type == 'warning':
@@ -186,6 +194,10 @@ class Hydropolator:
     #   Project Management
     #
     # ====================================== #
+
+    def ___PROJECT___(self):
+        # placeholder for Atom symbol-tree-view
+        pass
 
     def init_project(self, projectName):
         cwd = os.getcwd()
@@ -369,6 +381,10 @@ class Hydropolator:
     #
     # ====================================== #
 
+    def ___EXPORTING___(self):
+        # placeholder for Atom symbol-tree-view
+        pass
+
     def export_shapefile(self, shpName):
         self.msg('> exporting shapefiles...', 'info')
         pointShpName = 'points_{}_{}.shp'.format(shpName, self.now())
@@ -529,6 +545,10 @@ class Hydropolator:
     #
     # ====================================== #
 
+    def ___POINTS___(self):
+        # placeholder for Atom symbol-tree-view
+        pass
+
     def load_pointfile(self, pointFile, fileType, delimiter, flip=False):
         pointFilePath = os.path.normpath(os.path.join(os.getcwd(), pointFile))
         print(pointFilePath)
@@ -578,6 +598,10 @@ class Hydropolator:
     #   Triangle Functions
     #
     # ====================================== #
+
+    def ___TRIANGLE___(self):
+        # placeholder for Atom symbol-tree-view
+        pass
 
     def poly_from_triangle(self, vertex_list):
         # vertices = self.triangulation.all_vertices()
@@ -678,6 +702,10 @@ class Hydropolator:
     #
     # ====================================== #
 
+    def ___VERTEX___(self):
+        # placeholder for Atom symbol-tree-view
+        pass
+
     def get_z(self, vertex, idOnly=False):
         # return self.vertexDict[tuple(vertex)]['z']
         if not idOnly:
@@ -707,6 +735,10 @@ class Hydropolator:
     #   Triangulation
     #
     # ====================================== #
+
+    def ___TRIANGULATION___(self):
+        # placeholder for Atom symbol-tree-view
+        pass
 
     def triangulation_insert(self):
         prevVertexCount = self.triangulation.number_of_vertices()
@@ -746,6 +778,9 @@ class Hydropolator:
     #
     # ====================================== #
 
+    def ___TRGRAPH___(self):
+        # placeholder for Atom symbol-tree-view
+        pass
     # --------------- #
     #   CREATION
     # --------------- #
@@ -2070,6 +2105,10 @@ class Hydropolator:
     #
     # ====================================== #
 
+    def ___ISOBATHS___(self):
+        # placeholder for Atom symbol-tree-view
+        pass
+
     def generate_isobaths4(self, edgeIds=[]):
         if len(edgeIds) == 0:
             edgeIds = list(self.graph['edges'].keys())
@@ -2398,6 +2437,10 @@ class Hydropolator:
     #
     # ====================================== #
 
+    def ___INTERPOLATION___(self):
+        # placeholder for Atom symbol-tree-view
+        pass
+
     def get_vertices_around_point(self, point_tuple, rings=3):
         locatedTriangle = tuple(self.pseudo_triangle(
             self.triangulation.locate(point_tuple[0], point_tuple[1])))
@@ -2708,6 +2751,10 @@ class Hydropolator:
     #   Metrics
     #
     # ====================================== #
+
+    def ___METRICS___(self):
+        # placeholder for Atom symbol-tree-view
+        pass
 
     def angularity(self, ptHead, ptMid, ptTail):
         dx1, dy1 = ptMid[0] - ptHead[0], ptMid[1] - ptHead[1]
