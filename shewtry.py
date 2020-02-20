@@ -42,8 +42,11 @@ edgeBends.export_triangles_shp()
 
 # invalidTriangles = edgeBends.classify_bends(35.0)
 spurs, gullys = edgeBends.get_spurs_and_gullys(20.0)
-edgeBends.export_triangles_shp(triangle_ids=spurs, name='spurs')
-edgeBends.export_triangles_shp(triangle_ids=gullys, name='gullys')
+exportDict = {'spurs': spurs, 'gullys': gullys}
+edgeBends.export_triangles_shp(multi=exportDict)
+# edgeBends.export_triangles_shp(triangle_ids=spurs, name='spurs')
+# edgeBends.export_triangles_shp(triangle_ids=gullys, name='gullys')
+
 # invalidVertices = edgeBends.get_vertices_from_triangles(triangle_ids=invalidTriangles)
 # edgeBends.export_triangles_shp(triangle_ids=invalidTriangles)
 # print(invalidVertices)

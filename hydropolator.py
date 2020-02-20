@@ -640,7 +640,7 @@ class Hydropolator:
     def find_intervals(self, triangle, indexOnly=True):
         min, max = self.minmax_from_triangle(triangle)
         intervals = []
-        for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_left(self.isobathValues, max) + 1):
+        for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_right(self.isobathValues, max) + 1):
             if indexOnly:
                 intervals.append(index)
             else:
@@ -653,7 +653,7 @@ class Hydropolator:
     def find_previous_intervals(self, triangle, indexOnly=True):
         min, max = self.previous_minmax_from_triangle(triangle)
         intervals = []
-        for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_left(self.isobathValues, max) + 1):
+        for index in range(bisect.bisect_left(self.isobathValues, min), bisect.bisect_right(self.isobathValues, max) + 1):
             if indexOnly:
                 intervals.append(index)
             else:

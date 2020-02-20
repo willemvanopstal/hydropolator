@@ -57,23 +57,29 @@ class BendDetector():
     def now(self):
         return datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    def export_triangles_shp(self, triangle_ids=[], name='tris'):
+    def export_triangles_shp(self, triangle_ids=[], name='tris', multi=None):
+        # multi = { 'name': {triangle_ids} }
         if len(triangle_ids) == 0:
             triangle_ids = self.triangles.keys()
+        exportDict = {name: triangle_ids}
+        if multi:
+            exportDict = multi
 
-        triangleShpFile = os.path.join(
-            self.projectPath, 'constrained_triangles_{}_{}_{}.shp'.format(name, self.edgeId, self.now()))
+        for multiName in exportDict.keys():
+            multiTriangles = exportDict[multiName]
+            triangleShpFile = os.path.join(
+                self.projectPath, 'constrained_triangles_{}_{}_{}.shp'.format(multiName, self.edgeId, self.now()))
 
-        with shapefile.Writer(triangleShpFile) as wt:
-            wt.field('triid', 'C')
-            wt.field('vertices', 'C')
-            wt.field('neighbors', 'C')
-            for triangle in triangle_ids:
-                geom = self.triangle_geom(triangle)
-                vertices = str(self.triangles[triangle]['vertices'])
-                neighbors = str(self.triangles[triangle]['neighbors'])
-                wt.poly([geom])
-                wt.record(triangle, vertices, neighbors)
+            with shapefile.Writer(triangleShpFile) as wt:
+                wt.field('triid', 'C')
+                wt.field('vertices', 'C')
+                wt.field('neighbors', 'C')
+                for triangle in multiTriangles:
+                    geom = self.triangle_geom(triangle)
+                    vertices = str(self.triangles[triangle]['vertices'])
+                    neighbors = str(self.triangles[triangle]['neighbors'])
+                    wt.poly([geom])
+                    wt.record(triangle, vertices, neighbors)
 
     # ====================================== #
     #
@@ -177,7 +183,7 @@ class BendDetector():
         gullyTriangles = set()
 
         for triangleId in allTriangles:
-            print(triangleId, self.triangles[triangleId])
+            # print(triangleId, self.triangles[triangleId])
             triangleVertices = self.triangles[triangleId]['vertices']
 
             leftOfSegment = False
@@ -197,19 +203,19 @@ class BendDetector():
             # print(rightOfSegment, leftOfSegment)
 
             if leftOfSegment or rightOfSegment:
-                print('im directly adjacent to isobath')
+                # print('im directly adjacent to isobath')
                 invalidCounter = 0
                 for l in edgeLengths:
                     if l < length_threshold:
                         invalidCounter += 1
 
                 if invalidCounter >= nrInvalidEdges:  # input amount of invalid edges needed to trigger
-                    print('im invalid triangle')
+                    # print('im invalid triangle')
                     if leftOfSegment:
-                        print('left, deeper, gully')
+                        # print('left, deeper, gully')
                         gullyTriangles.add(triangleId)
                     elif rightOfSegment:
-                        print('right, shallower, spur')
+                        # print('right, shallower, spur')
                         spurTriangles.add(triangleId)
 
             # print(edgeLengths)
@@ -390,7 +396,7 @@ class BendDetector():
         # only takes into account one simple closed isobath
         polyName = '{}.poly'.format(self.edgeId)
         polyPath = os.path.join(self.projectPath, polyName)
-        print(polyPath)
+        # print(polyPath)
 
         if self.closed:
             vertexHeader = '{} 2 0 1\n'.format(self.nrVertices)
@@ -415,7 +421,7 @@ class BendDetector():
                 segmentEntry = '{} {} {} 2\n'.format(
                     counter, counter, segmentEnd)
                 self.segments.add((counter, segmentEnd))
-                print((counter, segmentEnd))
+                # print((counter, segmentEnd))
                 segmentList = segmentList + segmentEntry
 
                 counter += 1
@@ -426,16 +432,16 @@ class BendDetector():
             of.write(segmentHeader)
             of.write(segmentList)
             of.write(holeHeader)
-        print(vertexHeader)
-        print(vertexList)
-        print(segmentHeader)
-        print(segmentList)
+        # print(vertexHeader)
+        # print(vertexList)
+        # print(segmentHeader)
+        # print(segmentList)
 
     def triangulate(self):
         # only takes into account one simple closed isobath
         polyName = '{}.poly'.format(self.edgeId)
         polyPath = os.path.join(self.projectPath, polyName)
-        print(polyPath)
+        # print(polyPath)
 
         self.execute_constrained(polyPath)
 
@@ -445,8 +451,10 @@ class BendDetector():
         pass
 
     def execute_constrained(self, pathToFile):
-        print(pathToFile)
-        subprocess.run('./triangle -pcn "{}"'.format(pathToFile), shell=True)
+        # print(pathToFile)
+        runCommand = './triangle -pcn "{}"'.format(pathToFile)
+        print(runCommand)
+        subprocess.run(runCommand, shell=True)
 
     def parse_output(self, inputPath):
         outputFilePart = os.path.splitext(inputPath)[0]
