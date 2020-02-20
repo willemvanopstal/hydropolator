@@ -55,21 +55,25 @@ projectObject.generate_regions()
 projectObject.build_graph2()
 
 projectObject.generate_isobaths4()
-
+innerNodes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 18,
+              19, 20, 21, 22, 23, 24, 26, 27, 28, 30, 31, 32, 33, 34, 35, 36]
+innerNodes = [str(val) for val in innerNodes]
+projectObject.generate_depth_areas(nodeIds=innerNodes)
+projectObject.export_depth_areas(nodeIds=innerNodes)
 ########
-sharpPoints = projectObject.check_isobath_angularity(edgeIds=[], threshold=0.6)
-spurgullyPoints = projectObject.check_spurs_gullys(
-    edgeIds=['2', '5', '6', '27'], threshold=10, spurThreshold=None, gullyThreshold=None)
-
-projectObject.export_all_angularities()
-projectObject.export_all_isobaths()
+# sharpPoints = projectObject.check_isobath_angularity(edgeIds=[], threshold=0.6)
+# spurgullyPoints = projectObject.check_spurs_gullys(
+#     edgeIds=['2', '5', '6', '27'], threshold=10, spurThreshold=None, gullyThreshold=None)
+#
+# projectObject.export_all_angularities()
+# projectObject.export_all_isobaths()
 
 
 # print(sharpPoints)
-verticesToSmooth = set()
-for point in sharpPoints:
-    verticesToSmooth.update(projectObject.get_vertices_around_point(point, rings=1))
-print('nr vertices: ', len(verticesToSmooth))
+# verticesToSmooth = set()
+# for point in sharpPoints:
+#     verticesToSmooth.update(projectObject.get_vertices_around_point(point, rings=1))
+# print('nr vertices: ', len(verticesToSmooth))
 
 # projectObject.simple_smooth_and_rebuild(verticesToSmooth)
 
@@ -80,9 +84,9 @@ print('nr vertices: ', len(verticesToSmooth))
 # projectObject.export_all_angularities()
 #
 # projectObject.export_all_isobaths()
-projectObject.export_all_node_triangles()
-projectObject.export_all_edge_triangles()
-projectObject.export_shapefile('output')
+# projectObject.export_all_node_triangles()
+# projectObject.export_all_edge_triangles()
+# projectObject.export_shapefile('output')
 
 projectObject.print_errors()
 

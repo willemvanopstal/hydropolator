@@ -549,6 +549,71 @@ class Hydropolator:
                     wp.point(point[0], point[1])
                     wp.record(pointAngularities[i])
 
+    def export_depth_areas(self, nodeIds=[]):
+        if nodeIds == []:
+            nodeIds = self.graph['nodes'].keys()
+
+        self.msg('> saving depth areas...', 'info')
+        depareName = 'DEPARE_{}.shp'.format(self.now())
+        depareFile = os.path.join(os.getcwd(), 'projects', self.projectName, depareName)
+        print('depth areas file: ', depareFile)
+
+        with shapefile.Writer(depareFile) as wt:
+            wt.field('node', 'N')
+            wt.field('region', 'N')
+            wt.field('interval', 'C')
+            wt.field('dep_min', 'F', decimal=3)
+            wt.field('dep_max', 'F', decimal=3)
+
+            for nodeId in nodeIds:
+                region = self.get_interval_from_node(nodeId)
+                interval = self.regions[region]
+
+                geom = []
+                node = self.graph['nodes'][nodeId]
+                print(nodeId, node['outer_boundary'], node['holes'])
+
+                boundaryEdge = self.graph['edges'][node['outer_boundary']]['edge']
+                print(boundaryEdge, boundaryEdge.index(nodeId))
+
+                # check if the current node is deeper side or shallower side of the isobath
+                if boundaryEdge.index(nodeId) == 1:
+                    # ccw, so reverse
+                    geom.append(list(reversed(self.graph['edges'][node['outer_boundary']]['geom'])))
+                else:
+                    # already clockwise
+                    geom.append(self.graph['edges'][node['outer_boundary']]['geom'])
+
+                for holeId in node['holes']:
+                    holeEdge = self.graph['edges'][holeId]['edge']
+                    if holeEdge.index(nodeId) == 1:
+                        # already ccw
+                        geom.append(self.graph['edges'][holeId]['geom'])
+                    else:
+                        geom.append(list(reversed(self.graph['edges'][holeId]['geom'])))
+
+                wt.poly(geom)
+                wt.record(int(nodeId), region, str(interval), interval[0], interval[1])
+
+            # wt.field('shallowNbs', 'C')
+            # wt.field('deepNbs', 'C')
+            # wt.field('full_area', 'F', decimal=3)
+            # for node in nodeIds:
+            #     geom = []
+            #     for triangle in self.graph['nodes'][node]['triangles']:
+            #         geom.append(self.poly_from_triangle(list(triangle)))
+            #
+            #     region = self.get_interval_from_node(node)
+            #     interval = str(self.regions[region])
+            #     shallowNeighbors = str(self.get_neighboring_nodes(node, 'shallow'))
+            #     deepNeighbors = str(self.get_neighboring_nodes(node, 'deep'))
+            #     nodeArea = self.graph['nodes'][node]['full_area']
+            #
+            #     wt.poly(geom)
+            #     wt.record(int(node), region, interval, shallowNeighbors, deepNeighbors, nodeArea)
+
+        self.msg('> depth areas saved', 'info')
+
     # ====================================== #
     #
     #   Point Functions
@@ -1969,8 +2034,18 @@ class Hydropolator:
                 self.availableNodeIds.discard(idn)
                 break
 
-        self.graph['nodes'][nodeId] = {'region': interval, 'triangles': {pseudoTriangle}, 'deepNeighbors': set(), 'shallowNeighbors': set(
-        ), 'currentQueue': set(), 'shallowQueue': set(), 'deepQueue': set(), 'classification': None, 'full_area': None, 'edges': []}
+        self.graph['nodes'][nodeId] = {'region': interval,
+                                       'triangles': {pseudoTriangle},
+                                       'deepNeighbors': set(),
+                                       'shallowNeighbors': set(),
+                                       'currentQueue': set(),
+                                       'shallowQueue': set(),
+                                       'deepQueue': set(),
+                                       'classification': None,
+                                       'full_area': None,
+                                       'edges': [],
+                                       'outer_boundary': None,
+                                       'holes': []}
         self.nrNodes += 1
         # print('new node: ', nodeId)
 
@@ -2446,6 +2521,46 @@ class Hydropolator:
 
         return intersections, isPoint
 
+    def generate_depth_areas(self, nodeIds=[]):
+        self.msg('> generating depth areas...', 'header')
+        if nodeIds == []:
+            nodeIds = self.graph['nodes'].keys()
+
+        computedEdges = set()
+
+        for nodeId in nodeIds:
+            boundaryArea = -1.0
+            outerBoundary = None
+            innerHoles = []
+
+            node = self.graph['nodes'][nodeId]
+            # interval = self.get_interval_from_node(nodeId)
+            # region = self.regions[interval]
+            nodeEdgeIds = node['edges']
+            print(nodeId, nodeEdgeIds)
+
+            for edgeId in nodeEdgeIds:
+                edge = self.graph['edges'][edgeId]
+                if edgeId not in computedEdges:
+                    self.compute_isobath_area(edgeIds=[edgeId])
+                    computedEdges.add(edgeId)
+                fullIsoArea = edge['iso_area']
+
+                if fullIsoArea > boundaryArea:
+                    if outerBoundary is not None:
+                        innerHoles.append(outerBoundary)
+                    # outerBoundary = edge['geom']
+                    outerBoundary = edgeId
+                    boundaryArea = fullIsoArea
+                else:
+                    # innerHoles.append(edge['geom'])
+                    innerHoles.append(edgeId)
+
+            node['outer_boundary'] = outerBoundary
+            node['holes'] = innerHoles
+
+            print(len(outerBoundary), len(innerHoles))
+
     # ====================================== #
     #
     #   Interpolation
@@ -2839,7 +2954,7 @@ class Hydropolator:
 
         for edgeId in edgeIds:
             if self.graph['edges'][edgeId]['closed'] is True:
-                print(edgeId, 'im closed isobath, calculating area')
+                # print(edgeId, 'im closed isobath, calculating area')
 
                 ptArray = np.array([[p[0], p[1]] for p in self.graph['edges'][edgeId]['geom']])
                 x = ptArray[:, 0]
@@ -2853,7 +2968,7 @@ class Hydropolator:
                 correction = x_[-1] * y_[0] - y_[-1] * x_[0]
                 main_area = np.dot(x_[:-1], y_[1:]) - np.dot(y_[:-1], x_[1:])
                 isoArea = 0.5 * np.abs(main_area + correction)
-                print(round(isoArea, 3))
+                # print(round(isoArea, 3))
 
                 self.graph['edges'][edgeId]['iso_area'] = round(isoArea, 3)
 
@@ -3186,7 +3301,8 @@ class Hydropolator:
                 isobathSegments = []
                 visitedTriangles = set()
 
-                segmentIntersections = self.get_intersected_segments(startingTriangle, isoValue, 'full')
+                segmentIntersections = self.get_intersected_segments(
+                    startingTriangle, isoValue, 'full')
                 isobathSegments.append(segmentIntersections[0])
                 isobathSegments.append(segmentIntersections[1])
                 visitedTriangles.add(startingTriangle)
@@ -3253,7 +3369,8 @@ class Hydropolator:
                             x = round(xOne, 3)
                             y = round(yOne + ((isoValue-zOne)/(zTwo-zOne)) * (yTwo-yOne), 3)
                         else:
-                            x = round((isoValue*xTwo-isoValue*xOne-zOne*xTwo+zTwo*xOne)/(zTwo-zOne), 3)
+                            x = round((isoValue*xTwo-isoValue*xOne- \
+                                      zOne*xTwo+zTwo*xOne)/(zTwo-zOne), 3)
                             y = round((x*(yTwo-yOne)-xOne*yTwo+xTwo*yOne)/(xTwo-xOne), 3)
                         isoGeom.append([x, y])
 
@@ -3292,7 +3409,8 @@ class Hydropolator:
                             if nodeInterval + 1 in self.find_intervals(neighbor):
                                 for deeperNode in self.get_neighboring_nodes(nodeId, 'deep'):
                                     if self.triangle_in_queue(neighbor, deeperNode, 'shallow'):
-                                        self.remove_triangle_from_queue(neighbor, deeperNode, 'shallow')
+                                        self.remove_triangle_from_queue(
+                                            neighbor, deeperNode, 'shallow')
                                         deepTracker = True
                                 if not deepTracker:
                                     self.add_triangle_to_queue(neighbor, nodeId, 'deep')
@@ -3304,7 +3422,8 @@ class Hydropolator:
                             if nodeInterval - 1 in self.find_intervals(neighbor):
                                 for shallowerNode in self.get_neighboring_nodes(nodeId, 'shallow'):
                                     if self.triangle_in_queue(neighbor, shallowerNode, 'deep'):
-                                        self.remove_triangle_from_queue(neighbor, shallowerNode, 'deep')
+                                        self.remove_triangle_from_queue(
+                                            neighbor, shallowerNode, 'deep')
                                         shallowTracker = True
                                 if not shallowTracker:
                                     self.add_triangle_to_queue(neighbor, nodeId, 'shallow')
