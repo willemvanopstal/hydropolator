@@ -3,7 +3,7 @@
 # @Email:  willemvanopstal home nl
 # @Project: Hydropolator
 # @Last modified by:   willemvanopstal
-# @Last modified time: 20-Feb-2020
+# @Last modified time: 21-Feb-2020
 
 
 from ElevationDict import ElevationDict
@@ -586,7 +586,7 @@ class Hydropolator:
 
                 for holeId in node['holes']:
                     holeEdge = self.graph['edges'][holeId]['edge']
-                    if holeEdge.index(nodeId) == 1:
+                    if holeEdge.index(nodeId) == 0:
                         # already ccw
                         geom.append(self.graph['edges'][holeId]['geom'])
                     else:
