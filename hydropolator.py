@@ -2521,6 +2521,56 @@ class Hydropolator:
 
         return intersections, isPoint
 
+    def generate_depth_areas_nonclosed(self, nodeIds=[]):
+        self.msg('> generating depth areas...', 'header')
+        if nodeIds == []:
+            nodeIds = self.graph['nodes'].keys()
+
+        for nodeId in nodeIds:
+            print(nodeId)
+            node = self.graph['nodes'][nodeId]
+            nodeEdgeIds = node['edges']
+
+            for nodeEdgeId in nodeEdgeIds:
+                edge = self.graph['edges'][nodeEdgeId]
+                print(nodeEdgeId, edge['closed'])
+
+                if edge['closed'] is not True:
+                    closeShallow = False
+                    closeDeep = False
+
+                    # edge['edge'] # [shallowNode, deepNode]
+                    if edge['edge'].index(nodeId) == 0:
+                        # node is the shallow node
+                        closeShallow = True
+                    elif edge['edge'].index(nodeId) == 1:
+                        # node is the deeper side of the edge
+                        closeDeep = True
+
+                    startPoint = edge['geom'][0]
+                    endPoint = edge['geom'][-1]
+
+                    startTri = self.triangulation.locate(startPoint[0], startPoint[1])
+                    endTri = self.triangulation.locate(endPoint[0], endPoint[1])
+
+                    startVertices = []
+                    endVertices = []
+                    for v in startTri:
+                        if self.triangulation.is_vertex_convex_hull(v):
+                            startVertices.append(v)
+                    startDepths = [self.get_z(vertex, idOnly=True) for vertex in startVertices]
+
+                    for v in endTri:
+                        if self.triangulation.is_vertex_convex_hull(v):
+                            endVertices.append(v)
+                    endDepths = [self.get_z(vertex, idOnly=True) for vertex in endVertices]
+
+                    # print(self.triangulation.is_vertex(startPoint[0], startPoint[1]))
+                    print(startPoint, endPoint)
+                    print(startTri, endTri)
+                    print(startVertices, endVertices)
+                    print(self.triangulation.convex_hull())
+
     def generate_depth_areas(self, nodeIds=[]):
         self.msg('> generating depth areas...', 'header')
         if nodeIds == []:

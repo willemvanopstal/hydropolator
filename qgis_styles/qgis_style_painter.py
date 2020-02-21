@@ -1,5 +1,5 @@
 # https://gis.stackexchange.com/a/199458
-from qgis.core import QgsProject, QgsSymbol, QgsRuleBasedRenderer
+from qgis.core import QgsProject, QgsSymbol, QgsRuleBasedRenderer, QgsFillSymbol
 from qgis.utils import iface
 from PyQt5.QtGui import QColor
 
@@ -10,6 +10,9 @@ def rule_based_style(layer, symbol, renderer, label, expression, color):
     rule.setLabel(label)
     rule.setFilterExpression(expression)
     rule.symbol().setColor(QColor(color[0], color[1], color[2], 255))
+    symbolProps = rule.symbol().symbolLayer(0).properties()
+    symbolProps['outline_style'] = 'no'
+    rule.setSymbol(QgsFillSymbol.createSimple(symbolProps))
     root_rule.appendChild(rule)
     layer.setRenderer(renderer)
     layer.triggerRepaint()
