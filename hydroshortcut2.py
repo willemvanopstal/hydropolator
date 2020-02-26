@@ -30,18 +30,18 @@ projectDir = os.path.join(cwd, 'projects')
 #######################################################
 # Process goes here
 
-projectName = 'regiongraphtesttttp'
+projectName = 'todaystest'
 
 projectObject = Hydropolator()
 
 # # possibly initiatie new project
-# projectObject.init_project(projectName)
-# projectObject.load_pointfile(surveyData, 'csv', ' ', flip=True)
+projectObject.init_project(projectName)
+projectObject.load_pointfile(surveyData, 'csv', ' ', flip=True)
 
 # comment this if initiating
-if projectObject.load_project(projectName) is True:
-    msg('> loaded project', 'header')
-    projectObject.summarize_project()
+# if projectObject.load_project(projectName) is True:
+#     msg('> loaded project', 'header')
+#     projectObject.summarize_project()
 
 # cleaning files
 hours = 12
@@ -56,40 +56,54 @@ projectObject.build_graph2()
 
 projectObject.generate_isobaths4()
 innerNodes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-              19, 20, 21, 22, 23, 24, 26, 27, 28, 30, 31, 32, 33, 34, 35, 36]
+              19, 20, 21, 22, 23, 24, 27, 28, 31, 32, 33, 34, 35, 36]
 innerNodes = [str(val) for val in innerNodes]
-# projectObject.generate_depth_areas(nodeIds=innerNodes)
+projectObject.generate_depth_areas(nodeIds=innerNodes)
+projectObject.export_depth_areas(nodeIds=innerNodes)
 
-nonClosedNodes = [25]
-nonClosedNodes = [str(val) for val in nonClosedNodes]
+# nonClosedNodes = [25]
+# nonClosedNodes = [str(val) for val in nonClosedNodes]
 # projectObject.generate_depth_areas_nonclosed(nodeIds=nonClosedNodes)
 # projectObject.export_depth_areas(nodeIds=innerNodes)
 ########
-# sharpPoints = projectObject.check_isobath_angularity(edgeIds=[], threshold=0.6)
-# spurgullyPoints = projectObject.check_spurs_gullys(
-#     edgeIds=['2', '5', '6', '27'], threshold=10, spurThreshold=None, gullyThreshold=None)
+sharpPoints = projectObject.check_isobath_angularity(edgeIds=[], threshold=0.6)
+spurgullyPoints = projectObject.check_spurs_gullys(
+    edgeIds=['2', '5', '6', '27'], threshold=10, spurThreshold=None, gullyThreshold=None)
+print('sharp length: ', len(sharpPoints))
+print('sgully length: ', len(spurgullyPoints))
 #
 # projectObject.export_all_angularities()
 projectObject.export_all_isobaths()
+projectObject.export_all_node_triangles()
+projectObject.export_all_edge_triangles()
+projectObject.export_all_angularities()
 
 
 # print(sharpPoints)
-# verticesToSmooth = set()
-# for point in sharpPoints:
-#     verticesToSmooth.update(projectObject.get_vertices_around_point(point, rings=1))
-# print('nr vertices: ', len(verticesToSmooth))
+verticesToSmooth = set()
+for point in sharpPoints:
+    verticesToSmooth.update(projectObject.get_vertices_around_point(point, rings=1))
+print('nr vertices, sharps: ', len(verticesToSmooth))
+for point in spurgullyPoints:
+    verticesToSmooth.update(projectObject.get_vertices_around_point(point, rings=1))
+print('nr vertices, spursgullys: ', len(verticesToSmooth))
 
-# projectObject.simple_smooth_and_rebuild(verticesToSmooth)
+projectObject.simple_smooth_and_rebuild(verticesToSmooth)
 
 
 ########
-# projectObject.generate_isobaths4()
-# projectObject.check_isobath_angularity()
-# projectObject.export_all_angularities()
-#
-# projectObject.export_all_isobaths()
-# projectObject.export_all_node_triangles()
-# projectObject.export_all_edge_triangles()
+projectObject.generate_isobaths4()
+sharpPoints = projectObject.check_isobath_angularity(edgeIds=[], threshold=0.6)
+spurgullyPoints = projectObject.check_spurs_gullys(
+    edgeIds=['2', '5', '6', '27'], threshold=10, spurThreshold=None, gullyThreshold=None)
+projectObject.export_all_angularities()
+
+print('sharp length: ', len(sharpPoints))
+print('sgully length: ', len(spurgullyPoints))
+
+projectObject.export_all_isobaths()
+projectObject.export_all_node_triangles()
+projectObject.export_all_edge_triangles()
 # projectObject.export_shapefile('output')
 
 projectObject.print_errors()
