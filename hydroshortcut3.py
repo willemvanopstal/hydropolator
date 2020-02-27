@@ -46,9 +46,9 @@ if projectObject.load_project(projectName) is True:
 projectObject.generate_regions()
 projectObject.build_graph2()
 
-projectObject.generate_isobaths4()
-projectObject.export_all_isobaths()
-projectObject.print_graph()
+projectObject.generate_isobaths5()
+# projectObject.export_all_isobaths()
+# projectObject.print_graph()
 
 
 ###############################
@@ -56,9 +56,9 @@ projectObject.print_graph()
 ###############################
 
 # projectObject.export_all_isobaths()
-projectObject.export_all_node_triangles()
-projectObject.export_all_edge_triangles()
-projectObject.export_shapefile('output')
+# projectObject.export_all_node_triangles()
+# projectObject.export_all_edge_triangles()
+# projectObject.export_shapefile('output')
 
 ###############################
 # Closing project
