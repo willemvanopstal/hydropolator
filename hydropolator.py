@@ -2524,7 +2524,7 @@ class Hydropolator:
 
             self.graph['edges'][edge]['geom'] = isoGeom
 
-    def generate_isobaths5(self, edgeIds=['6', '10', '22', '29']):
+    def generate_isobaths5(self, edgeIds=[]):  # ['6', '10', '22', '29']):
         if len(edgeIds) == 0:
             edgeIds = list(self.graph['edges'].keys())
 
@@ -2938,8 +2938,34 @@ class Hydropolator:
                     finished = True
                     minTriangleId = triangleCounter
 
-            print(edgeObject['ordered_triangles'].keys())
+            # print(edgeObject['ordered_triangles'].keys())
             print('min: {}  max: {}'.format(minTriangleId, maxTriangleId))
+            edgeObject['minmax_order'] = [minTriangleId, maxTriangleId]
+
+            startSegment = edgeObject['ordered_triangles'][str(minTriangleId)]['tri_segment'][0]
+            endSegment = edgeObject['ordered_triangles'][str(maxTriangleId)]['tri_segment'][1]
+            # print(startSegment, endSegment)
+            # print(startSegment == endSegment)
+            # print(startSegment == reversed(endSegment))
+            edgeObject['closed'] = self.is_closed_isobath(startSegment, endSegment)
+            print(edgeObject['closed'])
+
+    def is_closed_isobath(self, start_seg, end_seg):
+
+        if type(start_seg) == type(end_seg) == int:
+            if start_seg == end_seg:
+                return True
+            else:
+                return False
+
+        elif type(start_seg) == type(start_seg) == tuple:
+            if min(start_seg) == min(end_seg) and max(start_seg) == max(end_seg):
+                return True
+            else:
+                return False
+
+        else:
+            return False
 
     def lineseg_from_vertices(self, vertex_list, isoValue):
 
