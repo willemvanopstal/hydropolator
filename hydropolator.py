@@ -2,8 +2,8 @@
 # @Date:   17-Jan-2020
 # @Email:  willemvanopstal home nl
 # @Project: Hydropolator
-# @Last modified by:   willemvanopstal
-# @Last modified time: 25-Feb-2020
+# @Last modified by:   Bonny
+# @Last modified time: 27-Feb-2020
 
 
 from ElevationDict import ElevationDict
@@ -2168,7 +2168,7 @@ class Hydropolator:
         # print(region)
         for vertex in similarEdge:
             # print(self.get_z(vertex, True))
-            if self.get_z(vertex, idOnly=True) < region[0]:
+            if self.get_z(vertex, idOnly=True) <= region[0]:
                 lower += 1
                 # print(lower)
             elif self.get_z(vertex, idOnly=True) > region[1]:
@@ -2182,6 +2182,7 @@ class Hydropolator:
             # print('t2: ', triangleTwo)
             # for vId in triangleTwo:
             #     print(self.triangulation.get_point(vId))
+            print('saddle', interval)
             return True
         else:
             return False
@@ -2505,6 +2506,151 @@ class Hydropolator:
                     isoGeom.append([x, y])
 
             self.graph['edges'][edge]['geom'] = isoGeom
+
+    def generate_isobaths5(self, edgeIds=['6', '10', '22']):
+        if len(edgeIds) == 0:
+            edgeIds = list(self.graph['edges'].keys())
+
+        for edge in edgeIds:
+            self.msg('--new edge', 'header')
+            edgeObject = self.graph['edges'][edge]
+            isoValue = edgeObject['value']
+            print('isoValue: ', isoValue, edgeObject['edge'], edge)
+
+            edgeTriangles = self.get_edge_triangles(edge)
+
+            # create some data entries in the edge
+            # { '1': { 'triangle': (tvId1, tvId2, tvId3),
+            #          'segment': ((ivX, ivY), (ivX, ivY)) },
+            #   '2': { 'triangle': (tvId1, tvId2, tvId3),
+            #          'segment': ((ivX, ivY), (ivX, ivY)) },
+            #   '3': ...
+            # }
+            edgeObject['ordered_triangles'] = {}
+            # { (ivX, ivY): ['1', '5'],
+            #   (ivX, ivY): ['2'],
+            #   ...
+            # }
+            edgeObject['iso_vertex_pointers'] = {}
+            triangleCounter = 0
+            nrVsitedTriangles = 0
+            indexedTriangles = set()
+
+            # get a starting triangle
+            for triangle in edgeTriangles:
+                break
+
+            finished = False
+            iterations = 0
+            while not finished:
+
+                triangleCounter += 1
+                intersections, isPoint = self.triangle_intersections(triangle, isoValue)
+                print('triangle: ', triangle, intersections, isPoint)
+                triangleSegment = ['start', 'end']
+                trianglePoint = None
+
+                if isPoint:
+                    # not handling as segment
+                    # but still inventorize the triangle itself
+                    print('POINT')
+                    for vId in triangle:
+                        vertexElevation = self.get_z(vId, idOnly=True)
+                        if vertexElevation == isoValue:
+                            trianglePoint = vId
+
+                elif intersections == 0:
+                    print('FULL')
+                    # full intersection
+                    for i in range(3):
+                        segment = (triangle[i], triangle[(i + 1) % 3])
+                        zOne = self.get_z(segment[0], idOnly=True)
+                        zTwo = self.get_z(segment[1], idOnly=True)
+                        if min(zOne, zTwo) < isoValue < max(zOne, zTwo):
+                            if zOne > zTwo:
+                                # deep is on the left
+                                triangleSegment[0] = segment
+                            else:
+                                triangleSegment[1] = segment
+
+                elif intersections == 1:
+                    print('SEMI')
+                    # point to edge or edge to point
+                    for i in range(3):
+                        segment = (triangle[i], triangle[(i + 1) % 3])
+                        zOne = self.get_z(segment[0], idOnly=True)
+                        zTwo = self.get_z(segment[1], idOnly=True)
+                        if min(zOne, zTwo) < isoValue < max(zOne, zTwo):
+                            if zOne > zTwo:
+                                # deep is on the left
+                                triangleSegment[0] = segment
+                            else:
+                                triangleSegment[1] = segment
+                        elif zOne == isoValue and zOne < zTwo:
+                            triangleSegment[1] = (segment[0])
+                        elif zOne == isoValue and zOne > zTwo:
+                            triangleSegment[0] = (segment[0])
+
+                elif intersections == 2:
+                    print('EDGE')
+                    # edge
+                    for i in range(3):
+                        segment = (triangle[i], triangle[(i + 1) % 3])
+                        zOne = self.get_z(segment[0], idOnly=True)
+                        zTwo = self.get_z(segment[1], idOnly=True)
+                        if zOne == isoValue and zTwo != isoValue:
+                            if zTwo < isoValue:
+                                triangleSegment[0] = (segment[0])
+                            elif zTwo > isoValue:
+                                triangleSegment[1] = (segment[0])
+                        elif zTwo == isoValue and zOne != isoValue:
+                            if zOne > isoValue:
+                                triangleSegment[0] = (segment[1])
+                            elif zOne < isoValue:
+                                triangleSegment[1] = (segment[1])
+
+                elif intersections == 3:
+                    # not handling horizontal triangles
+                    print('HORIZONTAL')
+                    continue
+
+                ####
+                print(triangleSegment)
+
+                # adding to content
+                if trianglePoint is not None:
+                    edgeObject['ordered_triangles'][str(triangleCounter)] = {'triangle': triangle,
+                                                                             'segment': None}
+                    isoVertexPointers = edgeObject['iso_vertex_pointers']
+                    if tuple(trianglePoint) in isoVertexPointers:
+                        isoVertexPointers[tuple(trianglePoint)].append(triangle)
+                    else:
+                        isoVertexPointers[tuple(trianglePoint)] = [triangle]
+
+                else:
+                    edgeObject['ordered_triangles'][str(triangleCounter)] = {'triangle': triangle,
+                                                                             'segment': tuple(triangleSegment)}
+                    isoVertexPointers = edgeObject['iso_vertex_pointers']
+                    for isoVertex in triangleSegment:
+                        if tuple(isoVertex) in isoVertexPointers:
+                            isoVertexPointers[tuple(isoVertex)].append(triangle)
+                        else:
+                            isoVertexPointers[tuple(isoVertex)] = [triangle]
+
+                indexedTriangles.add(triangle)
+
+                # find next triangle
+
+                # managing while loop
+                if len(indexedTriangles) >= len(edgeTriangles):
+                    print('all triangles visited')
+                    finished = True
+                    break
+
+                iterations += 1
+                if iterations > 3:
+                    print('exceeded iteration limit')
+                    finished = True
 
     def triangle_intersections(self, triangle, isoValue):
         isPoint = False
