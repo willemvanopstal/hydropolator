@@ -26,6 +26,10 @@ surveyData = '../Data/operatorimplications/simulated_surface_points.txt'
 projectName = 'newisobaths'
 projectObject = Hydropolator()
 
+innerNodes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
+              19, 20, 21, 22, 23, 24, 25, 27, 28, 29, 31, 32, 33, 34, 35, 36, 37]
+innerNodes = [str(val) for val in innerNodes]
+
 ###############################
 # Project management
 ###############################
@@ -47,7 +51,7 @@ projectObject.generate_regions()
 projectObject.build_graph2()
 
 projectObject.generate_isobaths5()
-projectObject.export_all_isobaths()
+projectObject.generate_depth_areas()  # nodeIds=innerNodes)
 # projectObject.print_graph()
 
 
@@ -55,7 +59,8 @@ projectObject.export_all_isobaths()
 # Exporting shapefiles
 ###############################
 
-# projectObject.export_all_isobaths()
+projectObject.export_all_isobaths()
+# projectObject.export_depth_areas()  # nodeIds=innerNodes)
 # projectObject.export_all_node_triangles()
 # projectObject.export_all_edge_triangles()
 # projectObject.export_shapefile('output')

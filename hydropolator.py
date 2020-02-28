@@ -566,15 +566,20 @@ class Hydropolator:
             wt.field('dep_max', 'F', decimal=3)
 
             for nodeId in nodeIds:
+
+                node = self.graph['nodes'][nodeId]
+                if not node['outer_boundary']:
+                    continue
+
                 region = self.get_interval_from_node(nodeId)
                 interval = self.regions[region]
 
                 geom = []
-                node = self.graph['nodes'][nodeId]
-                print(nodeId, node['outer_boundary'], node['holes'])
+
+                # print(nodeId, node['outer_boundary'], node['holes'])
 
                 boundaryEdge = self.graph['edges'][node['outer_boundary']]['edge']
-                print(boundaryEdge, boundaryEdge.index(nodeId))
+                # print(boundaryEdge, boundaryEdge.index(nodeId))
 
                 # check if the current node is deeper side or shallower side of the isobath
                 if boundaryEdge.index(nodeId) == 1:
@@ -594,23 +599,6 @@ class Hydropolator:
 
                 wt.poly(geom)
                 wt.record(int(nodeId), region, str(interval), interval[0], interval[1])
-
-            # wt.field('shallowNbs', 'C')
-            # wt.field('deepNbs', 'C')
-            # wt.field('full_area', 'F', decimal=3)
-            # for node in nodeIds:
-            #     geom = []
-            #     for triangle in self.graph['nodes'][node]['triangles']:
-            #         geom.append(self.poly_from_triangle(list(triangle)))
-            #
-            #     region = self.get_interval_from_node(node)
-            #     interval = str(self.regions[region])
-            #     shallowNeighbors = str(self.get_neighboring_nodes(node, 'shallow'))
-            #     deepNeighbors = str(self.get_neighboring_nodes(node, 'deep'))
-            #     nodeArea = self.graph['nodes'][node]['full_area']
-            #
-            #     wt.poly(geom)
-            #     wt.record(int(node), region, interval, shallowNeighbors, deepNeighbors, nodeArea)
 
         self.msg('> depth areas saved', 'info')
 
@@ -2195,7 +2183,7 @@ class Hydropolator:
             # print('t2: ', triangleTwo)
             # for vId in triangleTwo:
             #     print(self.triangulation.get_point(vId))
-            print('saddle', interval)
+            # print('saddle', interval)
             return True
         else:
             return False
@@ -2529,10 +2517,10 @@ class Hydropolator:
             edgeIds = list(self.graph['edges'].keys())
 
         for edge in edgeIds:
-            self.msg('--new edge', 'header')
+            # self.msg('--new edge', 'header')
             edgeObject = self.graph['edges'][edge]
             isoValue = edgeObject['value']
-            print('isoValue: ', isoValue, edgeObject['edge'], edge)
+            # print('isoValue: ', isoValue, edgeObject['edge'], edge)
 
             edgeTriangles = self.get_edge_triangles(edge)
 
@@ -2846,7 +2834,7 @@ class Hydropolator:
 
                 # managing while loop
                 if len(indexedTriangles) >= len(edgeTriangles):
-                    print('all triangles visited')
+                    # print('all triangles visited')
                     finished = True
 
                     if backwardSearch is False:
@@ -2858,11 +2846,11 @@ class Hydropolator:
 
                 iterations += 1
                 if iterations > 1000:
-                    print('exceeded iteration limit')
+                    # print('exceeded iteration limit')
                     finished = True
 
                 if triangleCopy == triangle and backwardSearch is False:
-                    print('no new triangle found! swtiching to backwardsearch\n')
+                    # print('no new triangle found! swtiching to backwardsearch\n')
                     # finished = True
                     maxTriangleId = triangleCounter
                     backwardSearch = True
@@ -2933,13 +2921,13 @@ class Hydropolator:
                             # print('new tri for bwsearch: ', triangle)
 
                 if triangleCopy == triangle and backwardSearch:
-                    print('no new triangle found, open isobath')
+                    # print('no new triangle found, open isobath')
                     edgeObject['closed'] = False
                     finished = True
                     minTriangleId = triangleCounter
 
             # print(edgeObject['ordered_triangles'].keys())
-            print('min: {}  max: {}'.format(minTriangleId, maxTriangleId))
+            # print('min: {}  max: {}'.format(minTriangleId, maxTriangleId))
             edgeObject['minmax_order'] = [minTriangleId, maxTriangleId]
 
             startSegment = edgeObject['ordered_triangles'][str(minTriangleId)]['tri_segment'][0]
@@ -2948,20 +2936,37 @@ class Hydropolator:
             # print(startSegment == endSegment)
             # print(startSegment == reversed(endSegment))
             edgeObject['closed'] = self.is_closed_isobath(startSegment, endSegment)
-            print('closed: ', edgeObject['closed'])
+            # print('closed: ', edgeObject['closed'])
 
             self.create_simple_iso_geom(edge)
+            self.compute_isobath_area(edgeIds=[edge])
+
+            if not edgeObject['closed']:
+                print('not closed isobath, checking convex hull')
+
+                print(startSegment, endSegment)
+
+                if type(startSegment) == int:
+                    print(self.triangulation.is_vertex_convex_hull(startSegment))
+                else:
+                    print('first ', self.triangulation.is_vertex_convex_hull(startSegment[0]))
+                    print('second ', self.triangulation.is_vertex_convex_hull(startSegment[1]))
+                if type(endSegment) == int:
+                    print(self.triangulation.is_vertex_convex_hull(endSegment))
+                else:
+                    print('first ', self.triangulation.is_vertex_convex_hull(endSegment[0]))
+                    print('second ', self.triangulation.is_vertex_convex_hull(endSegment[1]))
 
     def create_simple_iso_geom(self, edgeId):
         edgeObject = self.graph['edges'][edgeId]
         orderedTriangles = edgeObject['ordered_triangles']
-        closed = edgeObject['closed']
+        # closed = edgeObject['closed']
         # geom = edgeObject['iso_geom']
         # print(geom)
         simpleGeom = []
 
         minTri, maxTri = edgeObject['minmax_order']
-        print(minTri, maxTri)
+        # print(minTri, maxTri)
 
         firstPoint = orderedTriangles[str(minTri)]['segment'][0]
         simpleGeom.append(list(firstPoint))
@@ -2969,7 +2974,7 @@ class Hydropolator:
             segment = orderedTriangles[str(triangleNumber)]['segment']
             if segment:
                 simpleGeom.append(list(segment[1]))
-        print(simpleGeom)
+        # print(simpleGeom)
 
         edgeObject['geom'] = simpleGeom
 
@@ -3085,12 +3090,19 @@ class Hydropolator:
 
     def generate_depth_areas(self, nodeIds=[]):
         self.msg('> generating depth areas...', 'header')
+
+        self.depare_areas = {'total': 0.0, 'regions': []}
+        for r in self.regions:
+            self.depare_areas['regions'].append(0.0)
+
         if nodeIds == []:
             nodeIds = self.graph['nodes'].keys()
 
         computedEdges = set()
 
         for nodeId in nodeIds:
+            nonClosed = False
+
             boundaryArea = -1.0
             outerBoundary = None
             innerHoles = []
@@ -3099,10 +3111,15 @@ class Hydropolator:
             # interval = self.get_interval_from_node(nodeId)
             # region = self.regions[interval]
             nodeEdgeIds = node['edges']
-            print(nodeId, nodeEdgeIds)
+            print('----new node ', nodeId, nodeEdgeIds)
 
             for edgeId in nodeEdgeIds:
                 edge = self.graph['edges'][edgeId]
+
+                if not edge['closed']:
+                    nonClosed = True
+                    break
+
                 if edgeId not in computedEdges:
                     self.compute_isobath_area(edgeIds=[edgeId])
                     computedEdges.add(edgeId)
@@ -3118,10 +3135,40 @@ class Hydropolator:
                     # innerHoles.append(edge['geom'])
                     innerHoles.append(edgeId)
 
+            if nonClosed:
+                continue
+
             node['outer_boundary'] = outerBoundary
             node['holes'] = innerHoles
 
             print(len(outerBoundary), len(innerHoles))
+            # print(outerBoundary)
+
+            print('area')
+            edges = self.graph['edges']
+            bArea = edges[outerBoundary]['iso_area']
+            print('boundary ', bArea)
+            hArea = 0.0
+            for hole in innerHoles:
+                cArea = edges[hole]['iso_area']
+                hArea += cArea
+                print(cArea)
+            print('holes ', hArea)
+            print('total:', round(bArea - hArea, 3))
+
+            totalArea = round(bArea - hArea, 3)
+            regionIndex = self.get_interval_from_node(nodeId)
+
+            self.depare_areas['regions'][regionIndex] = round(
+                totalArea + self.depare_areas['regions'][regionIndex], 3)
+            self.depare_areas['total'] = round(totalArea + self.depare_areas['total'], 3)
+
+        print(self.depare_areas['total'])
+        print(self.depare_areas)
+
+        totalArea = self.depare_areas['total']
+        for regionArea in self.depare_areas['regions']:
+            print(round(regionArea/totalArea * 100, 2))
 
     # ====================================== #
     #
