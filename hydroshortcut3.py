@@ -47,7 +47,7 @@ projectObject.generate_regions()
 projectObject.build_graph2()
 
 projectObject.generate_isobaths5()
-# projectObject.export_all_isobaths()
+projectObject.export_all_isobaths()
 # projectObject.print_graph()
 
 

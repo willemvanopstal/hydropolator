@@ -3,7 +3,7 @@
 # @Email:  willemvanopstal home nl
 # @Project: Hydropolator
 # @Last modified by:   Bonny
-# @Last modified time: 27-Feb-2020
+# @Last modified time: 28-Feb-2020
 
 
 from ElevationDict import ElevationDict
@@ -2948,7 +2948,30 @@ class Hydropolator:
             # print(startSegment == endSegment)
             # print(startSegment == reversed(endSegment))
             edgeObject['closed'] = self.is_closed_isobath(startSegment, endSegment)
-            print(edgeObject['closed'])
+            print('closed: ', edgeObject['closed'])
+
+            self.create_simple_iso_geom(edge)
+
+    def create_simple_iso_geom(self, edgeId):
+        edgeObject = self.graph['edges'][edgeId]
+        orderedTriangles = edgeObject['ordered_triangles']
+        closed = edgeObject['closed']
+        # geom = edgeObject['iso_geom']
+        # print(geom)
+        simpleGeom = []
+
+        minTri, maxTri = edgeObject['minmax_order']
+        print(minTri, maxTri)
+
+        firstPoint = orderedTriangles[str(minTri)]['segment'][0]
+        simpleGeom.append(list(firstPoint))
+        for triangleNumber in range(minTri, maxTri+1):
+            segment = orderedTriangles[str(triangleNumber)]['segment']
+            if segment:
+                simpleGeom.append(list(segment[1]))
+        print(simpleGeom)
+
+        edgeObject['geom'] = simpleGeom
 
     def is_closed_isobath(self, start_seg, end_seg):
 
