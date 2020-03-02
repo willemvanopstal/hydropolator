@@ -3,7 +3,7 @@
 # @Email:  willemvanopstal home nl
 # @Project: Hydropolator
 # @Last modified by:   Bonny
-# @Last modified time: 28-Feb-2020
+# @Last modified time: 02-Mar-2020
 
 
 from ElevationDict import ElevationDict
@@ -75,6 +75,11 @@ class Hydropolator:
     triangleRegions = []
     triangleRegionDict = {}
     regionNodes = {}
+
+    depare_areas = []
+    statistics = {'iterations': 0,
+                  'depare_areas': [],
+                  'sharp_points': []}
 
     projectName = None
     initDate = None
@@ -3091,9 +3096,10 @@ class Hydropolator:
     def generate_depth_areas(self, nodeIds=[]):
         self.msg('> generating depth areas...', 'header')
 
-        self.depare_areas = {'total': 0.0, 'regions': []}
+        depare_areas_current = {'total': 0.0, 'regions': []}
+
         for r in self.regions:
-            self.depare_areas['regions'].append(0.0)
+            depare_areas_current['regions'].append(0.0)
 
         if nodeIds == []:
             nodeIds = self.graph['nodes'].keys()
@@ -3111,7 +3117,7 @@ class Hydropolator:
             # interval = self.get_interval_from_node(nodeId)
             # region = self.regions[interval]
             nodeEdgeIds = node['edges']
-            print('----new node ', nodeId, nodeEdgeIds)
+            # print('----new node ', nodeId, nodeEdgeIds)
 
             for edgeId in nodeEdgeIds:
                 edge = self.graph['edges'][edgeId]
@@ -3141,34 +3147,40 @@ class Hydropolator:
             node['outer_boundary'] = outerBoundary
             node['holes'] = innerHoles
 
-            print(len(outerBoundary), len(innerHoles))
+            # print(len(outerBoundary), len(innerHoles))
             # print(outerBoundary)
 
-            print('area')
+            # print('area')
             edges = self.graph['edges']
             bArea = edges[outerBoundary]['iso_area']
-            print('boundary ', bArea)
+            # print('boundary ', bArea)
             hArea = 0.0
             for hole in innerHoles:
                 cArea = edges[hole]['iso_area']
                 hArea += cArea
-                print(cArea)
-            print('holes ', hArea)
-            print('total:', round(bArea - hArea, 3))
+            #     print(cArea)
+            # print('holes ', hArea)
+            # print('total:', round(bArea - hArea, 3))
 
             totalArea = round(bArea - hArea, 3)
             regionIndex = self.get_interval_from_node(nodeId)
 
-            self.depare_areas['regions'][regionIndex] = round(
-                totalArea + self.depare_areas['regions'][regionIndex], 3)
-            self.depare_areas['total'] = round(totalArea + self.depare_areas['total'], 3)
+            depare_areas_current['regions'][regionIndex] = round(
+                totalArea + depare_areas_current['regions'][regionIndex], 3)
+            depare_areas_current['total'] = round(totalArea + depare_areas_current['total'], 3)
 
-        print(self.depare_areas['total'])
-        print(self.depare_areas)
+        # print(self.depare_areas['total'])
+        # print(self.depare_areas)
 
-        totalArea = self.depare_areas['total']
-        for regionArea in self.depare_areas['regions']:
-            print(round(regionArea/totalArea * 100, 2))
+        totalArea = depare_areas_current['total']
+        for regionArea in depare_areas_current['regions']:
+            # print(round(regionArea/totalArea * 100, 2))
+            pass
+
+        # self.depare_areas.append(depare_areas_current)
+        self.depare_areas = depare_areas_current
+
+        return depare_areas_current
 
     # ====================================== #
     #
@@ -3622,6 +3634,140 @@ class Hydropolator:
         # edgeBends = BendDetector(edgeId, edge, self.projectName)
 
         pass
+
+    def set_sharp_points_bins(self, breakpoints):
+        # print(breakpoints)
+
+        sharpPointRegions = []
+        sharpPointRegions.append([0, breakpoints[0]])
+        for i in range(len(breakpoints))[1:]:
+            sharpPointRegions.append([breakpoints[i - 1], breakpoints[i]])
+        sharpPointRegions.append([breakpoints[-1], 10])
+
+        # print(sharpPointRegions)
+
+        self.sharpPointBins = sharpPointRegions
+
+    def check_all_sharp_points(self):
+        edgeIds = self.graph['edges'].keys()
+
+        # sharpPointAngles = set()
+        sharp_points = {}
+
+        for bin in self.sharpPointBins:
+            # print(str(bin))
+            sharp_points[str(bin)[1:-1]] = 0
+
+        for edge in edgeIds:
+            closed = self.graph['edges'][str(edge)]['closed']
+            geom = self.graph['edges'][str(edge)]['geom']
+
+            if closed:
+                angularity = self.angularity(geom[-2], geom[0], geom[1])
+                # print(angularity)
+
+                for bin, sharpBin in enumerate(self.sharpPointBins):
+                    if angularity > sharpBin[0] and angularity <= sharpBin[1]:
+                        sharp_points[str(sharpBin)[1:-1]] += 1
+                        # print(str(sharpBin))
+                        break
+
+                # sharpPointAngles.add(angularity)
+
+            for i in range(1, len(geom)-1):
+                angularity = self.angularity(geom[i-1], geom[i], geom[i+1])
+                # print(angularity)
+
+                for bin, sharpBin in enumerate(self.sharpPointBins):
+                    if angularity > sharpBin[0] and angularity <= sharpBin[1]:
+                        sharp_points[str(sharpBin)[1:-1]] += 1
+                        # print(str(sharpBin))
+                        break
+                # sharpPointAngles.add(angularity)
+
+        print(sharp_points)
+        return sharp_points
+
+    def generate_statistics(self):
+
+        depare_area_dict = self.generate_depth_areas()
+        sharp_points_dict = self.check_all_sharp_points()
+
+        stats = self.statistics
+        stats['iterations'] += 1
+        stats['depare_areas'].append(depare_area_dict)
+        stats['sharp_points'].append(sharp_points_dict)
+
+    def export_statistics(self):
+
+        stats = self.statistics
+        separator = ';'
+
+        depare_header = 'SEP={}\ndepares'.format(separator)
+        sharp_header = 'SEP={}\nsharps'.format(separator)
+        for iter in range(stats['iterations']):
+            depare_header = depare_header + '{}{}'.format(separator, iter)
+            sharp_header = sharp_header + '{}{}'.format(separator, iter)
+        # print(depare_header, sharp_header)
+
+        depare_rows = []
+        depare_rows.append('total')
+        for regionIndex in range(len(stats['depare_areas'][0]['regions'])):
+            depare_rows.append(str(regionIndex))
+        # print(depare_rows)
+
+        sharp_rows = []
+        for sharpBin in stats['sharp_points'][0].keys():
+            sharp_rows.append('[{}]'.format(sharpBin))
+
+        for iteration in range(stats['iterations']):
+            # print(iteration)
+            # print(stats['depare_areas'][iteration])
+            # print(stats['sharp_points'][iteration])
+
+            # DEPARE
+            for rowIndex, row in enumerate(depare_rows):
+                if rowIndex == 0:
+                    value = str(stats['depare_areas'][iteration]['total']).replace('.', ',')
+                    depare_rows[rowIndex] = row + \
+                        '{}{}'.format(separator, value)
+                else:
+                    value = str(stats['depare_areas'][iteration]['regions']
+                                [rowIndex - 1]).replace('.', ',')
+                    depare_rows[rowIndex] = row + \
+                        '{}{}'.format(separator, value)
+
+            # SHARP Points
+            for rowIndex, row in enumerate(stats['sharp_points'][0].keys()):
+                sharp_rows[rowIndex] = sharp_rows[rowIndex] + \
+                    '{}{}'.format(separator, stats['sharp_points'][iteration][row])
+
+        self.msg('> saving statistics...', 'info')
+        depareName = 'stats_{}_depare.csv'.format(self.now())
+        depareFile = os.path.join(os.getcwd(), 'projects', self.projectName, depareName)
+        print('depare statistics file: ', depareFile)
+        sharpsName = 'stats_{}_sharps.csv'.format(self.now())
+        sharpsFile = os.path.join(os.getcwd(), 'projects', self.projectName, sharpsName)
+        print('sharp statistics file: ', sharpsFile)
+
+        with open(depareFile, 'w') as depFile:
+            # print(depare_header)
+            # for depRow in depare_rows:
+            #     print(depRow)
+            depFile.write(depare_header + '\n')
+            for depRow in depare_rows:
+                depFile.write(depRow + '\n')
+
+        # print(sharp_header)
+        # for sharpRow in sharp_rows:
+        #     print(sharpRow)
+        with open(sharpsFile, 'w') as sharpFile:
+            # print(depare_header)
+            # for depRow in depare_rows:
+            #     print(depRow)
+            sharpFile.write(sharp_header + '\n')
+            for sharpRow in sharp_rows:
+                sharpFile.write(sharpRow + '\n')
 
     # ==================================================================== #
     #
