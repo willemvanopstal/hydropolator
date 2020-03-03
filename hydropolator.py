@@ -81,7 +81,8 @@ class Hydropolator:
                   'depare_areas': [],
                   'sharp_points': [],
                   'abs_change': [],
-                  'min_change': []}
+                  'min_change': [],
+                  'iso_seg_lengths': []}
 
     projectName = None
     initDate = None
@@ -3683,6 +3684,18 @@ class Hydropolator:
 
         self.minChangeBins = minChangeRegions
 
+    def set_iso_seg_bins(self, breakpoints):
+
+        isoSegBins = []
+        isoSegBins.append([0, breakpoints[0]])
+        for i in range(len(breakpoints))[1:]:
+            isoSegBins.append([breakpoints[i - 1], breakpoints[i]])
+        isoSegBins.append([breakpoints[-1], 10000])
+
+        print(isoSegBins)
+
+        self.isoSegBins = isoSegBins
+
     def check_all_sharp_points(self):
         edgeIds = self.graph['edges'].keys()
 
@@ -3722,6 +3735,36 @@ class Hydropolator:
 
         # print(sharp_points)
         return sharp_points
+
+    def check_all_iso_lengths(self):
+        edgeIds = self.graph['edges'].keys()
+
+        iso_lengths = {}
+
+        for bin in self.isoSegBins:
+            iso_lengths[str(bin)[1:-1]] = 0
+
+        for edge in edgeIds:
+            orderedTriangles = self.graph['edges'][str(edge)]['ordered_triangles']
+
+            for triangleId in orderedTriangles.keys():
+                triangleObj = orderedTriangles[triangleId]
+                if triangleObj['segment']:
+                    seg = triangleObj['segment']
+                    # print(seg)
+                    dX = seg[1][0] - seg[0][0]
+                    dY = seg[1][1] - seg[0][1]
+                    segLength = math.hypot(dX, dY)
+
+                for bin, isoBin in enumerate(self.isoSegBins):
+                    if segLength > isoBin[0] and segLength <= isoBin[1]:
+                        iso_lengths[str(isoBin)[1:-1]] += 1
+                        break
+
+        # for cha in iso_lengths.keys():
+        #     print(cha, iso_lengths[cha])
+
+        return iso_lengths
 
     def check_all_point_diffs(self):
 
@@ -3770,8 +3813,8 @@ class Hydropolator:
         # for bin in abs_diffs.keys():
         #     print(bin, abs_diffs[bin])
 
-        for cha in min_diffs.keys():
-            print(cha, min_diffs[cha])
+        # for cha in min_diffs.keys():
+        #     print(cha, min_diffs[cha])
 
         # print(self.isobathValues)
         return abs_diffs, min_diffs
@@ -3781,6 +3824,7 @@ class Hydropolator:
         depare_area_dict = self.generate_depth_areas()
         sharp_points_dict = self.check_all_sharp_points()
         abs_diffs_dict, min_diffs_dict = self.check_all_point_diffs()
+        iso_lengths_dict = self.check_all_iso_lengths()
 
         stats = self.statistics
         stats['iterations'] += 1
@@ -3788,6 +3832,7 @@ class Hydropolator:
         stats['sharp_points'].append(sharp_points_dict)
         stats['abs_change'].append(abs_diffs_dict)
         stats['min_change'].append(min_diffs_dict)
+        stats['iso_seg_lengths'].append(iso_lengths_dict)
 
     def export_statistics(self):
 
@@ -3796,9 +3841,16 @@ class Hydropolator:
 
         depare_header = 'SEP={}\ndepares'.format(separator)
         sharp_header = 'SEP={}\nsharps'.format(separator)
+        abs_change_header = 'SEP={}\nabs_change'.format(separator)
+        min_change_header = 'SEP={}\nmin_change'.format(separator)
+        isoseg_header = 'SEP={}\nisoseg'.format(separator)
+
         for iter in range(stats['iterations']):
             depare_header = depare_header + '{}{}'.format(separator, iter)
             sharp_header = sharp_header + '{}{}'.format(separator, iter)
+            abs_change_header = abs_change_header + '{}{}'.format(separator, iter)
+            min_change_header = min_change_header + '{}{}'.format(separator, iter)
+            isoseg_header = isoseg_header + '{}{}'.format(separator, iter)
         # print(depare_header, sharp_header)
 
         depare_rows = []
@@ -3810,6 +3862,15 @@ class Hydropolator:
         sharp_rows = []
         for sharpBin in stats['sharp_points'][0].keys():
             sharp_rows.append('[{}]'.format(sharpBin))
+        abs_change_rows = []
+        for absBin in stats['abs_change'][0].keys():
+            abs_change_rows.append('[{}]'.format(absBin))
+        min_change_rows = []
+        for minBin in stats['min_change'][0].keys():
+            min_change_rows.append('[{}]'.format(minBin))
+        isoseg_rows = []
+        for isoBin in stats['iso_seg_lengths'][0].keys():
+            isoseg_rows.append('[{}]'.format(isoBin))
 
         for iteration in range(stats['iterations']):
             # print(iteration)
@@ -3833,6 +3894,21 @@ class Hydropolator:
                 sharp_rows[rowIndex] = sharp_rows[rowIndex] + \
                     '{}{}'.format(separator, stats['sharp_points'][iteration][row])
 
+            # abs change Points
+            for rowIndex, row in enumerate(stats['abs_change'][0].keys()):
+                abs_change_rows[rowIndex] = abs_change_rows[rowIndex] + \
+                    '{}{}'.format(separator, stats['abs_change'][iteration][row])
+
+            # min change Points
+            for rowIndex, row in enumerate(stats['min_change'][0].keys()):
+                min_change_rows[rowIndex] = min_change_rows[rowIndex] + \
+                    '{}{}'.format(separator, stats['min_change'][iteration][row])
+
+            # iso seg length Points
+            for rowIndex, row in enumerate(stats['iso_seg_lengths'][0].keys()):
+                isoseg_rows[rowIndex] = isoseg_rows[rowIndex] + \
+                    '{}{}'.format(separator, stats['iso_seg_lengths'][iteration][row])
+
         self.msg('> saving statistics...', 'info')
         depareName = 'stats_{}_depare.csv'.format(self.now())
         depareFile = os.path.join(os.getcwd(), 'projects', self.projectName, depareName)
@@ -3840,6 +3916,18 @@ class Hydropolator:
         sharpsName = 'stats_{}_sharps.csv'.format(self.now())
         sharpsFile = os.path.join(os.getcwd(), 'projects', self.projectName, sharpsName)
         print('sharp statistics file: ', sharpsFile)
+
+        absChangeName = 'stats_{}_abschanges.csv'.format(self.now())
+        absChangeFile = os.path.join(os.getcwd(), 'projects', self.projectName, absChangeName)
+        print('abs change statistics file: ', absChangeFile)
+
+        minChangeName = 'stats_{}_minchanges.csv'.format(self.now())
+        minChangeFile = os.path.join(os.getcwd(), 'projects', self.projectName, minChangeName)
+        print('min changes statistics file: ', minChangeFile)
+
+        isoSegName = 'stats_{}_isosegs.csv'.format(self.now())
+        isoSegFile = os.path.join(os.getcwd(), 'projects', self.projectName, isoSegName)
+        print('iso lengths statistics file: ', isoSegFile)
 
         with open(depareFile, 'w') as depFile:
             # print(depare_header)
@@ -3859,6 +3947,21 @@ class Hydropolator:
             sharpFile.write(sharp_header + '\n')
             for sharpRow in sharp_rows:
                 sharpFile.write(sharpRow + '\n')
+
+        with open(absChangeFile, 'w') as absChangeFile:
+            absChangeFile.write(abs_change_header + '\n')
+            for absRow in abs_change_rows:
+                absChangeFile.write(absRow + '\n')
+
+        with open(minChangeFile, 'w') as minChangeFile:
+            minChangeFile.write(min_change_header + '\n')
+            for minRow in min_change_rows:
+                minChangeFile.write(minRow + '\n')
+
+        with open(isoSegFile, 'w') as isoSegFile:
+            isoSegFile.write(isoseg_header + '\n')
+            for isoRow in isoseg_rows:
+                isoSegFile.write(isoRow + '\n')
 
     # ==================================================================== #
     #
