@@ -36,6 +36,9 @@ sharpPointsBreakpoints = [5, 10, 15, 20, 25, 30, 35, 40, 45,
 sharpPointsBreakpoints = [round(math.radians(val), 3) for val in sharpPointsBreakpoints]
 # print(sharpPointsBreakpoints)
 
+absoluteChangedPointsBreakpoints = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0,
+                                    7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0]
+
 ###############################
 # Project management
 ###############################
@@ -57,14 +60,16 @@ projectObject.generate_regions()
 projectObject.build_graph2()
 
 projectObject.generate_isobaths5()
-projectObject.generate_depth_areas()  # nodeIds=innerNodes)
+# projectObject.generate_depth_areas()  # nodeIds=innerNodes)
 
 projectObject.set_sharp_points_bins(sharpPointsBreakpoints)
+projectObject.set_abs_change_bins(absoluteChangedPointsBreakpoints)
 # projectObject.check_all_sharp_points()
+# projectObject.check_all_point_diffs()
 projectObject.generate_statistics()
-projectObject.generate_statistics()
+# projectObject.generate_statistics()
 
-projectObject.export_statistics()
+# projectObject.export_statistics()
 
 # projectObject.print_graph()
 

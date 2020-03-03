@@ -3,7 +3,7 @@
 # @Email:  willemvanopstal home nl
 # @Project: Hydropolator
 # @Last modified by:   Bonny
-# @Last modified time: 02-Mar-2020
+# @Last modified time: 03-Mar-2020
 
 
 from ElevationDict import ElevationDict
@@ -79,7 +79,9 @@ class Hydropolator:
     depare_areas = []
     statistics = {'iterations': 0,
                   'depare_areas': [],
-                  'sharp_points': []}
+                  'sharp_points': [],
+                  'abs_change': [],
+                  'min_change': []}
 
     projectName = None
     initDate = None
@@ -781,6 +783,14 @@ class Hydropolator:
         else:
             parsedVertex = self.triangulation.get_point(vertex)
             return self.vertexDict.get_z(parsedVertex)
+
+    def get_original_z(self, vertex, idOnly=False):
+        # return self.vertexDict[tuple(vertex)]['z']
+        if not idOnly:
+            return self.vertexDict.get_original_z(vertex)
+        else:
+            parsedVertex = self.triangulation.get_point(vertex)
+            return self.vertexDict.get_original_z(parsedVertex)
 
     def get_previous_z(self, vertex, idOnly=False):
         # return self.vertexDict[tuple(vertex)]['z']
@@ -3648,6 +3658,19 @@ class Hydropolator:
 
         self.sharpPointBins = sharpPointRegions
 
+    def set_abs_change_bins(self, breakpoints):
+        # print(breakpoints)
+
+        absChangeRegions = []
+        absChangeRegions.append([-0.1, breakpoints[0]])
+        for i in range(len(breakpoints))[1:]:
+            absChangeRegions.append([breakpoints[i - 1], breakpoints[i]])
+        absChangeRegions.append([breakpoints[-1], 10000])
+
+        # print(absChangeRegions)
+
+        self.absChangeBins = absChangeRegions
+
     def check_all_sharp_points(self):
         edgeIds = self.graph['edges'].keys()
 
@@ -3685,18 +3708,46 @@ class Hydropolator:
                         break
                 # sharpPointAngles.add(angularity)
 
-        print(sharp_points)
+        # print(sharp_points)
         return sharp_points
+
+    def check_all_point_diffs(self):
+
+        abs_diffs = {}
+
+        for bin in self.absChangeBins:
+            # print(str(bin))
+            abs_diffs[str(bin)[1:-1]] = 0
+
+        for vertex in self.vertices[1:]:
+            # print(vertex)
+            # print(vertex, self.get_z(vertex, idOnly=False),
+            #       self.get_original_z(vertex, idOnly=False))
+            originalZ = self.get_original_z(vertex)
+            currentZ = self.get_z(vertex)
+            absDifference = round(originalZ - currentZ, 3)
+
+            for bin, absBin in enumerate(self.absChangeBins):
+                if absDifference > absBin[0] and absDifference <= absBin[1]:
+                    abs_diffs[str(absBin)[1:-1]] += 1
+                    break
+
+        # for bin in abs_diffs.keys():
+        #     print(bin, abs_diffs[bin])
+
+        return abs_diffs
 
     def generate_statistics(self):
 
         depare_area_dict = self.generate_depth_areas()
         sharp_points_dict = self.check_all_sharp_points()
+        abs_diffs_dict = self.check_all_point_diffs()
 
         stats = self.statistics
         stats['iterations'] += 1
         stats['depare_areas'].append(depare_area_dict)
         stats['sharp_points'].append(sharp_points_dict)
+        stats['abs_change'].append(abs_diffs_dict)
 
     def export_statistics(self):
 

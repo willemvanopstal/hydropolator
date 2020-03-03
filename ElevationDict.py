@@ -28,6 +28,10 @@ class ElevationDict:
         else:
             return previousZ
 
+    def get_original_z(self, vertex_tuple):
+        originalZ = self.elevationDict[tuple(vertex_tuple)]['original_z']
+        return originalZ
+
     def remove_previous_z(self, vertex_tuple):
         self.elevationDict[tuple(vertex_tuple)]['previous_z'] = None
 
