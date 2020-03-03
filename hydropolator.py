@@ -3671,6 +3671,18 @@ class Hydropolator:
 
         self.absChangeBins = absChangeRegions
 
+    def set_min_change_bins(self, breakpoints):
+
+        minChangeRegions = []
+        minChangeRegions.append([-0.1, breakpoints[0]])
+        for i in range(len(breakpoints))[1:]:
+            minChangeRegions.append([breakpoints[i - 1], breakpoints[i]])
+        minChangeRegions.append([breakpoints[-1], 10000])
+
+        # print(absChangeRegions)
+
+        self.minChangeBins = minChangeRegions
+
     def check_all_sharp_points(self):
         edgeIds = self.graph['edges'].keys()
 
@@ -3714,10 +3726,15 @@ class Hydropolator:
     def check_all_point_diffs(self):
 
         abs_diffs = {}
+        min_diffs = {}
 
         for bin in self.absChangeBins:
             # print(str(bin))
             abs_diffs[str(bin)[1:-1]] = 0
+
+        for bin in self.minChangeBins:
+            # print(str(bin))
+            min_diffs[str(bin)[1:-1]] = 0
 
         for vertex in self.vertices[1:]:
             # print(vertex)
@@ -3725,7 +3742,25 @@ class Hydropolator:
             #       self.get_original_z(vertex, idOnly=False))
             originalZ = self.get_original_z(vertex)
             currentZ = self.get_z(vertex)
+
             absDifference = round(originalZ - currentZ, 3)
+
+            originalMinimalDepth = self.isobathValues[bisect.bisect_right(
+                self.isobathValues, originalZ) - 1]
+            currentMinimalDepth = self.isobathValues[bisect.bisect_right(
+                self.isobathValues, currentZ) - 1]
+
+            minDifference = round(originalMinimalDepth - currentMinimalDepth, 3)
+
+            # if str(minDifference) in min_diffs:
+            #     min_diffs[str(minDifference)] += 1
+            # else:
+            #     min_diffs[str(minDifference)] = 1
+
+            for bin, minBin in enumerate(self.minChangeBins):
+                if minDifference > minBin[0] and minDifference <= minBin[1]:
+                    min_diffs[str(minBin)[1:-1]] += 1
+                    break
 
             for bin, absBin in enumerate(self.absChangeBins):
                 if absDifference > absBin[0] and absDifference <= absBin[1]:
@@ -3735,19 +3770,24 @@ class Hydropolator:
         # for bin in abs_diffs.keys():
         #     print(bin, abs_diffs[bin])
 
-        return abs_diffs
+        for cha in min_diffs.keys():
+            print(cha, min_diffs[cha])
+
+        # print(self.isobathValues)
+        return abs_diffs, min_diffs
 
     def generate_statistics(self):
 
         depare_area_dict = self.generate_depth_areas()
         sharp_points_dict = self.check_all_sharp_points()
-        abs_diffs_dict = self.check_all_point_diffs()
+        abs_diffs_dict, min_diffs_dict = self.check_all_point_diffs()
 
         stats = self.statistics
         stats['iterations'] += 1
         stats['depare_areas'].append(depare_area_dict)
         stats['sharp_points'].append(sharp_points_dict)
         stats['abs_change'].append(abs_diffs_dict)
+        stats['min_change'].append(min_diffs_dict)
 
     def export_statistics(self):
 

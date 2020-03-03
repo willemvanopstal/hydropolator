@@ -38,7 +38,8 @@ sharpPointsBreakpoints = [round(math.radians(val), 3) for val in sharpPointsBrea
 
 absoluteChangedPointsBreakpoints = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0,
                                     7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0]
-
+minChangedPointsBreakpoints = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+                               12, 14, 16, 18, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100]
 ###############################
 # Project management
 ###############################
@@ -64,6 +65,7 @@ projectObject.generate_isobaths5()
 
 projectObject.set_sharp_points_bins(sharpPointsBreakpoints)
 projectObject.set_abs_change_bins(absoluteChangedPointsBreakpoints)
+projectObject.set_min_change_bins(minChangedPointsBreakpoints)
 # projectObject.check_all_sharp_points()
 # projectObject.check_all_point_diffs()
 projectObject.generate_statistics()
