@@ -3,7 +3,7 @@
 # @Email:  willemvanopstal home nl
 # @Project: Hydropolator
 # @Last modified by:   Bonny
-# @Last modified time: 03-Mar-2020
+# @Last modified time: 04-Mar-2020
 
 
 from ElevationDict import ElevationDict
@@ -402,6 +402,38 @@ class Hydropolator:
     def ___EXPORTING___(self):
         # placeholder for Atom symbol-tree-view
         pass
+
+    def export_triangles(self, triangleList, shpName):
+        triangleShpName = 'triangles_{}_{}.shp'.format(shpName, self.now())
+        triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
+        print('triangles file: ', triangleShpFile)
+
+        with shapefile.Writer(triangleShpFile) as wt:
+            wt.field('min_depth', 'F', decimal=4)
+            wt.field('max_depth', 'F', decimal=4)
+            wt.field('avg_depth', 'F', decimal=4)
+            for triangle in triangleList:
+                geom, min, max, avg = self.polystats_from_triangle(triangle)
+                # wt.poly(self.poly_from_triangle(triangle))
+                # min, max, avg = 10, 10, 10  # self.minmaxavg_from_triangle(triangle)
+                wt.poly([geom])
+                wt.record(min, max, avg)
+            self.msg('> triangles written to shapefile', 'info')
+
+    def export_points(self, pointList, shpName):
+        pointShpName = 'points_{}_{}.shp'.format(shpName, self.now())
+        pointShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, pointShpName)
+        print('points file: ', pointShpFile)
+
+        with shapefile.Writer(pointShpFile) as wp:
+            # wp.field('depth', 'F', decimal=4)
+            wp.field('id', 'N')
+            # for point in self.triangulation.all_vertices()[1:]:
+            for i, point in enumerate(pointList):  # remove the infinite vertex in startTIN
+                # actualZ = self.get_z(point, idOnly=False)
+                wp.point(point[0], point[1])
+                wp.record(i)
+            self.msg('> points written to shapefile', 'info')
 
     def export_shapefile(self, shpName):
         self.msg('> exporting shapefiles...', 'info')
@@ -2537,6 +2569,7 @@ class Hydropolator:
             edgeObject = self.graph['edges'][edge]
             isoValue = edgeObject['value']
             # print('isoValue: ', isoValue, edgeObject['edge'], edge)
+            # print('isoValue: ', isoValue, edge)
 
             edgeTriangles = self.get_edge_triangles(edge)
 
@@ -2702,7 +2735,7 @@ class Hydropolator:
                     # print('forward search: ', triangleSegment, triangleSegment[1])
                     if type(triangleSegment[1]) == int:
                         # ending in a vertex
-                        # print('type is int')
+                        # print('\ntype is int')
                         incidentTriangles = self.triangulation.incident_triangles_to_vertex(
                             triangleSegment[1])
                         incidentTriangles = [tuple(self.pseudo_triangle(tri))
@@ -2710,6 +2743,7 @@ class Hydropolator:
 
                         # now first add all incident triangles a POINT and last find the edge
                         for incTriangle in incidentTriangles:
+                            # print(incTriangle)
 
                             if incTriangle in indexedTriangles:
                                 continue
@@ -2717,9 +2751,12 @@ class Hydropolator:
                             if incTriangle not in edgeTriangles:
                                 continue
 
+                            # print('inctri: ', incTriangle)
+
                             intersections, isPoint = self.triangle_intersections(
                                 incTriangle, isoValue)
                             if isPoint:
+                                # print('also point')
                                 for vId in incTriangle:
                                     vertexElevation = self.get_z(vId, idOnly=True)
                                     if vertexElevation == isoValue:
@@ -2732,13 +2769,17 @@ class Hydropolator:
                                                                                          'tri_segment': None}
                                 isoVertexPointers = edgeObject['iso_vertex_pointers']
                                 geom = self.triangulation.get_point(trianglePoint)
+                                geom = (geom[0], geom[1])
+                                # print('inctri samepoint:', geom)
                                 if tuple(geom) in isoVertexPointers:
-                                    isoVertexPointers[tuple(geom)].append(incTriangle)
+                                    isoVertexPointers[geom].append(incTriangle)
                                 else:
-                                    isoVertexPointers[tuple(geom)] = [incTriangle]
+                                    isoVertexPointers[geom] = [incTriangle]
 
                             else:
                                 triangle = incTriangle
+
+                            # print(isoVertexPointers[tuple(geom)])
 
                     else:
                         # ending in an edge
@@ -2817,10 +2858,11 @@ class Hydropolator:
                                                                                          'tri_segment': None}
                                 isoVertexPointers = edgeObject['iso_vertex_pointers']
                                 geom = self.triangulation.get_point(trianglePoint)
+                                geom = (geom[0], geom[1])
                                 if tuple(geom) in isoVertexPointers:
-                                    isoVertexPointers[tuple(geom)].append(incTriangle)
+                                    isoVertexPointers[geom].append(incTriangle)
                                 else:
-                                    isoVertexPointers[tuple(geom)] = [incTriangle]
+                                    isoVertexPointers[geom] = [incTriangle]
 
                             else:
                                 triangle = incTriangle
@@ -2860,7 +2902,7 @@ class Hydropolator:
                         minTriangleId = triangleCounter
                     break
 
-                iterations += 1
+                iterations += 0
                 if iterations > 1000:
                     # print('exceeded iteration limit')
                     finished = True
@@ -2909,10 +2951,12 @@ class Hydropolator:
                                                                                          'tri_segment': None}
                                 isoVertexPointers = edgeObject['iso_vertex_pointers']
                                 geom = self.triangulation.get_point(trianglePoint)
+                                geom = (geom[0], geom[1])
+
                                 if tuple(geom) in isoVertexPointers:
-                                    isoVertexPointers[tuple(geom)].append(incTriangle)
+                                    isoVertexPointers[geom].append(incTriangle)
                                 else:
-                                    isoVertexPointers[tuple(geom)] = [incTriangle]
+                                    isoVertexPointers[geom] = [incTriangle]
 
                             else:
                                 triangle = incTriangle
@@ -3370,6 +3414,71 @@ class Hydropolator:
 
         # print(adjacentVertex, leftPseudoTriangle, rightPseudoTriangle)
 
+    def get_triangles_to_isopoints_in_edge(self, isopoints, edgeId):
+        # print(edgeId, isopoints)
+        edgeObject = self.graph['edges'][edgeId]
+        isoVertexPointers = edgeObject['iso_vertex_pointers']
+
+        # print(isoVertexPointers)
+        # for v in isoVertexPointers.keys():
+        #     print(v, isoVertexPointers[v])
+
+        immediateTriangles = set()
+
+        for isoPoint in isopoints:
+            # print(isoPoint)
+            # print(isoVertexPointers[isoPoint])
+            for triangle in isoVertexPointers[isoPoint]:
+                immediateTriangles.add(triangle)
+
+        # print(immediateTriangles)
+        return immediateTriangles
+
+    def get_all_immediate_triangles(self, edge_isopoints_dict):
+
+        immediateTriangles = set()
+
+        for edgeId in edge_isopoints_dict.keys():
+            sharpTriangles = self.get_triangles_to_isopoints_in_edge(
+                edge_isopoints_dict[edgeId], edgeId)
+            immediateTriangles.update(sharpTriangles)
+
+        return immediateTriangles
+
+    def get_ring_around_triangle(self, triangle):
+
+        ringTriangles = set()
+        for v in triangle:
+            incidentTriangles = self.triangulation.incident_triangles_to_vertex(v)
+            trueIncidentTriangles = []
+            for incTriangle in incidentTriangles:
+                if 0 not in incTriangle:
+                    trueIncidentTriangles.append(tuple(self.pseudo_triangle(incTriangle)))
+            # incidentTriangles = [tuple(self.pseudo_triangle(tri)) for tri in incidentTriangles]
+            ringTriangles.update(trueIncidentTriangles)
+
+        return ringTriangles
+
+    def get_triangle_rings_around_triangles(self, triangles, rings=0):
+
+        allTriangles = set(triangles)
+
+        ring = 0
+        while ring < rings:
+            print('ring: ', ring)
+
+            for triangle in allTriangles.copy():
+                # print(triangle)
+                ringTriangles = self.get_ring_around_triangle(triangle)
+                # print(ringTriangles)
+
+                allTriangles.update(ringTriangles)
+
+            ring += 1
+
+        print(len(allTriangles))
+        return allTriangles
+
     def simple_smooth_and_rebuild(self, vertexSet):
 
         self.print_graph()
@@ -3531,7 +3640,12 @@ class Hydropolator:
             edgeIds = self.graph['edges'].keys()
 
         turningPoints = set()
+        turningPointsDict = {}
+
         for edge in edgeIds:
+
+            turningPointsDict[edge] = []
+
             closed = self.graph['edges'][str(edge)]['closed']
             geom = self.graph['edges'][str(edge)]['geom']
             self.graph['edges'][str(edge)]['point_angularities'] = []
@@ -3545,14 +3659,16 @@ class Hydropolator:
                 pointAngularities.append(angularity)
                 if angularity > threshold:
                     turningPoints.add(tuple(geom[0]))
+                    turningPointsDict[edge].append(tuple(geom[0]))
             for i in range(1, len(geom)-1):
                 # print(i, geom[i-1], geom[i], geom[i+1])
                 angularity = self.angularity(geom[i-1], geom[i], geom[i+1])
                 pointAngularities.append(angularity)
                 if angularity > threshold:
                     turningPoints.add(tuple(geom[i]))
+                    turningPointsDict[edge].append(tuple(geom[i]))
 
-        return turningPoints
+        return turningPointsDict, turningPoints
 
     def triangle_area(self, triangle):
         ptOne = self.triangulation.get_point(triangle[0])

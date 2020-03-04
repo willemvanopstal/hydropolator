@@ -34,13 +34,10 @@ projectObject = Hydropolator()
 sharpPointsBreakpoints = [5, 10, 15, 20, 25, 30, 35, 40, 45,
                           50, 55, 60, 65, 70, 75, 80, 85, 90, 100, 120, 140, 160, 180]
 sharpPointsBreakpoints = [round(math.radians(val), 3) for val in sharpPointsBreakpoints]
-# print(sharpPointsBreakpoints)
-
 absoluteChangedPointsBreakpoints = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0,
                                     7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0]
 minChangedPointsBreakpoints = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
                                12, 14, 16, 18, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100]
-
 isoLengthBreakpoints = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
                         15, 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500]
 ###############################
@@ -56,6 +53,11 @@ if projectObject.load_project(projectName) is True:
     msg('> loaded project', 'header')
     projectObject.summarize_project()
 
+projectObject.set_sharp_points_bins(sharpPointsBreakpoints)
+projectObject.set_abs_change_bins(absoluteChangedPointsBreakpoints)
+projectObject.set_min_change_bins(minChangedPointsBreakpoints)
+projectObject.set_iso_seg_bins(isoLengthBreakpoints)
+
 ###############################
 # Process
 ###############################
@@ -63,22 +65,29 @@ if projectObject.load_project(projectName) is True:
 projectObject.generate_regions()
 projectObject.build_graph2()
 
-projectObject.generate_isobaths5()
+projectObject.generate_isobaths5(edgeIds=[])
 # projectObject.generate_depth_areas()  # nodeIds=innerNodes)
 
-projectObject.set_sharp_points_bins(sharpPointsBreakpoints)
-projectObject.set_abs_change_bins(absoluteChangedPointsBreakpoints)
-projectObject.set_min_change_bins(minChangedPointsBreakpoints)
-projectObject.set_iso_seg_bins(isoLengthBreakpoints)
 
-
-# projectObject.check_all_iso_lengths()
-# projectObject.check_all_sharp_points()
-# projectObject.check_all_point_diffs()
-projectObject.generate_statistics()
 # projectObject.generate_statistics()
 
-projectObject.export_statistics()
+sharpPointsDict, allSharpPoints = projectObject.check_isobath_angularity(edgeIds=[], threshold=0.8)
+immediateTriangles = projectObject.get_all_immediate_triangles(sharpPointsDict)
+
+projectObject.export_triangles(list(immediateTriangles), 'immediateTriangles')
+projectObject.export_points(allSharpPoints, 'sharpPoints')
+
+ringTriangles = projectObject.get_triangle_rings_around_triangles(immediateTriangles, rings=1)
+projectObject.export_triangles(list(ringTriangles), 'ringTriangles')
+
+ringTriangles = projectObject.get_triangle_rings_around_triangles(immediateTriangles, rings=2)
+projectObject.export_triangles(list(ringTriangles), 'ringTriangles2')
+
+
+# for point in sharpPointsDict[edgeId]:
+#     # print(point)
+#     projectObject.get_triangles_to_isopoint_in_edge(point, edgeId)
+
 
 # projectObject.print_graph()
 
@@ -92,6 +101,8 @@ projectObject.export_statistics()
 # projectObject.export_all_node_triangles()
 # projectObject.export_all_edge_triangles()
 # projectObject.export_shapefile('output')
+# projectObject.export_statistics()
+
 
 ###############################
 # Closing project
