@@ -65,23 +65,29 @@ projectObject.set_iso_seg_bins(isoLengthBreakpoints)
 projectObject.generate_regions()
 projectObject.build_graph2()
 
-projectObject.generate_isobaths5(edgeIds=[])
-# projectObject.generate_depth_areas()  # nodeIds=innerNodes)
+for i in range(50):
+    projectObject.generate_isobaths5(edgeIds=[])
+    projectObject.generate_statistics()
 
+    sharpPointsDict, allSharpPoints = projectObject.check_isobath_angularity(
+        edgeIds=[], threshold=1.0)
+    immediateTriangles = projectObject.get_all_immediate_triangles(sharpPointsDict)
+    ringTriangles = projectObject.get_triangle_rings_around_triangles(immediateTriangles, rings=1)
+    ringVertices = projectObject.get_vertices_from_triangles(ringTriangles)
+    print('len vertices: ', len(ringVertices))
+    verticesAreUpdated = projectObject.simple_smooth_and_rebuild(ringVertices)
 
-# projectObject.generate_statistics()
+    if not verticesAreUpdated:
+        break
 
-sharpPointsDict, allSharpPoints = projectObject.check_isobath_angularity(edgeIds=[], threshold=0.8)
-immediateTriangles = projectObject.get_all_immediate_triangles(sharpPointsDict)
-
-projectObject.export_triangles(list(immediateTriangles), 'immediateTriangles')
-projectObject.export_points(allSharpPoints, 'sharpPoints')
-
-ringTriangles = projectObject.get_triangle_rings_around_triangles(immediateTriangles, rings=1)
-projectObject.export_triangles(list(ringTriangles), 'ringTriangles')
-
-ringTriangles = projectObject.get_triangle_rings_around_triangles(immediateTriangles, rings=2)
-projectObject.export_triangles(list(ringTriangles), 'ringTriangles2')
+# projectObject.export_triangles(list(immediateTriangles), 'immediateTriangles')
+# projectObject.export_points(allSharpPoints, 'sharpPoints')
+#
+# ringTriangles = projectObject.get_triangle_rings_around_triangles(immediateTriangles, rings=1)
+# projectObject.export_triangles(list(ringTriangles), 'ringTriangles')
+#
+# ringTriangles = projectObject.get_triangle_rings_around_triangles(immediateTriangles, rings=2)
+# projectObject.export_triangles(list(ringTriangles), 'ringTriangles2')
 
 
 # for point in sharpPointsDict[edgeId]:
@@ -91,17 +97,19 @@ projectObject.export_triangles(list(ringTriangles), 'ringTriangles2')
 
 # projectObject.print_graph()
 
+projectObject.generate_isobaths5(edgeIds=[])
+projectObject.generate_statistics()
 
 ###############################
 # Exporting shapefiles
 ###############################
 
-# projectObject.export_all_isobaths()
+projectObject.export_all_isobaths()
 # projectObject.export_depth_areas()  # nodeIds=innerNodes)
 # projectObject.export_all_node_triangles()
 # projectObject.export_all_edge_triangles()
 # projectObject.export_shapefile('output')
-# projectObject.export_statistics()
+projectObject.export_statistics()
 
 
 ###############################

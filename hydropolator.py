@@ -3298,7 +3298,7 @@ class Hydropolator:
     def smooth_vertices(self, vertexSet):
         # disabled the convex hull vertices
 
-        print('smoothing ...')
+        # print('smoothing ...')
 
         triangleCenters = dict()
         updatedVertices = set()
@@ -3405,7 +3405,7 @@ class Hydropolator:
                 self.add_vertex_to_queue(vertex, interpolatedZ, idOnly=True)
                 updatedVertices.add(vertex)
 
-        print('{} vertices added to update queue'.format(updates))
+        self.msg('updated vertices: {}'.format(updates), 'info')
 
         return updatedVertices
 
@@ -3479,12 +3479,24 @@ class Hydropolator:
         print(len(allTriangles))
         return allTriangles
 
+    def get_vertices_from_triangles(self, triangles):
+
+        allVertices = set()
+
+        for triangle in triangles:
+            allVertices.update(triangle)
+
+        return allVertices
+
     def simple_smooth_and_rebuild(self, vertexSet):
 
-        self.print_graph()
+        # self.print_graph()
+
+        self.msg('smoothing', 'header')
+        self.msg('vertices to smooth: {}'.format(len(vertexSet)), 'info')
 
         allChangedVertices = set()
-        for i in range(15):
+        for i in range(1):
             changedVertices = self.smooth_vertices(vertexSet)
             allChangedVertices.update(changedVertices)
             # print(allChangedVertices)
@@ -3492,6 +3504,9 @@ class Hydropolator:
             self.vertexDict.update_values_from_queue()  # updates the working z-value in z
             # queue is now empty again
         # may again smooth the vertices?
+
+        if len(allChangedVertices) == 0:
+            return False
 
         # remove previous_z because region graph is built again
         for changedVertex in allChangedVertices:
@@ -3506,7 +3521,9 @@ class Hydropolator:
         self.generate_regions()
 
         self.build_graph2()
-        self.print_graph()
+        # self.print_graph()
+
+        return True
 
     def smooth_vertices_helper2(self, vertexSet):
         # self.print_graph()
@@ -3572,11 +3589,11 @@ class Hydropolator:
         # newly inserted nodes are not connected yet
         print(affectedNodes)
 
-        self.print_graph()
+        # self.print_graph()
         # establish edges again
         self.establish_edges_on_affected_nodes(affectedNodes)
 
-        self.print_graph()
+        # self.print_graph()
         # self.make_network_graph()
 
     def smooth_vertices_helper(self, vertexSet):
@@ -3588,13 +3605,13 @@ class Hydropolator:
         self.vertexDict.update_values_from_queue()  # edits the interpolated z-value
         # queue is now empty
         # gets all the affected triangles, only if their interval is also changed
-        changedTriangles = self.get_changed_triangles(changedVertices)
+        changedTriangles = self.get_changed_triangles(changedVertices, oldTriangleInventory)
 
         for changedVertex in changedVertices:
             self.vertexDict.remove_previous_z(self.triangulation.get_point(
                 changedVertex))  # cautieso, used in smooth_vertices()
 
-        # self.update_region_graph(changedVertices)
+        self.update_region_graph(changedVertices)
 
     def circumcenter(self, triangle):
         # https://stackoverflow.com/a/56225021
