@@ -3,6 +3,7 @@ import shapefile
 import os
 import math
 from datetime import datetime
+import numpy as np
 
 
 class BendDetector():
@@ -176,6 +177,15 @@ class BendDetector():
 
         return allVertices
 
+    def distance_between_points(self, ptA, ptB):
+
+        dX = ptB[0] - ptA[0]
+        dY = ptB[1] - ptA[1]
+
+        distance = math.hypot(dX, dY)
+
+        return distance
+
     # ====================================== #
     #
     #   Detection
@@ -192,6 +202,129 @@ class BendDetector():
 
         return True
 
+    def get_spurs_and_gullys2(self, gully_threshold=0, spur_threshold=0):
+
+        allTriangles = self.triangles.keys()
+        spurTriangles = set()
+        gullyTriangles = set()
+
+        for triangleId in allTriangles:
+            # print(triangleId, self.triangles[triangleId])
+            triangleVertices = self.triangles[triangleId]['vertices']
+
+            print('\n', triangleId, triangleVertices)
+
+            leftOfSegment = False
+            rightOfSegment = False
+            edgeLengths = []
+            isoSeg = None
+
+            for i in [0, 1, 2]:
+                # edgeIndices = [i, (i+1)%3]
+                edge = (int(triangleVertices[i]), int(triangleVertices[(i+1) % 3]))
+                # print(edge)
+                if not leftOfSegment and edge in self.segments:
+                    rightOfSegment = True
+                    isoSeg = (str(edge[0]), str(edge[1]))
+                elif not rightOfSegment and tuple(reversed(edge)) in self.segments:
+                    leftOfSegment = True
+                    isoSeg = (str(edge[0]), str(edge[1]))
+                else:
+                    edgeLength = self.edge_length(edge)
+                    edgeLengths.append(edgeLength)
+            # print(rightOfSegment, leftOfSegment)
+
+            print('edgeLengths: ', edgeLengths)
+
+            if len(edgeLengths) == 1:
+                # triangle bounded by two iso-segments
+                # not checking for orthogonality
+                if leftOfSegment:
+                    if edgeLengths[0] < gully_threshold:
+                        gullyTriangles.add(triangleId)
+                elif rightOfSegment:
+                    if edgeLengths[0] < spur_threshold:
+                        spurTriangles.add(triangleId)
+
+            elif len(edgeLengths) == 2:
+                # triangles touches one isosegment
+                # need to check what kind of triangle it is
+                # print('isoSeg: ', isoSeg)
+                isoLine = [self.get_point(vId) for vId in isoSeg]
+                isoLineXs = [isoLine[0][0], isoLine[1][0]]
+                isoLineYs = [isoLine[0][1], isoLine[1][1]]
+                print('isoLine: ', isoLine)
+
+                openPoint = list(set(triangleVertices).difference(isoSeg))
+                openPointVals = self.get_point(openPoint[0])
+                print(openPoint, openPointVals)
+
+                # https://stackoverflow.com/a/49073142
+                # project point onto line segment
+                x = np.array(openPointVals)
+                u = np.array(isoLine[0])
+                v = np.array(isoLine[1])
+                n = v - u
+                n /= np.linalg.norm(n, 2)
+                P = u + n*np.dot(x - u, n)
+
+                projectedPoint = [P[0], P[1]]
+                print('projectedPoint: ', projectedPoint)
+
+                if min(isoLineXs) <= projectedPoint[0] <= max(isoLineXs) and min(isoLineYs) <= projectedPoint[1] <= max(isoLineYs):
+                    print('projected on line')
+                    minDistance = self.distance_between_points(openPointVals, projectedPoint)
+                    # print(minDistance)
+                else:
+                    print('projected outside line')
+                    # print(min(edgeLengths))
+                    minDistance = min(edgeLengths)
+
+                if leftOfSegment:
+                    if minDistance < gully_threshold:
+                        gullyTriangles.add(triangleId)
+                elif rightOfSegment:
+                    if minDistance < spur_threshold:
+                        spurTriangles.add(triangleId)
+
+            # if leftOfSegment:
+            #     # deeper than contour, gully
+            #     invalidCounter = 0
+            #     for l in edgeLengths:
+            #         if l < gully_threshold:
+            #             invalidCounter += 1
+            #     if invalidCounter >= nrInvalidEdges:
+            #         gullyTriangles.add(triangleId)
+            #
+            # elif rightOfSegment:
+            #     # shallower than contour, spur
+            #     invalidCounter = 0
+            #     for l in edgeLengths:
+            #         if l < spur_threshold:
+            #             invalidCounter += 1
+            #     if invalidCounter >= nrInvalidEdges:
+            #         spurTriangles.add(triangleId)
+
+            # if leftOfSegment or rightOfSegment:
+            #     # print('im directly adjacent to isobath')
+            #     invalidCounter = 0
+            #     for l in edgeLengths:
+            #         if l < length_threshold:
+            #             invalidCounter += 1
+            #
+            #     if invalidCounter >= nrInvalidEdges:  # input amount of invalid edges needed to trigger
+            #         # print('im invalid triangle')
+            #         if leftOfSegment:
+            #             # print('left, deeper, gully')
+            #             gullyTriangles.add(triangleId)
+            #         elif rightOfSegment:
+            #             # print('right, shallower, spur')
+            #             spurTriangles.add(triangleId)
+
+            # print(edgeLengths)
+
+        return spurTriangles, gullyTriangles
+
     def get_spurs_and_gullys(self, gully_threshold=0, spur_threshold=0, nrInvalidEdges=1):
 
         allTriangles = self.triangles.keys()
@@ -201,6 +334,8 @@ class BendDetector():
         for triangleId in allTriangles:
             # print(triangleId, self.triangles[triangleId])
             triangleVertices = self.triangles[triangleId]['vertices']
+
+            print(triangleId, triangleVertices)
 
             leftOfSegment = False
             rightOfSegment = False
@@ -218,6 +353,8 @@ class BendDetector():
                     edgeLengths.append(edgeLength)
             # print(rightOfSegment, leftOfSegment)
 
+            print('edgeLengths: ', edgeLengths)
+
             if leftOfSegment:
                 # deeper than contour, gully
                 invalidCounter = 0
@@ -226,6 +363,7 @@ class BendDetector():
                         invalidCounter += 1
                 if invalidCounter >= nrInvalidEdges:
                     gullyTriangles.add(triangleId)
+
             elif rightOfSegment:
                 # shallower than contour, spur
                 invalidCounter = 0
@@ -515,9 +653,11 @@ class BendDetector():
 
     def execute_constrained(self, pathToFile):
         # print(pathToFile)
+        FNULL = open(os.devnull, 'w')
+
         runCommand = './triangle -pcn "{}"'.format(pathToFile)
         print(runCommand)
-        subprocess.run(runCommand, shell=True)
+        subprocess.run(runCommand, shell=True, stdout=FNULL)
 
     def parse_output(self, inputPath):
         outputFilePart = os.path.splitext(inputPath)[0]

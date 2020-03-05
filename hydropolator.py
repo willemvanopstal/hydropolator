@@ -3,7 +3,7 @@
 # @Email:  willemvanopstal home nl
 # @Project: Hydropolator
 # @Last modified by:   Bonny
-# @Last modified time: 04-Mar-2020
+# @Last modified time: 05-Mar-2020
 
 
 from ElevationDict import ElevationDict
@@ -3760,7 +3760,7 @@ class Hydropolator:
             edge['bend_detector'].write_poly_file()
             edge['bend_detector'].triangulate()
 
-            spurs, gullys = edge['bend_detector'].get_spurs_and_gullys(
+            spurs, gullys = edge['bend_detector'].get_spurs_and_gullys2(
                 gully_threshold=gullyThreshold, spur_threshold=spurThreshold)
 
             exportDict = {'spurs': spurs, 'gullys': gullys}

@@ -84,6 +84,7 @@ verticesToSmooth = set()
 for point in sharpPoints:
     verticesToSmooth.update(projectObject.get_vertices_around_point(point, rings=1))
 print('nr vertices, sharps: ', len(verticesToSmooth))
+
 for point in spurgullyPoints:
     verticesToSmooth.update(projectObject.get_vertices_around_point(point, rings=1))
 print('nr vertices, spursgullys: ', len(verticesToSmooth))
