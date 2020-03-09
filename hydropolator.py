@@ -3,7 +3,7 @@
 # @Email:  willemvanopstal home nl
 # @Project: Hydropolator
 # @Last modified by:   Bonny
-# @Last modified time: 05-Mar-2020
+# @Last modified time: 09-Mar-2020
 
 
 from ElevationDict import ElevationDict
@@ -31,6 +31,9 @@ colorama.init()
 
 
 class Hydropolator:
+
+    debugBool = False
+
     xMin = 10e20
     yMin = 10e20
     zMin = 10e20
@@ -127,6 +130,10 @@ class Hydropolator:
             colColor = colorama.Fore.GREEN
 
         print(colColor + string + colorama.Style.RESET_ALL)
+
+    def debug(self, message):
+        if self.debugBool:
+            print(message)
 
     def print_errors(self):
         if len(self.errors):
@@ -1316,7 +1323,7 @@ class Hydropolator:
 
     def insert_triangles_into_region_graph2(self, triangles, oldEdges):
         self.msg('inserting triangles again...', 'info')
-        print(len(triangles))
+        print('triangles to insert: ', len(triangles))
 
         tempTriangleRegionDict = {}
 
@@ -1345,7 +1352,7 @@ class Hydropolator:
             regionTriangles = tempTriangleRegionDict[interval]
             # tempDebugging.update(regionTriangles)
             triangleAmount = len(regionTriangles)
-            print('----- new interval\n', interval, triangleAmount)
+            self.debug('----- new interval\n {} {}'.format(interval, triangleAmount))
 
             if triangleAmount == 0:
                 self.errors.append(
@@ -1404,8 +1411,8 @@ class Hydropolator:
 
                 i += 0
                 if len(indexedTriangles) == triangleAmount:
-                    print('all triangles in this region visited, ending')
-                    print(len(indexedTriangles))
+                    self.debug('all triangles in this region visited, ending')
+                    self.debug(len(indexedTriangles))
                     finished = True
                 elif i > 500:
                     self.errors.append('{} insert_triangles_into_region_graph\titeration limit exceeded on splitting in touching nodes\tinterval: {}\tcurrent node: {}'.format(
@@ -1432,6 +1439,7 @@ class Hydropolator:
                             self.add_triangle_to_node(triangle, existingNode)
                             # tempNodes[currentNode]['previous_nodes'].update(
                             #     oldTriangleInventory[triangle])
+                            indexedTriangles.add(triangle)
                             existingTracker = True
                             insertedTriangles += 1
                             insertedTrianglesSet.add(triangle)
@@ -1455,6 +1463,7 @@ class Hydropolator:
                                                 if neighboringTriangle in self.get_triangles(existingNode):
                                                     self.add_triangle_to_node(
                                                         triangle, existingNode)
+                                                    indexedTriangles.add(triangle)
                                                     # tempNodes[currentNode]['previous_nodes'].update(
                                                     #     oldTriangleInventory[triangle])
                                                     existingTracker = True
@@ -1496,7 +1505,8 @@ class Hydropolator:
 
                     if len(queue) == 0:
                         finished = False
-                        print('no queue left: ', len(indexedTriangles), triangleAmount)
+                        self.debug('no queue left: {} {}'.format(
+                            len(indexedTriangles), triangleAmount))
                         for triangle in regionTriangles.difference(indexedTriangles):
                             if 0 not in triangle:  # and len(self.find_intervals(triangle)) == 1:
                                 break
@@ -1520,23 +1530,23 @@ class Hydropolator:
                         self.errors.append(
                             '{} insert_triangles_in_region_graph\tno queue left\tinterval: {}\tcurrent node: {}'.format(self.now(), interval, currentNode))
 
-        print('tempNodes: ', tempNodes)
+        self.debug('tempNodes: {}'.format(tempNodes))
         affectedNodes = tempNodes.copy()
         # self.add_triangle_to_new_node(interval, triangle)
 
         # print('tempDebug: ', len(tempDebugging))
-        print('inserted triangles: ', insertedTriangles, len(
-            insertedTrianglesSet), len(indexedTriangles))
-        print('remove/insert diff: ', set(triangles).difference(insertedTrianglesSet))
+        # print('inserted triangles: ', insertedTriangles, len(
+        #     insertedTrianglesSet), len(indexedTriangles))
+        # print('remove/insert diff: ', set(triangles).difference(insertedTrianglesSet))
 
-        print('======\ntempNodes')
+        self.debug('======\ntempNodes')
         # merge nodes with existing nodes if possible
         for tempNode in tempNodes:
             tempNodeInterval = self.get_interval_from_node(tempNode)
             previousNodes = oldEdges
             tempNodeTriangles = self.get_triangles(tempNode)
-            print('------', tempNode, tempNodeInterval)
-            print(previousNodes)
+            self.debug('------ {} {}'.format(tempNode, tempNodeInterval))
+            self.debug(previousNodes)
             match = False
             for previousNode in previousNodes:
                 if self.is_node(previousNode):
@@ -1562,14 +1572,14 @@ class Hydropolator:
                         break
 
             if match is False:
-                print('need searching.. BUT should be in the previousedges??')
+                self.debug('need searching.. BUT should be in the previousedges??')
                 # TODO first try to search the shallow/deeper nodes of the previous nodes, probably it is adjacent to that
                 for oldEdgingNode in oldEdges:
                     if self.is_node(oldEdgingNode):
                         # for sameIntervalNode in self.regionNodes[str(tempNodeInterval)]:
                         # if tempNodeInterval == self.get_interval_from_node(oldEdgingNode)
                         if oldEdgingNode not in tempNodes and tempNodeInterval == self.get_interval_from_node(oldEdgingNode):
-                            print(oldEdgingNode)
+                            self.debug(oldEdgingNode)
                             for tempNodeTriangle in tempNodeTriangles:
                                 for adjacentTriangle in self.adjacent_triangles(tempNodeTriangle):
                                     if not self.saddle_test(tempNodeTriangle, adjacentTriangle, tempNodeInterval):
@@ -1605,7 +1615,8 @@ class Hydropolator:
             #             break
 
             if match is False:
-                print('im a completely new/rebuilt node')
+                self.debug('im a completely new/rebuilt node')
+                pass
 
         return affectedNodes
 
@@ -1865,7 +1876,7 @@ class Hydropolator:
                 print('im a completely new node')
 
     def merge_nodes(self, keepNode, mergeNode):
-        print('mergin nodes:', keepNode, mergeNode)
+        self.debug('mergin nodes: {} {}'.format(keepNode, mergeNode))
 
         trianglesToAdd = self.get_triangles(mergeNode)
         deepsToAdd = self.get_queue(mergeNode, 'deep')
@@ -1888,7 +1899,7 @@ class Hydropolator:
         return deletedNodes
 
     def delete_edge(self, edgeCombination):
-        self.msg('deleting edge from graph: {}'.format(edgeCombination), 'warning')
+        self.debug('deleting edge from graph: {}'.format(edgeCombination))
 
         shallowNode = edgeCombination[0]
         deepNode = edgeCombination[1]
@@ -1902,11 +1913,11 @@ class Hydropolator:
         for edgeId in self.graph['edges'].keys():
             if self.graph['edges'][edgeId]['edge'] == [shallowNode, deepNode]:
                 del self.graph['edges'][edgeId]
-                print('removed edge')
+                self.debug('removed edge')
                 break
 
     def remove_node_and_all_contents(self, nodeId):
-        self.msg('deleting node from graph: {}'.format(nodeId), 'warning')
+        self.debug('deleting node from graph: {}'.format(nodeId))
         nodeInterval = self.get_interval_from_node(nodeId)
 
         # remove pointers from neighboring nodes
@@ -1932,7 +1943,7 @@ class Hydropolator:
 
     def delete_node(self, nodeId):
         # from graph, from edges, pointers of neighbors
-        self.msg('deleting node from graph: {}'.format(nodeId), 'warning')
+        self.debug('deleting node from graph: {}'.format(nodeId))
         nodeInterval = self.get_interval_from_node(nodeId)
 
         edgesToRemove = []
@@ -2003,8 +2014,13 @@ class Hydropolator:
                     updatedTriangles[pseudoTriangle]['updated_intervals'] = updatedIntervals
                     # updatedTriangles.add(tuple(self.pseudo_triangle(incidentTriangle)))
 
+        print('updated triangles: ', len(updatedTriangles))
+
         for updatedVertex in updatedVertices:
             self.vertexDict.remove_previous_z(self.triangulation.get_point(updatedVertex))
+
+        if len(updatedTriangles) == 0:
+            return
 
         oldTriangleInventory = self.triangleInventory.copy()
         possibleDeletedNodes, possibleDeletedEdges = self.remove_triangles_from_graph(
@@ -2045,7 +2061,7 @@ class Hydropolator:
         # self.print_graph()
 
     def establish_edges_on_affected_nodes(self, affectedNodes):
-        print(affectedNodes)
+        self.debug(affectedNodes)
         # print(self.get_triangles('7'))
         for nodeId in affectedNodes:
             # print(nodeId)
@@ -3567,6 +3583,9 @@ class Hydropolator:
         return True
 
     def smooth_vertices_helper2(self, vertexSet):
+
+        self.msg('\n==== Smoothing pass ====', 'header')
+        print('input vertices: ', len(vertexSet))
         # self.print_graph()
         # self.make_network_graph()
         # this dict contains for each triangle the nodes it belonged to previously
@@ -3584,16 +3603,24 @@ class Hydropolator:
             # queue is now empty again
         # may again smooth the vertices?
 
+        print('vertices with updated depth: ', len(allChangedVertices))
+
         # Updatin the region graph if necessary:
         changedTriangles, changedNodes = self.get_changed_triangles(
             allChangedVertices, oldTriangleInventory)
-        print(changedNodes)
+        # print(changedNodes)
+        print('triangles with updated interval: ', len(changedTriangles))
+        print('affected nodes: ', changedNodes)
+
+        if len(changedTriangles) == 0:
+            print('no triangles were changed in interval, returning without updating!')
+            return
 
         # we need to update the entire node, so lets get all triangles in each node
         trianglesToBeDeleted = set()
         edgesToBeDeleted = set()
         for changedNode in changedNodes:
-            print(changedNode, self.get_interval_from_node(changedNode))
+            # print('changedNode: ', changedNode, self.get_interval_from_node(changedNode))
             # print(changedNode, len(self.get_triangles(changedNode)))
             trianglesToBeDeleted.update(self.get_triangles(changedNode))
             shallowNeighbors = self.get_neighboring_nodes(changedNode, 'shallow')
@@ -3602,20 +3629,36 @@ class Hydropolator:
             deepNeighbors = self.get_neighboring_nodes(changedNode, 'deep')
             for deepNeighbor in deepNeighbors:
                 edgesToBeDeleted.add((changedNode, deepNeighbor))
-        print(len(trianglesToBeDeleted), edgesToBeDeleted)
+        # print('all triangles to be deleted: ', len(trianglesToBeDeleted), 'edges: ', edgesToBeDeleted)
 
         # for tri in trianglesToBeDeleted:
         #     print(oldTriangleInventory[tri])
+
+        # removes actual edges
+        possibleNeighboringEdges = set()
+        extendedNeighboringNodes = set()
+        for edgeCombination in edgesToBeDeleted:
+            possibleNeighboringEdges.update({edgeCombination[0], edgeCombination[1]})
+
+            # extendedNeighboringNodes.update(self.get_neighboring_nodes(edgeCombination[0], 'deep'))
+            # extendedNeighboringNodes.update(
+            #     self.get_neighboring_nodes(edgeCombination[0], 'shallow'))
+            # extendedNeighboringNodes.update(self.get_neighboring_nodes(edgeCombination[1], 'deep'))
+            # extendedNeighboringNodes.update(
+            #     self.get_neighboring_nodes(edgeCombination[1], 'shallow'))
+
+            self.delete_edge(edgeCombination)
 
         # removes actual nodes and all its triangles inside
         for changedNode in changedNodes:
             self.remove_node_and_all_contents(changedNode)
 
-        # removes actual edges
-        possibleNeighboringEdges = set()
-        for edgeCombination in edgesToBeDeleted:
-            possibleNeighboringEdges.update({edgeCombination[0], edgeCombination[1]})
-            self.delete_edge(edgeCombination)
+        # # removes actual edges
+        # possibleNeighboringEdges = set()
+        # for edgeCombination in edgesToBeDeleted:
+        #     possibleNeighboringEdges.update({edgeCombination[0], edgeCombination[1]})
+        #
+        #     self.delete_edge(edgeCombination)
 
         # remove previous_z because region graph is built again
         for changedVertex in allChangedVertices:
@@ -3623,12 +3666,14 @@ class Hydropolator:
                 changedVertex))
 
         # self.build_graph2()
+        self.debug('######old neighboring nodes: {}'.format(possibleNeighboringEdges))
+        self.debug('######ext neighboring nodes: {}'.format(extendedNeighboringNodes))
 
         # insert all deleted triangles back in the graph
         affectedNodes = self.insert_triangles_into_region_graph2(
             trianglesToBeDeleted, possibleNeighboringEdges)
         # newly inserted nodes are not connected yet
-        print(affectedNodes)
+        self.debug(affectedNodes)
 
         # self.print_graph()
         # establish edges again

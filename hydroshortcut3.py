@@ -1,4 +1,5 @@
 from Hydropolator import Hydropolator
+from datetime import datetime
 import math
 import colorama
 colorama.init()
@@ -65,11 +66,41 @@ projectObject.set_iso_seg_bins(isoLengthBreakpoints)
 projectObject.generate_regions()
 projectObject.build_graph2()
 
+
+projectObject.export_all_node_triangles()
+projectObject.export_all_edge_triangles()
 projectObject.generate_isobaths5()
 
-spurGullyDict, allSpurGullyPoints = projectObject.check_spurs_gullys(
-    edgeIds=[], threshold=10, spurThreshold=None, gullyThreshold=None)
-print('sgully length: ', len(allSpurGullyPoints))
+# spurGullyDict, allSpurGullyPoints = projectObject.check_spurs_gullys(
+#     edgeIds=[], threshold=10, spurThreshold=None, gullyThreshold=None)
+# print('sgully length: ', len(allSpurGullyPoints))
+
+startTime = datetime.now()
+
+sharpPointsDict, allSharpPoints = projectObject.check_isobath_angularity(edgeIds=[], threshold=1.0)
+print('sharp points: ', len(allSharpPoints))
+sharpTriangles = projectObject.get_all_immediate_triangles(sharpPointsDict)
+sharpTriangleVertices = projectObject.get_vertices_from_triangles(sharpTriangles)
+
+projectObject.simple_smooth_and_rebuild(sharpTriangleVertices)
+
+endTime = datetime.now()
+print('elapsed time: ', endTime - startTime)
+
+projectObject.generate_isobaths5()
+
+
+startTime = datetime.now()
+
+sharpPointsDict, allSharpPoints = projectObject.check_isobath_angularity(edgeIds=[], threshold=1.0)
+print('sharp points: ', len(allSharpPoints))
+sharpTriangles = projectObject.get_all_immediate_triangles(sharpPointsDict)
+sharpTriangleVertices = projectObject.get_vertices_from_triangles(sharpTriangles)
+
+projectObject.smooth_vertices_helper2(sharpTriangleVertices)
+
+endTime = datetime.now()
+print('elapsed time: ', endTime - startTime)
 
 
 # for i in range(50):
@@ -113,9 +144,9 @@ print('sgully length: ', len(allSpurGullyPoints))
 
 # projectObject.export_all_isobaths()
 # projectObject.export_depth_areas()  # nodeIds=innerNodes)
-# projectObject.export_all_node_triangles()
-# projectObject.export_all_edge_triangles()
-# projectObject.export_shapefile('output')
+projectObject.export_all_node_triangles()
+projectObject.export_all_edge_triangles()
+projectObject.export_shapefile('output')
 # projectObject.export_statistics()
 
 
