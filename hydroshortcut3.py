@@ -67,9 +67,9 @@ projectObject.build_graph2()
 
 projectObject.generate_isobaths5()
 
-spurgullyPoints = projectObject.check_spurs_gullys(
-    edgeIds=['2', '5', '6', '27'], threshold=10, spurThreshold=None, gullyThreshold=None)
-print('sgully length: ', len(spurgullyPoints))
+spurGullyDict, allSpurGullyPoints = projectObject.check_spurs_gullys(
+    edgeIds=[], threshold=10, spurThreshold=None, gullyThreshold=None)
+print('sgully length: ', len(allSpurGullyPoints))
 
 
 # for i in range(50):

@@ -642,6 +642,47 @@ class Hydropolator:
 
         self.msg('> depth areas saved', 'info')
 
+    def export_spur_gully_geoms(self, geom_summary):
+
+        self.msg('> exporting spur gully triangles...', 'info')
+        triangleShpName = 'spur_gully_triangles_{}.shp'.format(self.now())
+        triangleShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, triangleShpName)
+        print('spur gully triangles file: ', triangleShpFile)
+
+        with shapefile.Writer(triangleShpFile) as wt:
+            wt.field('edgeId', 'N')
+            wt.field('type', 'C')
+
+            for edgeCollection in geom_summary:
+                edgeId = int(edgeCollection[0])
+                for spurPolygon in edgeCollection[1]:
+                    polyType = 'spur'
+                    # print(spurPolygon)
+
+                    wt.poly(spurPolygon)
+                    wt.record(edgeId, polyType)
+
+                for gullyPolygon in edgeCollection[2]:
+                    polyType = 'gully'
+                    # print(spurPolygon)
+
+                    wt.poly(gullyPolygon)
+                    wt.record(edgeId, polyType)
+
+                # print(edgeCollection[0])
+                # print('spur geom: ', edgeCollection[1])
+
+            # wt.field('region', 'N')
+            # for i, region in enumerate(self.triangleRegions):
+            #     if len(region):
+            #         geom = []
+            #         for triangle in region:
+            #             geom.append(self.poly_from_triangle(triangle))
+            #         wt.poly(geom)
+            #         wt.record(i)
+
+        self.msg('> spur gully triangles saved to file', 'info')
+
     # ====================================== #
     #
     #   Point Functions
@@ -3744,6 +3785,8 @@ class Hydropolator:
             edgeIds = self.graph['edges'].keys()
 
         spurgullyPoints = set()
+        spurGullyDict = {}
+        allGeoms = []
 
         if not threshold and not spurThreshold and not gullyThreshold:
             print('please define a threshold for the spurs and gullies')
@@ -3763,15 +3806,27 @@ class Hydropolator:
             spurs, gullys = edge['bend_detector'].get_spurs_and_gullys2(
                 gully_threshold=gullyThreshold, spur_threshold=spurThreshold)
 
-            exportDict = {'spurs': spurs, 'gullys': gullys}
-            edge['bend_detector'].export_triangles_shp(multi=exportDict)
+            # exportDict = {'spurs': spurs, 'gullys': gullys}
+            # edge['bend_detector'].export_triangles_shp(multi=exportDict)
+
+            geomSummary = []
+            spurGeoms = edge['bend_detector'].get_triangle_geoms(spurs)
+            gullyGeoms = edge['bend_detector'].get_triangle_geoms(gullys)
+            geomSummary.append(edgeId)
+            geomSummary.append(spurGeoms)
+            geomSummary.append(gullyGeoms)
+            allGeoms.append(geomSummary)
 
             allInvalidTriangles = spurs.union(gullys)
             invalidIsoVertices = edge['bend_detector'].get_vertices_from_triangles(
                 allInvalidTriangles)
             spurgullyPoints.update(invalidIsoVertices)
 
-        return spurgullyPoints
+            spurGullyDict[edgeId] = invalidIsoVertices
+
+        self.export_spur_gully_geoms(allGeoms)
+
+        return spurGullyDict, spurgullyPoints
 
         # exportDict = {'spurs': spurs, 'gullys': gullys}
         # edge['bend_detector'].export_triangles_shp(multi=exportDict)

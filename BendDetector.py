@@ -74,6 +74,18 @@ class BendDetector():
     def now(self):
         return datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    def get_triangle_geoms(self, triangle_ids=[]):
+        if triangle_ids == []:
+            triangle_ids = self.triangles.keys()
+
+        geoms = []
+
+        for triangleId in triangle_ids:
+            triangleGeom = self.triangle_geom(triangleId)
+            geoms.append([triangleGeom])
+
+        return geoms
+
     def export_triangles_shp(self, triangle_ids=[], name='tris', multi=None):
         # multi = { 'name': {triangle_ids} }
         if len(triangle_ids) == 0:
@@ -212,7 +224,7 @@ class BendDetector():
             # print(triangleId, self.triangles[triangleId])
             triangleVertices = self.triangles[triangleId]['vertices']
 
-            print('\n', triangleId, triangleVertices)
+            # print('\n', triangleId, triangleVertices)
 
             leftOfSegment = False
             rightOfSegment = False
@@ -234,7 +246,7 @@ class BendDetector():
                     edgeLengths.append(edgeLength)
             # print(rightOfSegment, leftOfSegment)
 
-            print('edgeLengths: ', edgeLengths)
+            # print('edgeLengths: ', edgeLengths)
 
             if len(edgeLengths) == 1:
                 # triangle bounded by two iso-segments
@@ -253,11 +265,11 @@ class BendDetector():
                 isoLine = [self.get_point(vId) for vId in isoSeg]
                 isoLineXs = [isoLine[0][0], isoLine[1][0]]
                 isoLineYs = [isoLine[0][1], isoLine[1][1]]
-                print('isoLine: ', isoLine)
+                # print('isoLine: ', isoLine)
 
                 openPoint = list(set(triangleVertices).difference(isoSeg))
                 openPointVals = self.get_point(openPoint[0])
-                print(openPoint, openPointVals)
+                # print(openPoint, openPointVals)
 
                 # https://stackoverflow.com/a/49073142
                 # project point onto line segment
@@ -269,14 +281,14 @@ class BendDetector():
                 P = u + n*np.dot(x - u, n)
 
                 projectedPoint = [P[0], P[1]]
-                print('projectedPoint: ', projectedPoint)
+                # print('projectedPoint: ', projectedPoint)
 
                 if min(isoLineXs) <= projectedPoint[0] <= max(isoLineXs) and min(isoLineYs) <= projectedPoint[1] <= max(isoLineYs):
-                    print('projected on line')
+                    # print('projected on line')
                     minDistance = self.distance_between_points(openPointVals, projectedPoint)
                     # print(minDistance)
                 else:
-                    print('projected outside line')
+                    # print('projected outside line')
                     # print(min(edgeLengths))
                     minDistance = min(edgeLengths)
 
@@ -570,7 +582,7 @@ class BendDetector():
         # print(polyPath)
 
         if not self.closed:
-            print(self.geom, self.nrVertices, self.nrSegments)
+            # print(self.geom, self.nrVertices, self.nrSegments)
             vertexHeader = '{} 2 0 1\n'.format(self.nrVertices)
             segmentHeader = '{} 1\n'.format(self.nrSegments)
             holeHeader = '{}\n'.format(0)
