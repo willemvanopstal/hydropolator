@@ -72,12 +72,12 @@ projectObject.generate_isobaths5()
 
 paramDict = {'prepass': 0,
              'densification': 0,
-             'angularity_threshold': 1.0,
+             'angularity_threshold': 2.0,
              'spurgully_threshold': None,
-             'spur_threshold': 10,
-             'gully_threshold': 15,
+             'spur_threshold': 0.1,
+             'gully_threshold': 0.1,
              'process': [],
-             'maxiter': 5
+             'maxiter': 1
              }
 # prepass if always first if >0
 # 'r' defines rings around extracted triangle
@@ -87,7 +87,7 @@ paramDict = {'prepass': 0,
 # [>0] defines the repeated amount per process, so if [1] the process-line is only done once
 paramDict['process'] = [[['angularity', 'r', 1], ['spurs', 'r', 1], ['gullys', 'r', 1], 2],
                         [['angularity', 'r', 2], ['spurs', 'r', 2], ['gullys', 'r', 2], 1],
-                        [['angularity', 'r', 4], ['spurs', 'r', 4], ['gullys', 'r', 4], 1],
+                        [['angularity', 'r', 4], 1],
                         ]
 
 startTime = datetime.now()
@@ -145,8 +145,8 @@ print('elapsed time: ', endTime - startTime)
 
 # projectObject.export_all_isobaths()
 # projectObject.export_depth_areas()  # nodeIds=innerNodes)
-# projectObject.export_all_node_triangles()
-# projectObject.export_all_edge_triangles()
+projectObject.export_all_node_triangles()
+projectObject.export_all_edge_triangles()
 # projectObject.export_shapefile('output')
 # projectObject.export_statistics()
 

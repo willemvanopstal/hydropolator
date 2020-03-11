@@ -3584,7 +3584,7 @@ class Hydropolator:
         self.build_graph2()
         # self.print_graph()
 
-        return True
+        return True, len(allChangedVertices)
 
     def smooth_vertices_helper2(self, vertexSet):
 
@@ -3618,7 +3618,7 @@ class Hydropolator:
 
         if len(changedTriangles) == 0:
             print('no triangles were changed in interval, returning without updating!')
-            return
+            return False
 
         # we need to update the entire node, so lets get all triangles in each node
         trianglesToBeDeleted = set()
@@ -3685,6 +3685,8 @@ class Hydropolator:
 
         # self.print_graph()
         # self.make_network_graph()
+
+        return True, len(allChangedVertices)
 
     def smooth_vertices_helper(self, vertexSet):
         # contains pointers per triangle to which nodes it belonged to previously
@@ -4321,7 +4323,7 @@ class Hydropolator:
             # print(processList)
 
             while process and routine:
-                print('executing process..', iterations)
+                self.msg('executing process, iteration: {}'.format(iterations), 'info')
 
                 self.generate_isobaths5()
                 if statistics:
@@ -4393,6 +4395,12 @@ class Hydropolator:
 
                 verticesToUpdate = self.get_vertices_from_triangles(extendedConflictingTriangles)
                 print('verticesToUpdate ', len(verticesToUpdate))
+
+                # verticesAreUpdated, numberUpdatedVertices = self.smooth_vertices_helper2(
+                #     verticesToUpdate)
+                verticesAreUpdated, numberUpdatedVertices = self.simple_smooth_and_rebuild(
+                    verticesToUpdate)
+                print('something updated: ', verticesAreUpdated, numberUpdatedVertices)
 
                 iterations += 1
                 if iterations >= paramDict['maxiter']:
