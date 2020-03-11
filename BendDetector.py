@@ -347,7 +347,7 @@ class BendDetector():
             # print(triangleId, self.triangles[triangleId])
             triangleVertices = self.triangles[triangleId]['vertices']
 
-            print(triangleId, triangleVertices)
+            # print(triangleId, triangleVertices)
 
             leftOfSegment = False
             rightOfSegment = False
@@ -365,7 +365,7 @@ class BendDetector():
                     edgeLengths.append(edgeLength)
             # print(rightOfSegment, leftOfSegment)
 
-            print('edgeLengths: ', edgeLengths)
+            # print('edgeLengths: ', edgeLengths)
 
             if leftOfSegment:
                 # deeper than contour, gully
@@ -442,7 +442,7 @@ class BendDetector():
         foundThree = False
         for triangleId in allTriangles:
             if self.has_three_neighbors(triangleId):
-                print(triangleId)
+                # print(triangleId)
                 # three-side tri is always valid, no overlap with isobath
                 validTriangles.add(triangleId)
                 validQueue.add(triangleId)
@@ -453,7 +453,7 @@ class BendDetector():
         if not foundThree:
             for triangleId in allTriangles:
                 if self.number_neighbors(triangleId) == 2:
-                    print(triangleId)
+                    # print(triangleId)
                     validQueue.add(triangleId)
                     break
 
@@ -668,7 +668,7 @@ class BendDetector():
         FNULL = open(os.devnull, 'w')
 
         runCommand = './triangle -pcn "{}"'.format(pathToFile)
-        print(runCommand)
+        # print(runCommand)
         subprocess.run(runCommand, shell=True, stdout=FNULL)
 
     def parse_output(self, inputPath):

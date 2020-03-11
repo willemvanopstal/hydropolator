@@ -3,7 +3,7 @@
 # @Email:  willemvanopstal home nl
 # @Project: Hydropolator
 # @Last modified by:   Bonny
-# @Last modified time: 09-Mar-2020
+# @Last modified time: 11-Mar-2020
 
 
 from ElevationDict import ElevationDict
@@ -3059,20 +3059,24 @@ class Hydropolator:
             self.compute_isobath_area(edgeIds=[edge])
 
             if not edgeObject['closed']:
-                print('not closed isobath, checking convex hull')
+                # print('not closed isobath, checking convex hull')
 
-                print(startSegment, endSegment)
+                # print(startSegment, endSegment)
 
                 if type(startSegment) == int:
-                    print(self.triangulation.is_vertex_convex_hull(startSegment))
+                    # print(self.triangulation.is_vertex_convex_hull(startSegment))
+                    pass
                 else:
-                    print('first ', self.triangulation.is_vertex_convex_hull(startSegment[0]))
-                    print('second ', self.triangulation.is_vertex_convex_hull(startSegment[1]))
+                    # print('first ', self.triangulation.is_vertex_convex_hull(startSegment[0]))
+                    # print('second ', self.triangulation.is_vertex_convex_hull(startSegment[1]))
+                    pass
                 if type(endSegment) == int:
-                    print(self.triangulation.is_vertex_convex_hull(endSegment))
+                    # print(self.triangulation.is_vertex_convex_hull(endSegment))
+                    pass
                 else:
-                    print('first ', self.triangulation.is_vertex_convex_hull(endSegment[0]))
-                    print('second ', self.triangulation.is_vertex_convex_hull(endSegment[1]))
+                    # print('first ', self.triangulation.is_vertex_convex_hull(endSegment[0]))
+                    # print('second ', self.triangulation.is_vertex_convex_hull(endSegment[1]))
+                    pass
 
     def create_simple_iso_geom(self, edgeId):
         edgeObject = self.graph['edges'][edgeId]
@@ -3522,7 +3526,7 @@ class Hydropolator:
 
         ring = 0
         while ring < rings:
-            print('ring: ', ring)
+            # print('ring: ', ring)
 
             for triangle in allTriangles.copy():
                 # print(triangle)
@@ -3533,7 +3537,7 @@ class Hydropolator:
 
             ring += 1
 
-        print(len(allTriangles))
+        # print(len(allTriangles))
         return allTriangles
 
     def get_vertices_from_triangles(self, triangles):
@@ -3823,7 +3827,7 @@ class Hydropolator:
 
                 self.graph['edges'][edgeId]['iso_area'] = round(isoArea, 3)
 
-    def check_spurs_gullys(self, edgeIds=[], threshold=None, spurThreshold=None, gullyThreshold=None):
+    def check_spurs_gullys_2(self, edgeIds=[], threshold=None, spurThreshold=None, gullyThreshold=None):
 
         if not len(edgeIds):
             # get all edges
@@ -3831,6 +3835,8 @@ class Hydropolator:
 
         spurgullyPoints = set()
         spurGullyDict = {}
+        spursDict = {}
+        gullyDict = {}
         allGeoms = []
 
         if not threshold and not spurThreshold and not gullyThreshold:
@@ -3862,12 +3868,82 @@ class Hydropolator:
             geomSummary.append(gullyGeoms)
             allGeoms.append(geomSummary)
 
+            spurVertices = edge['bend_detector'].get_vertices_from_triangles(spurs)
+            gullyVertices = edge['bend_detector'].get_vertices_from_triangles(gullys)
+
+            # allInvalidTriangles = spurs.union(gullys)
+            # invalidIsoVertices = edge['bend_detector'].get_vertices_from_triangles(
+            #     allInvalidTriangles)
+            # spurgullyPoints.update(invalidIsoVertices)
+
+            # spurGullyDict[edgeId] = invalidIsoVertices
+
+            spursDict[edgeId] = spurVertices
+            gullyDict[edgeId] = gullyVertices
+
+        # self.export_spur_gully_geoms(allGeoms)
+
+        return spursDict, gullyDict
+
+        # exportDict = {'spurs': spurs, 'gullys': gullys}
+        # edge['bend_detector'].export_triangles_shp(multi=exportDict)
+        # edgeBends = BendDetector(edgeId, edge, self.projectName)
+
+        pass
+
+    def check_spurs_gullys(self, edgeIds=[], threshold=None, spurThreshold=None, gullyThreshold=None):
+
+        if not len(edgeIds):
+            # get all edges
+            edgeIds = self.graph['edges'].keys()
+
+        spurgullyPoints = set()
+        spurGullyDict = {}
+        spursDict = {}
+        gullyDict = {}
+        allGeoms = []
+
+        if not threshold and not spurThreshold and not gullyThreshold:
+            print('please define a threshold for the spurs and gullies')
+            # return set(), set()  # at least return something valid, handy for iterating later
+
+        if threshold and not spurThreshold:
+            spurThreshold = threshold
+        if threshold and not gullyThreshold:
+            gullyThreshold = threshold
+
+        for edgeId in edgeIds:
+            edge = self.graph['edges'][edgeId]
+            edge['bend_detector'] = BendDetector(edgeId, edge, self.projectName)
+            edge['bend_detector'].write_poly_file()
+            edge['bend_detector'].triangulate()
+
+            spurs, gullys = edge['bend_detector'].get_spurs_and_gullys2(
+                gully_threshold=gullyThreshold, spur_threshold=spurThreshold)
+
+            # exportDict = {'spurs': spurs, 'gullys': gullys}
+            # edge['bend_detector'].export_triangles_shp(multi=exportDict)
+
+            geomSummary = []
+            spurGeoms = edge['bend_detector'].get_triangle_geoms(spurs)
+            gullyGeoms = edge['bend_detector'].get_triangle_geoms(gullys)
+            geomSummary.append(edgeId)
+            geomSummary.append(spurGeoms)
+            geomSummary.append(gullyGeoms)
+            allGeoms.append(geomSummary)
+
+            spurVertices = edge['bend_detector'].get_vertices_from_triangles(spurs)
+            gullyVertices = edge['bend_detector'].get_vertices_from_triangles(gullys)
+
             allInvalidTriangles = spurs.union(gullys)
             invalidIsoVertices = edge['bend_detector'].get_vertices_from_triangles(
                 allInvalidTriangles)
             spurgullyPoints.update(invalidIsoVertices)
 
             spurGullyDict[edgeId] = invalidIsoVertices
+
+            spursDict[edgeId] = spurVertices
+            gullyDict[edgeId] = gullyVertices
 
         self.export_spur_gully_geoms(allGeoms)
 
@@ -4195,6 +4271,138 @@ class Hydropolator:
             isoSegFile.write(isoseg_header + '\n')
             for isoRow in isoseg_rows:
                 isoSegFile.write(isoRow + '\n')
+
+    # ====================================== #
+    #
+    #   Routine
+    #
+    # ====================================== #
+
+    def start_routine(self, paramDict, statistics=False):
+
+        self.msg('> starting routine...', 'header')
+
+        # for param in paramDict.keys():
+        #     print(param, paramDict[param])
+
+        spurgully_threshold = paramDict['spurgully_threshold']
+        spur_threshold = paramDict['spur_threshold']
+        gully_threshold = paramDict['gully_threshold']
+        angularity_threshold = paramDict['angularity_threshold']
+
+        iterations = 0
+
+        # PREPASS
+        for prepassIteration in range(paramDict['prepass']):
+            self.msg('> prepass {}'.format(iterations), 'info')
+
+            if statistics:
+                self.generate_isobaths5()
+                self.generate_statistics()
+
+            allVertices = self.vertices[1:]
+            self.smooth_vertices_helper2(allVertices)
+
+            iterations += 1
+
+        # REST OF PROCESS
+        routine = True
+        process = True
+        processNumber = 0
+        while routine:
+
+            if processNumber >= len(paramDict['process']):
+                self.msg('> no process left', 'info')
+                break
+
+            processStartIteration = iterations
+            processList = paramDict['process'][processNumber]
+            print('process number: ', processNumber)
+            # print(processList)
+
+            while process and routine:
+                print('executing process..', iterations)
+
+                self.generate_isobaths5()
+                if statistics:
+                    self.generate_statistics()
+
+                # Conflicting triangles
+                conflictingTriangles = set()
+                conflictingVertices = set()
+                extendedConflictingTriangles = set()
+                extendedConflictingVertices = set()
+                verticesToUpdate = set()
+
+                # Calculate metrics
+                spurGullyCalculated = False
+                for metricDefinition in processList[:-1]:
+                    print(metricDefinition)
+
+                    if metricDefinition[0] == 'angularity':
+                        sharpPointsDict, allSharpPoints = self.check_isobath_angularity(
+                            threshold=angularity_threshold)
+                        sharp_conflictingTriangles = self.get_all_immediate_triangles(
+                            sharpPointsDict)
+                        if metricDefinition[1] == 'r':
+                            sharp_extendedConflictingTriangles = self.get_triangle_rings_around_triangles(
+                                sharp_conflictingTriangles, rings=metricDefinition[2])
+                        elif metricDefinition[1] == 'n':
+                            pass
+                        elif metricDefinition[1] == 'nn':
+                            pass
+                        conflictingTriangles.update(sharp_conflictingTriangles)
+                        extendedConflictingTriangles.update(sharp_extendedConflictingTriangles)
+
+                    elif metricDefinition[0] == 'spurs':
+                        if not spurGullyCalculated:
+                            spursDict, gullyDict = self.check_spurs_gullys_2(
+                                threshold=spurgully_threshold, spurThreshold=spur_threshold, gullyThreshold=gully_threshold)
+                            spurGullyCalculated = True
+                        spurs_conflictingTriangles = self.get_all_immediate_triangles(
+                            spursDict)
+                        if metricDefinition[1] == 'r':
+                            spurs_extendedConflictingTriangles = self.get_triangle_rings_around_triangles(
+                                spurs_conflictingTriangles, rings=metricDefinition[2])
+                        elif metricDefinition[1] == 'n':
+                            pass
+                        elif metricDefinition[1] == 'nn':
+                            pass
+                        conflictingTriangles.update(spurs_conflictingTriangles)
+                        extendedConflictingTriangles.update(spurs_extendedConflictingTriangles)
+
+                    elif metricDefinition[0] == 'gullys':
+                        if not spurGullyCalculated:
+                            spursDict, gullyDict = self.check_spurs_gullys_2(
+                                threshold=spurgully_threshold, spurThreshold=spur_threshold, gullyThreshold=gully_threshold)
+                            spurGullyCalculated = True
+                        gully_conflictingTriangles = self.get_all_immediate_triangles(
+                            gullyDict)
+                        if metricDefinition[1] == 'r':
+                            gully_extendedConflictingTriangles = self.get_triangle_rings_around_triangles(
+                                gully_conflictingTriangles, rings=metricDefinition[2])
+                        elif metricDefinition[1] == 'n':
+                            pass
+                        elif metricDefinition[1] == 'nn':
+                            pass
+                        conflictingTriangles.update(gully_conflictingTriangles)
+                        extendedConflictingTriangles.update(gully_extendedConflictingTriangles)
+
+                print('conflictingTriangles ', len(conflictingTriangles))
+                print('extendedConflictingTriangles ', len(extendedConflictingTriangles))
+
+                verticesToUpdate = self.get_vertices_from_triangles(extendedConflictingTriangles)
+                print('verticesToUpdate ', len(verticesToUpdate))
+
+                iterations += 1
+                if iterations >= paramDict['maxiter']:
+                    self.msg('> max iterations exceeded', 'info')
+                    routine = False
+                    break
+                if iterations - processStartIteration >= processList[-1]:
+                    self.msg('> max process iteration, next process', 'info')
+                    processNumber += 1
+                    break
 
     # ==================================================================== #
     #

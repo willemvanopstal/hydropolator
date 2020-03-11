@@ -66,38 +66,39 @@ projectObject.set_iso_seg_bins(isoLengthBreakpoints)
 projectObject.generate_regions()
 projectObject.build_graph2()
 
-
-projectObject.export_all_node_triangles()
-projectObject.export_all_edge_triangles()
+# projectObject.export_all_node_triangles()
+# projectObject.export_all_edge_triangles()
 projectObject.generate_isobaths5()
 
-# spurGullyDict, allSpurGullyPoints = projectObject.check_spurs_gullys(
-#     edgeIds=[], threshold=10, spurThreshold=None, gullyThreshold=None)
-# print('sgully length: ', len(allSpurGullyPoints))
+paramDict = {'prepass': 0,
+             'densification': 0,
+             'angularity_threshold': 1.0,
+             'spurgully_threshold': None,
+             'spur_threshold': 10,
+             'gully_threshold': 15,
+             'process': [],
+             'maxiter': 5
+             }
+# prepass if always first if >0
+# 'r' defines rings around extracted triangle
+# 'n' will define the entire node should be smoothened
+# 'nn' will define neighboruing nodes
+# [0] defines the process step is stopped if no vertices are updated anymore
+# [>0] defines the repeated amount per process, so if [1] the process-line is only done once
+paramDict['process'] = [[['angularity', 'r', 1], ['spurs', 'r', 1], ['gullys', 'r', 1], 2],
+                        [['angularity', 'r', 2], ['spurs', 'r', 2], ['gullys', 'r', 2], 1],
+                        [['angularity', 'r', 4], ['spurs', 'r', 4], ['gullys', 'r', 4], 1],
+                        ]
 
 startTime = datetime.now()
 
-sharpPointsDict, allSharpPoints = projectObject.check_isobath_angularity(edgeIds=[], threshold=1.0)
-print('sharp points: ', len(allSharpPoints))
-sharpTriangles = projectObject.get_all_immediate_triangles(sharpPointsDict)
-sharpTriangleVertices = projectObject.get_vertices_from_triangles(sharpTriangles)
-
-projectObject.simple_smooth_and_rebuild(sharpTriangleVertices)
-
-endTime = datetime.now()
-print('elapsed time: ', endTime - startTime)
-
-projectObject.generate_isobaths5()
-
-
-startTime = datetime.now()
-
-sharpPointsDict, allSharpPoints = projectObject.check_isobath_angularity(edgeIds=[], threshold=1.0)
-print('sharp points: ', len(allSharpPoints))
-sharpTriangles = projectObject.get_all_immediate_triangles(sharpPointsDict)
-sharpTriangleVertices = projectObject.get_vertices_from_triangles(sharpTriangles)
-
-projectObject.smooth_vertices_helper2(sharpTriangleVertices)
+projectObject.start_routine(paramDict, statistics=False)
+# sharpPointsDict, allSharpPoints = projectObject.check_isobath_angularity(edgeIds=[], threshold=1.0)
+# print('sharp points: ', len(allSharpPoints))
+# sharpTriangles = projectObject.get_all_immediate_triangles(sharpPointsDict)
+# sharpTriangleVertices = projectObject.get_vertices_from_triangles(sharpTriangles)
+#
+# projectObject.smooth_vertices_helper2(sharpTriangleVertices)
 
 endTime = datetime.now()
 print('elapsed time: ', endTime - startTime)
@@ -144,9 +145,9 @@ print('elapsed time: ', endTime - startTime)
 
 # projectObject.export_all_isobaths()
 # projectObject.export_depth_areas()  # nodeIds=innerNodes)
-projectObject.export_all_node_triangles()
-projectObject.export_all_edge_triangles()
-projectObject.export_shapefile('output')
+# projectObject.export_all_node_triangles()
+# projectObject.export_all_edge_triangles()
+# projectObject.export_shapefile('output')
 # projectObject.export_statistics()
 
 
