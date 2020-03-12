@@ -3047,6 +3047,20 @@ class Hydropolator:
             # print('min: {}  max: {}'.format(minTriangleId, maxTriangleId))
             edgeObject['minmax_order'] = [minTriangleId, maxTriangleId]
 
+            startFalse = True
+            while startFalse:
+                if edgeObject['ordered_triangles'][str(minTriangleId)]['tri_segment']:
+                    startFalse = False
+                else:
+                    print('non valid start segment')
+                    minTriangleId = minTriangleId + 1
+            endFalse = True
+            while endFalse:
+                if edgeObject['ordered_triangles'][str(maxTriangleId)]['tri_segment']:
+                    endFalse = False
+                else:
+                    print('non valid end segment')
+                    maxTriangleId = maxTriangleId - 1
             startSegment = edgeObject['ordered_triangles'][str(minTriangleId)]['tri_segment'][0]
             endSegment = edgeObject['ordered_triangles'][str(maxTriangleId)]['tri_segment'][1]
             # print(startSegment, endSegment)
@@ -3724,7 +3738,77 @@ class Hydropolator:
               * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / d
         uy = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by)
               * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / d
+        ux = round(ux, 3)
+        uy = round(uy, 3)
         return (ux, uy)
+
+    def simple_densify_and_rebuild(self, trianglesToDensify):
+        self.msg('> densifying {} triangles'.format(len(trianglesToDensify)), 'info')
+
+        circumCenters = set()
+        newPoints = list()
+
+        for triangle in trianglesToDensify:
+            circumCenter = self.circumcenter(triangle)
+            circumTriangle = self.triangulation.locate(circumCenter[0], circumCenter[1])
+            if circumTriangle == []:
+                # outside convex hull
+                # print('is outside convex hull')
+                continue
+            convexHull = False
+            for vId in circumTriangle:
+                if self.triangulation.is_vertex_convex_hull(vId):
+                    convexHull = True
+                    break
+            if convexHull:
+                # wont add a point in a triangle adjacent to convex hull,
+                # we cannot interpolate there
+                # print('is convex hull triangle')
+                continue
+
+            # now we have a valid triangle to insert a new point
+            # just use 5 rings to make sure we have a complete voronoi?
+            # TODO
+            circumTriangle = tuple(self.pseudo_triangle(circumTriangle))
+            neighborhoodTriangles = self.get_triangle_rings_around_triangles(
+                [circumTriangle], rings=5)
+            neighborhoodVertices = self.get_vertices_from_triangles(neighborhoodTriangles)
+
+            tempVerticesList = []
+            for tempVertex in neighborhoodVertices:
+                tvPoint = self.triangulation.get_point(tempVertex)
+                tvElevation = self.get_z(tempVertex, idOnly=True)
+                tvX, tvY = tvPoint[0], tvPoint[1]
+
+                tempVerticesList.append([tvX, tvY, tvElevation])
+
+            tempTriangulation = startin.DT()
+            tempTriangulation.insert(tempVerticesList)
+            interpolatedValue = tempTriangulation.interpolate_laplace(
+                circumCenter[0], circumCenter[1])
+            interpolatedValue = round(interpolatedValue, 3)
+            del tempTriangulation
+
+            # print('interpolated: ', interpolatedValue)
+
+            newPoints.append([circumCenter[0], circumCenter[1], interpolatedValue])
+            self.pointQueue.append([circumCenter[0], circumCenter[1], interpolatedValue])
+
+        # print(newPoints)
+        # self.pointQueue.append(point)
+        self.pointCount += 1
+
+        self.triangulation_insert()
+
+        # delete entire graph
+        self.graph = {'nodes': {}, 'edges': {}, 'shallowestNodes': set(), 'deepestNodes': set()}
+        self.triangleInventory = dict()
+        self.nrNodes = 0
+        self.nrEdges = 0
+        self.generate_regions()
+
+        # rebuild graph
+        self.build_graph2()
 
     # ====================================== #
     #
@@ -4470,8 +4554,8 @@ class Hydropolator:
             self.msg('\n> densification {}'.format(iterations), 'info')
             iterations += 1
 
+            self.generate_isobaths5()
             if statistics:
-                self.generate_isobaths5()
                 self.generate_statistics()
 
             edgeTriangles = set()

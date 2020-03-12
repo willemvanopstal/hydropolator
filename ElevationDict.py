@@ -8,8 +8,9 @@ class ElevationDict:
         pass
 
     def add_new(self, vertex_tuple):
-        self.elevationDict[tuple(vertex_tuple)] = {
-            'z': vertex_tuple[2], 'z_original': vertex_tuple[2], 'previous_z': None}
+        if not tuple(vertex_tuple) in self.elevationDict:
+            self.elevationDict[tuple(vertex_tuple)] = {
+                'z': vertex_tuple[2], 'z_original': vertex_tuple[2], 'previous_z': None}
 
     def update_z(self, vertex_tuple, new_z):
         # self.elevationDict[tuple(vertex_tuple)]['previous_z'] = self.get_z(vertex_tuple)

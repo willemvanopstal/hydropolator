@@ -144,14 +144,14 @@ print('elapsed time: ', endTime - startTime)
 
 # projectObject.print_graph()
 
-# projectObject.generate_isobaths5(edgeIds=[])
+projectObject.generate_isobaths5()
 # projectObject.generate_statistics()
 
 ###############################
 # Exporting shapefiles
 ###############################
 
-# projectObject.export_all_isobaths()
+projectObject.export_all_isobaths()
 # projectObject.export_depth_areas()  # nodeIds=innerNodes)
 projectObject.export_all_node_triangles()
 projectObject.export_all_edge_triangles()
