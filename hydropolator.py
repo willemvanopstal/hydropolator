@@ -3,7 +3,7 @@
 # @Email:  willemvanopstal home nl
 # @Project: Hydropolator
 # @Last modified by:   Bonny
-# @Last modified time: 11-Mar-2020
+# @Last modified time: 12-Mar-2020
 
 
 from ElevationDict import ElevationDict
@@ -3567,7 +3567,7 @@ class Hydropolator:
         # may again smooth the vertices?
 
         if len(allChangedVertices) == 0:
-            return False
+            return False, len(allChangedVertices)
 
         # remove previous_z because region graph is built again
         for changedVertex in allChangedVertices:
@@ -3737,12 +3737,22 @@ class Hydropolator:
         pass
 
     def angularity(self, ptHead, ptMid, ptTail):
+        # print(ptHead, ptMid, ptTail)
         dx1, dy1 = ptMid[0] - ptHead[0], ptMid[1] - ptHead[1]
         dx2, dy2 = ptTail[0] - ptMid[0], ptTail[1] - ptMid[1]
         inner_product = dx1*dx2 + dy1*dy2
         len1 = math.hypot(dx1, dy1)
         len2 = math.hypot(dx2, dy2)
-        return round(math.acos(inner_product/(len1*len2)), 4)
+        # TODO redo this function, to much problems
+        if len1 == 0 or len2 == 0:
+            return 0.0
+        else:
+            splitted = inner_product/(len1*len2)
+            if splitted > 1.0:
+                splitted = 1.0
+            elif splitted < 1.0:
+                splitted = -1.0
+            return round(math.acos(splitted), 4)
 
     def check_isobath_angularity(self, edgeIds=[], threshold=3.14):
         if not len(edgeIds):
@@ -4314,16 +4324,16 @@ class Hydropolator:
         while routine:
 
             if processNumber >= len(paramDict['process']):
-                self.msg('> no process left', 'info')
+                self.msg('> no process left', 'warning')
                 break
 
             processStartIteration = iterations
             processList = paramDict['process'][processNumber]
-            print('process number: ', processNumber)
+            print('\nprocess number: ', processNumber)
             # print(processList)
 
             while process and routine:
-                self.msg('executing process, iteration: {}'.format(iterations), 'info')
+                self.msg('\nexecuting process, iteration: {}'.format(iterations), 'info')
 
                 self.generate_isobaths5()
                 if statistics:
@@ -4404,11 +4414,15 @@ class Hydropolator:
 
                 iterations += 1
                 if iterations >= paramDict['maxiter']:
-                    self.msg('> max iterations exceeded', 'info')
+                    self.msg('> max iterations exceeded', 'warning')
                     routine = False
                     break
-                if iterations - processStartIteration >= processList[-1]:
-                    self.msg('> max process iteration, next process', 'info')
+                if processList[-1] > 0 and iterations - processStartIteration >= processList[-1]:
+                    self.msg('> max process iteration, next process', 'warning')
+                    processNumber += 1
+                    break
+                if not verticesAreUpdated:
+                    self.msg('> no updated vertices !', 'warning')
                     processNumber += 1
                     break
 

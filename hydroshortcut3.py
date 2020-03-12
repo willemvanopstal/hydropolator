@@ -72,12 +72,12 @@ projectObject.generate_isobaths5()
 
 paramDict = {'prepass': 0,
              'densification': 0,
-             'angularity_threshold': 2.0,
+             'angularity_threshold': 1.5,
              'spurgully_threshold': None,
-             'spur_threshold': 0.1,
-             'gully_threshold': 0.1,
+             'spur_threshold': 5,
+             'gully_threshold': 5,
              'process': [],
-             'maxiter': 1
+             'maxiter': 100
              }
 # prepass if always first if >0
 # 'r' defines rings around extracted triangle
@@ -85,9 +85,9 @@ paramDict = {'prepass': 0,
 # 'nn' will define neighboruing nodes
 # [0] defines the process step is stopped if no vertices are updated anymore
 # [>0] defines the repeated amount per process, so if [1] the process-line is only done once
-paramDict['process'] = [[['angularity', 'r', 1], ['spurs', 'r', 1], ['gullys', 'r', 1], 2],
-                        [['angularity', 'r', 2], ['spurs', 'r', 2], ['gullys', 'r', 2], 1],
-                        [['angularity', 'r', 4], 1],
+paramDict['process'] = [[['angularity', 'r', 1], ['spurs', 'r', 1], ['gullys', 'r', 1], 0],
+                        [['angularity', 'r', 2], ['spurs', 'r', 2], ['gullys', 'r', 2], 0],
+                        [['angularity', 'r', 4], 3],
                         ]
 
 startTime = datetime.now()
