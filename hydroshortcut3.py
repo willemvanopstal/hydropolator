@@ -71,13 +71,16 @@ projectObject.build_graph2()
 projectObject.generate_isobaths5()
 
 paramDict = {'prepass': 0,
-             'densification': 0,
-             'angularity_threshold': 1.5,
+             'angularity_threshold': 3.1,
              'spurgully_threshold': None,
-             'spur_threshold': 5,
-             'gully_threshold': 5,
+             'spur_threshold': 0.005,
+             'gully_threshold': 0.005,
              'process': [],
-             'maxiter': 100
+             'maxiter': 2,
+             'densification': 1,
+             'densification_process': [],
+             'aspect_threshold': 4,
+             'size_threshold': 60
              }
 # prepass if always first if >0
 # 'r' defines rings around extracted triangle
@@ -89,6 +92,11 @@ paramDict['process'] = [[['angularity', 'r', 1], ['spurs', 'r', 1], ['gullys', '
                         [['angularity', 'r', 2], ['spurs', 'r', 2], ['gullys', 'r', 2], 0],
                         [['angularity', 'r', 4], 3],
                         ]
+paramDict['densification_process'] = [['angularity', 'r', 1],
+                                      ['aspect-edges', 'r', 0],
+                                      ['size-edges', 'r', 0]
+                                      ]
+
 
 startTime = datetime.now()
 
