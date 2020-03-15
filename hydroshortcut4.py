@@ -1,3 +1,4 @@
+import os
 from Hydropolator import Hydropolator
 from datetime import datetime
 import math
@@ -45,14 +46,23 @@ isoLengthBreakpoints = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
 # Project management
 ###############################
 
-# possibly initiate new project
-# projectObject.init_project(projectName)
-# projectObject.load_pointfile(surveyData, 'csv', ' ', flip=True)
+cwd = os.getcwd()
+projectsDir = os.path.join(cwd, 'projects')
+projectDir = os.path.join(projectsDir, projectName)
+projectExists = os.path.isdir(projectDir)
 
-# comment this if initiating
-if projectObject.load_project(projectName) is True:
-    msg('> loaded project', 'header')
-    projectObject.summarize_project()
+if projectExists:
+    if projectObject.load_project(projectName) is True:
+        msg('> loaded project', 'header')
+        projectObject.summarize_project()
+else:
+    msg('> init new project', 'header')
+    projectObject.init_project(projectName)
+    projectObject.load_pointfile(surveyData, 'csv', ' ', flip=True)
+
+###############################
+# Set statistics
+###############################
 
 projectObject.set_sharp_points_bins(sharpPointsBreakpoints)
 projectObject.set_abs_change_bins(absoluteChangedPointsBreakpoints)
@@ -60,25 +70,18 @@ projectObject.set_min_change_bins(minChangedPointsBreakpoints)
 projectObject.set_iso_seg_bins(isoLengthBreakpoints)
 
 ###############################
-# Process
+# Process parameters
 ###############################
 
-projectObject.generate_regions()
-projectObject.build_graph2()
-
-# projectObject.export_all_node_triangles()
-# projectObject.export_all_edge_triangles()
-projectObject.generate_isobaths5()
-
 paramDict = {'prepass': 0,
-             'densification': 1,
+             'densification': 0,
              'process': [],
              'densification_process': [],
-             'maxiter': 2,
-             'angularity_threshold': 3.1,
+             'maxiter': 120,
+             'angularity_threshold': 1.0,
              'spurgully_threshold': None,
-             'spur_threshold': 0.005,
-             'gully_threshold': 0.005,
+             'spur_threshold': 15,
+             'gully_threshold': 25,
              'aspect_threshold': 4,
              'size_threshold': 60
              }
@@ -88,10 +91,7 @@ paramDict = {'prepass': 0,
 # 'nn' will define neighboruing nodes
 # [0] defines the process step is stopped if no vertices are updated anymore
 # [>0] defines the repeated amount per process, so if [1] the process-line is only done once
-paramDict['process'] = [[['angularity', 'r', 1],
-                         ['spurs', 'r', 1],
-                         ['gullys', 'r', 1],
-                         0],
+paramDict['process'] = [[['angularity', 'r', 1], ['spurs', 'r', 1], ['gullys', 'r', 1], 0],
                         [['angularity', 'r', 2], ['spurs', 'r', 2], ['gullys', 'r', 2], 0],
                         [['angularity', 'r', 4], 3],
                         ]
@@ -100,55 +100,26 @@ paramDict['densification_process'] = [['angularity', 'r', 1],
                                       ['size-edges', 'r', 0]
                                       ]
 
+###############################
+# Process
+###############################
+
+projectObject.generate_regions()
+projectObject.build_graph2()
+
+projectObject.generate_isobaths5()
+
 
 startTime = datetime.now()
 
 projectObject.start_routine(paramDict, statistics=False)
-# sharpPointsDict, allSharpPoints = projectObject.check_isobath_angularity(edgeIds=[], threshold=1.0)
-# print('sharp points: ', len(allSharpPoints))
-# sharpTriangles = projectObject.get_all_immediate_triangles(sharpPointsDict)
-# sharpTriangleVertices = projectObject.get_vertices_from_triangles(sharpTriangles)
-#
-# projectObject.smooth_vertices_helper2(sharpTriangleVertices)
 
 endTime = datetime.now()
 print('elapsed time: ', endTime - startTime)
 
 
-# for i in range(50):
-#     projectObject.generate_isobaths5(edgeIds=[])
-#     projectObject.generate_statistics()
-#
-#     sharpPointsDict, allSharpPoints = projectObject.check_isobath_angularity(
-#         edgeIds=[], threshold=1.0)
-#     immediateTriangles = projectObject.get_all_immediate_triangles(sharpPointsDict)
-#     ringTriangles = projectObject.get_triangle_rings_around_triangles(immediateTriangles, rings=1)
-#     ringVertices = projectObject.get_vertices_from_triangles(ringTriangles)
-#     print('len vertices: ', len(ringVertices))
-#     verticesAreUpdated = projectObject.simple_smooth_and_rebuild(ringVertices)
-#
-#     if not verticesAreUpdated:
-#         break
-
-# projectObject.export_triangles(list(immediateTriangles), 'immediateTriangles')
-# projectObject.export_points(allSharpPoints, 'sharpPoints')
-#
-# ringTriangles = projectObject.get_triangle_rings_around_triangles(immediateTriangles, rings=1)
-# projectObject.export_triangles(list(ringTriangles), 'ringTriangles')
-#
-# ringTriangles = projectObject.get_triangle_rings_around_triangles(immediateTriangles, rings=2)
-# projectObject.export_triangles(list(ringTriangles), 'ringTriangles2')
-
-
-# for point in sharpPointsDict[edgeId]:
-#     # print(point)
-#     projectObject.get_triangles_to_isopoint_in_edge(point, edgeId)
-
-
-# projectObject.print_graph()
-
 projectObject.generate_isobaths5()
-# projectObject.generate_statistics()
+projectObject.generate_statistics()
 
 ###############################
 # Exporting shapefiles
@@ -159,7 +130,7 @@ projectObject.export_all_isobaths()
 projectObject.export_all_node_triangles()
 projectObject.export_all_edge_triangles()
 # projectObject.export_shapefile('output')
-# projectObject.export_statistics()
+projectObject.export_statistics()
 
 
 ###############################

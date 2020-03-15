@@ -3742,7 +3742,7 @@ class Hydropolator:
         uy = round(uy, 3)
         return (ux, uy)
 
-    def simple_densify_and_rebuild(self, trianglesToDensify):
+    def simple_densify_and_rebuild(self, trianglesToDensify, tempRings=3):
         self.msg('> densifying {} triangles'.format(len(trianglesToDensify)), 'info')
 
         circumCenters = set()
@@ -3771,7 +3771,7 @@ class Hydropolator:
             # TODO
             circumTriangle = tuple(self.pseudo_triangle(circumTriangle))
             neighborhoodTriangles = self.get_triangle_rings_around_triangles(
-                [circumTriangle], rings=5)
+                [circumTriangle], rings=tempRings)
             neighborhoodVertices = self.get_vertices_from_triangles(neighborhoodTriangles)
 
             tempVerticesList = []
