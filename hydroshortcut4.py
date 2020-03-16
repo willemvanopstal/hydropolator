@@ -26,7 +26,7 @@ print('\n\n')
 ###############################
 
 surveyData = '../Data/operatorimplications/simulated_surface_points.txt'
-projectName = 'newisobaths'
+projectName = 'pthree_smoothing_process_four_dense'
 projectObject = Hydropolator()
 
 # innerNodes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
@@ -42,6 +42,7 @@ minChangedPointsBreakpoints = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
                                12, 14, 16, 18, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100]
 isoLengthBreakpoints = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
                         15, 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500]
+
 ###############################
 # Project management
 ###############################
@@ -74,29 +75,35 @@ projectObject.set_iso_seg_bins(isoLengthBreakpoints)
 ###############################
 
 paramDict = {'prepass': 0,
-             'densification': 0,
+             'densification': 3,
              'process': [],
              'densification_process': [],
-             'maxiter': 120,
-             'angularity_threshold': 1.0,
+             'maxiter': 50,
+             'angularity_threshold': 1.3,
              'spurgully_threshold': None,
-             'spur_threshold': 15,
-             'gully_threshold': 25,
-             'aspect_threshold': 4,
-             'size_threshold': 60
+             'spur_threshold': 5,
+             'gully_threshold': 10,
+             'aspect_threshold': 0.5,
+             'size_threshold': 5
              }
+
 # prepass is always first if >0
 # 'r' defines rings around extracted triangle
 # 'n' will define the entire node should be smoothened
 # 'nn' will define neighboruing nodes
 # [0] defines the process step is stopped if no vertices are updated anymore
 # [>0] defines the repeated amount per process, so if [1] the process-line is only done once
-paramDict['process'] = [[['angularity', 'r', 1], ['spurs', 'r', 1], ['gullys', 'r', 1], 0],
-                        [['angularity', 'r', 2], ['spurs', 'r', 2], ['gullys', 'r', 2], 0],
-                        [['angularity', 'r', 4], 3],
-                        ]
-paramDict['densification_process'] = [['angularity', 'r', 1],
-                                      ['aspect-edges', 'r', 0],
+# paramDict['process'] = [[['angularity', 'r', 1], ['spurs', 'r', 1], ['gullys', 'r', 1], 0],
+#                         [['angularity', 'r', 2], ['spurs', 'r', 2], ['gullys', 'r', 2], 0],
+#                         [['angularity', 'r', 4], 3]
+#                         ]
+paramDict['process'] = [[['angularity', 'r', 1], 0]]
+
+# paramDict['densification_process'] = [['angularity', 'r', 1],
+#                                       ['aspect-edges', 'r', 0],
+#                                       ['size-edges', 'r', 0]
+#                                       ]
+paramDict['densification_process'] = [['aspect-edges', 'r', 0],
                                       ['size-edges', 'r', 0]
                                       ]
 
@@ -112,7 +119,7 @@ projectObject.generate_isobaths5()
 
 startTime = datetime.now()
 
-projectObject.start_routine(paramDict, statistics=False)
+projectObject.start_routine(paramDict, statistics=True)
 
 endTime = datetime.now()
 print('elapsed time: ', endTime - startTime)

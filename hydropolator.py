@@ -3,7 +3,7 @@
 # @Email:  willemvanopstal home nl
 # @Project: Hydropolator
 # @Last modified by:   Bonny
-# @Last modified time: 12-Mar-2020
+# @Last modified time: 15-Mar-2020
 
 
 from ElevationDict import ElevationDict
@@ -4430,6 +4430,10 @@ class Hydropolator:
 
             if processNumber >= len(paramDict['process']):
                 self.msg('\n> no process left', 'warning')
+                break
+            if iterations >= paramDict['maxiter']:
+                self.msg('> max iterations exceeded', 'warning')
+                routine = False
                 break
 
             processStartIteration = iterations
