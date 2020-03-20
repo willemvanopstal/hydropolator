@@ -26,7 +26,7 @@ print('\n\n')
 ###############################
 
 surveyData = '../Data/operatorimplications/simulated_surface_points.txt'
-projectName = 'new_updating'
+projectName = 'new_routine'
 projectObject = Hydropolator()
 
 # innerNodes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
@@ -74,17 +74,19 @@ projectObject.set_iso_seg_bins(isoLengthBreakpoints)
 # Process parameters
 ###############################
 
-paramDict = {'prepass': 0,
-             'densification': 0,
+paramDict = {'prepass': 2,
+             'densification': 2,
              'process': [],
              'densification_process': [],
-             'maxiter': 100,
-             'angularity_threshold': 1.1,
+             'maxiter': 4,
+             'angularity_threshold': 1.6,
              'spurgully_threshold': None,
              'spur_threshold': 0.5,
-             'gully_threshold': 1,
+             'gully_threshold': 0.5,
              'aspect_threshold': 0.5,
-             'size_threshold': 5
+             'size_threshold': 5,
+             'min_ring': 1,
+             'max_ring': 4
              }
 
 # prepass is always first if >0
@@ -98,12 +100,14 @@ paramDict = {'prepass': 0,
 #                         [['angularity', 'r', 4], 3]
 #                         ]
 paramDict['process'] = [[['angularity', 'r', 1], 0]]
+paramDict['process'] = [['spurs', 0], ['gullys', 0]]
 
 # paramDict['densification_process'] = [['angularity', 'r', 1],
 #                                       ['aspect-edges', 'r', 0],
 #                                       ['size-edges', 'r', 0]
 #                                       ]
-paramDict['densification_process'] = [['aspect-edges', 'r', 0],
+paramDict['densification_process'] = [['angularity', 'r', 0],
+                                      ['aspect-edges', 'r', 0],
                                       ['size-edges', 'r', 0]
                                       ]
 
@@ -126,7 +130,7 @@ print('elapsed time: ', endTime - startTime)
 
 
 projectObject.generate_isobaths5()
-projectObject.generate_statistics()
+# projectObject.generate_statistics()
 
 ###############################
 # Exporting shapefiles

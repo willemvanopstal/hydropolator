@@ -1961,7 +1961,7 @@ class Hydropolator:
                                     # in oldTriangleInventory[adjacentTriangle]:
                                     if adjacentTriangle in self.get_triangles(previousNode):
                                         match = True
-                                        print('merging: ', previousNode, tempNode)
+                                        # print('merging: ', previousNode, tempNode)
                                         self.merge_nodes(previousNode, tempNode)
                                         affectedNodes.add(previousNode)
                                         affectedNodes.discard(tempNode)
@@ -1988,7 +1988,7 @@ class Hydropolator:
                                         # sameIntervalNode in oldTriangleInventory[adjacentTriangle]:
                                         if adjacentTriangle in self.get_triangles(oldEdgingNode):
                                             match = True
-                                            print('merging nodes: ', oldEdgingNode, tempNode)
+                                            # print('merging nodes: ', oldEdgingNode, tempNode)
                                             self.merge_nodes(oldEdgingNode, tempNode)
                                             affectedNodes.add(oldEdgingNode)
                                             affectedNodes.discard(tempNode)
@@ -2582,7 +2582,7 @@ class Hydropolator:
             self.triangleInventory[pseudoTriangle] = {nodeId}
 
     def delete_triangle_from_node(self, triangle, nodeId):
-        self.graph['nodes'][nodeId]['triangles'].remove(triangle)
+        self.graph['nodes'][nodeId]['triangles'].discard(triangle)
 
     def add_triangle_to_queue(self, triangle, nodeId, type):
         queueType = type + 'Queue'
@@ -4010,15 +4010,15 @@ class Hydropolator:
         return True, len(allChangedVertices)
 
     def smooth_vertices_new(self, vertexSet):
-        self.msg('\n==== Smoothing pass ====', 'header')
-        print('input vertices: ', len(vertexSet))
+        # self.msg('\n==== Smoothing pass ====', 'header')
+        # print('input vertices: ', len(vertexSet))
 
         changedVertices = self.smooth_vertices(vertexSet)
         self.vertexDict.update_previous_z_from_queue()
         self.vertexDict.update_values_from_queue()
-        print('vertices with updated depth: ', len(changedVertices))
+        # print('vertices with updated depth: ', len(changedVertices))
 
-        print('allnodesfirst: ', self.graph['nodes'].keys())
+        # print('allnodesfirst: ', self.graph['nodes'].keys())
         changedTriangles, changedNodes = self.get_changed_triangles(
             changedVertices, self.triangleInventory.copy())
 
@@ -4029,11 +4029,11 @@ class Hydropolator:
         #
         # print('tinodes1: ', nodesInTI, '\nallnodes: ', self.graph['nodes'].keys())
 
-        print('changed nodes: ', changedNodes)
-        print('changed triangles: ', len(changedTriangles))
-        if len(changedTriangles) == 0:
-            print('no triangles were changed in interval, returning without updating!')
-            return False, 0
+        print('changed nodes: ', len(changedNodes))
+        # print('changed triangles: ', len(changedTriangles))
+        # if len(changedTriangles) == 0:
+        #     print('no triangles were changed in interval, returning without updating!')
+        #     return False, 0
 
         allDeletedTriangles = set()
         oldNeighboringNodes = set()
@@ -4050,8 +4050,8 @@ class Hydropolator:
             oldNeighboringNodes.update(deepNeighbors)
             oldNeighboringNodes.update(shallowNeighbors)
 
-        print(len(allDeletedTriangles), oldNeighboringNodes)
-        print(oldNeighboringNodes.difference(changedNodes))
+        # print(len(allDeletedTriangles), oldNeighboringNodes)
+        # print(oldNeighboringNodes.difference(changedNodes))
 
         poppedNodes = set()
         for triangle in allDeletedTriangles:
@@ -4063,7 +4063,7 @@ class Hydropolator:
             # print(self.triangleInventory[triangle])
             del self.triangleInventory[triangle]
 
-        print(poppedNodes)
+        # print(poppedNodes)
 
         for changedEdge in changedEdges:
             self.delete_edge(changedEdge)
@@ -4083,19 +4083,21 @@ class Hydropolator:
                 changedVertex))
 
         # insert all deleted triangles back in the graph
-        affectedNodes = self.insert_triangles_into_region_graph2(
-            allDeletedTriangles, poppedNodes)
+        if len(allDeletedTriangles) > 0:
+            affectedNodes = self.insert_triangles_into_region_graph2(
+                allDeletedTriangles, poppedNodes)
+            self.establish_edges_on_affected_nodes(affectedNodes)
+            self.debug(affectedNodes)
         # newly inserted nodes are not connected yet
-        self.debug(affectedNodes)
 
         # self.print_graph()
         # establish edges again
-        self.establish_edges_on_affected_nodes(affectedNodes)
+        # self.establish_edges_on_affected_nodes(affectedNodes)
 
         # self.print_graph()
-        print(self.availableNodeIds)
+        # print(self.availableNodeIds)
 
-        return True, len(changedVertices)
+        return len(changedVertices)
 
     def smooth_vertices_helper2(self, vertexSet):
 
@@ -4915,7 +4917,7 @@ class Hydropolator:
                 self.generate_statistics()
 
             allVertices = self.vertices[1:]
-            verticesAreUpdatedPre, numberUpdatedVerticesPre = self.smooth_vertices_new(allVertices)
+            numberUpdatedVerticesPre = self.smooth_vertices_new(allVertices)
 
             iterations += 1
 
@@ -4935,7 +4937,7 @@ class Hydropolator:
 
             processStartIteration = iterations
             processList = paramDict['process'][processNumber]
-            print('\nprocess number: ', processNumber)
+            self.msg('\nprocess number: '.format(processNumber), 'header')
             for processMetric in processList[:-1]:
                 print('metric: {}\t region: {}\t extended: {}'.format(
                     processMetric[0], processMetric[1], processMetric[2]))
@@ -4943,7 +4945,7 @@ class Hydropolator:
             # print(processList)
 
             while process and routine:
-                self.msg('\nexecuting process, iteration: {}'.format(iterations), 'info')
+                self.msg('\n====== executing process, iteration: {}'.format(iterations), 'header')
                 iterations += 1
 
                 self.generate_isobaths5()
@@ -5027,13 +5029,15 @@ class Hydropolator:
                     break
 
                 verticesToUpdate = self.get_vertices_from_triangles(extendedConflictingTriangles)
-                print('verticesToUpdate ', len(verticesToUpdate))
+                # print('verticesToUpdate ', len(verticesToUpdate))
 
                 # verticesAreUpdated, numberUpdatedVertices = self.smooth_vertices_helper2(
                 #     verticesToUpdate)
-                verticesAreUpdated, numberUpdatedVertices = self.smooth_vertices_new(
+                numberUpdatedVertices = self.smooth_vertices_new(
                     verticesToUpdate)
-                print('something updated: ', verticesAreUpdated, numberUpdatedVertices)
+                # verticesAreUpdated, numberUpdatedVertices = self.simple_smooth_and_rebuild(
+                # verticesToUpdate)
+                # print('something updated: ', numberUpdatedVertices)
 
                 # iterations += 1
                 if iterations >= paramDict['maxiter']:
@@ -5044,10 +5048,342 @@ class Hydropolator:
                     self.msg('> max process iteration, next process', 'warning')
                     processNumber += 1
                     break
-                if not verticesAreUpdated:
+                if numberUpdatedVertices == 0:
                     self.msg('> no updated vertices !', 'warning')
                     processNumber += 1
                     break
+
+        # DENSIFICATION
+
+        for densificationIteration in range(paramDict['densification']):
+            self.msg('\n> densification {}'.format(iterations), 'info')
+            iterations += 1
+
+            self.generate_isobaths5()
+            if statistics:
+                self.generate_statistics()
+
+            edgeTriangles = set()
+            edgeTrianglesExtracted = False
+
+            trianglesToDensify = set()
+            extendedTrianglesToDensify = set()
+
+            for densMetric in paramDict['densification_process']:
+                print(densMetric)
+
+                if densMetric[0] == 'angularity':
+                    sharp_extendedConflictingTriangles = set()
+                    sharpPointsDict, allSharpPoints = self.check_isobath_angularity(
+                        threshold=angularity_threshold)
+                    sharp_conflictingTriangles = self.get_all_immediate_triangles(
+                        sharpPointsDict)
+                    if densMetric[1] == 'r':
+                        sharp_extendedConflictingTriangles = self.get_triangle_rings_around_triangles(
+                            sharp_conflictingTriangles, rings=densMetric[2])
+                    trianglesToDensify.update(sharp_conflictingTriangles)
+                    extendedTrianglesToDensify.update(sharp_extendedConflictingTriangles)
+                    print('sharp triangles: ', len(sharp_conflictingTriangles))
+
+                elif densMetric[0] == 'aspect-edges':
+                    aspect_extendedConflictingTriangles = set()
+                    if not edgeTrianglesExtracted:
+                        edgeTriangles = self.get_all_edge_triangles()
+                        edgeTrianglesExtracted = True
+                    aspect_conflictingTriangles = self.check_triangle_aspect_ratio(
+                        edgeTriangles, aspect_threshold)
+                    if densMetric[1] == 'r':
+                        aspect_extendedConflictingTriangles = self.get_triangle_rings_around_triangles(
+                            aspect_conflictingTriangles, rings=densMetric[2])
+                    trianglesToDensify.update(aspect_conflictingTriangles)
+                    extendedTrianglesToDensify.update(aspect_extendedConflictingTriangles)
+                    print('aspect triangles: ', len(aspect_conflictingTriangles))
+
+                elif densMetric[0] == 'size-edges':
+                    size_extendedConflictingTriangles = set()
+                    if not edgeTrianglesExtracted:
+                        edgeTriangles = self.get_all_edge_triangles()
+                        edgeTrianglesExtracted = True
+
+                    size_conflictingTriangles = self.check_triangle_size(
+                        edgeTriangles, size_threshold)
+                    if densMetric[1] == 'r':
+                        size_extendedConflictingTriangles = self.get_triangle_rings_around_triangles(
+                            size_conflictingTriangles, rings=densMetric[2])
+                    trianglesToDensify.update(size_conflictingTriangles)
+                    extendedTrianglesToDensify.update(size_extendedConflictingTriangles)
+                    print('size triangles: ', len(size_conflictingTriangles))
+
+            print('conflictingTriangles ', len(trianglesToDensify))
+            print('extendedConflictingTriangles ', len(extendedTrianglesToDensify))
+
+            self.simple_densify_and_rebuild(trianglesToDensify=extendedTrianglesToDensify)
+
+    def start_routine_new(self, paramDict, statistics=False):
+
+        self.msg('> starting routine...', 'header')
+
+        # for param in paramDict.keys():
+        #     print(param, paramDict[param])
+
+        spurgully_threshold = paramDict['spurgully_threshold']
+        spur_threshold = paramDict['spur_threshold']
+        gully_threshold = paramDict['gully_threshold']
+        angularity_threshold = paramDict['angularity_threshold']
+        aspect_threshold = paramDict['aspect_threshold']
+        size_threshold = paramDict['size_threshold']
+        min_ring = paramDict['min_ring']
+        max_ring = paramDict['max_ring']
+
+        print('========\nthresholds:\nspurgully: {}\nspur: {}\ngully: {}\nangularity: {}\naspect: {}\nsize: {}\n========'.format(
+            spurgully_threshold, spur_threshold, gully_threshold, angularity_threshold, aspect_threshold, size_threshold))
+
+        iterations = 0
+
+        # PREPASS
+        for prepassIteration in range(paramDict['prepass']):
+            self.msg('> prepass {}'.format(iterations), 'info')
+
+            if statistics:
+                self.generate_isobaths5()
+                self.generate_statistics()
+
+            # allVertices = self.vertices[1:]
+            allVertices = set()
+            for tri in self.triangles:
+                if 0 not in tri:
+                    allVertices.update(tri)
+            numberUpdatedVerticesPre = self.smooth_vertices_new(allVertices)
+
+            iterations += 1
+
+        routine = True
+        ring_range = range(min_ring, max_ring + 1)
+        print(list(ring_range))
+        processNumber = 0
+        metricsToTest = paramDict['process']
+
+        while routine:
+
+            if processNumber >= len(ring_range):
+                self.msg('\nmax rings reached', 'warning')
+                break
+            if iterations >= paramDict['maxiter']:
+                self.msg('> max iterations exceeded', 'warning')
+                routine = False
+                break
+
+            currentRings = ring_range[processNumber]
+
+            self.msg('\n====== executing process, iteration: {}'.format(iterations), 'header')
+            print('currentRings: ', currentRings)
+            iterations += 1
+
+            self.generate_isobaths5()
+            if statistics:
+                self.generate_statistics()
+
+            # Conflicting triangles
+            conflictingTriangles = set()
+            extendedConflictingTriangles = set()
+            verticesToUpdate = set()
+
+            # Calculate metrics
+            spurGullyCalculated = False
+            for metricDefinition in metricsToTest:
+                # print(metricDefinition)
+
+                if metricDefinition[0] == 'angularity':
+                    sharpPointsDict, allSharpPoints = self.check_isobath_angularity(
+                        threshold=angularity_threshold)
+                    sharp_conflictingTriangles = self.get_all_immediate_triangles(
+                        sharpPointsDict)
+                    # if currentRings > 0:
+                    sharp_extendedConflictingTriangles = self.get_triangle_rings_around_triangles(
+                        sharp_conflictingTriangles, rings=currentRings)
+                    conflictingTriangles.update(sharp_conflictingTriangles)
+                    extendedConflictingTriangles.update(sharp_extendedConflictingTriangles)
+                    print('sharp points: ', len(allSharpPoints))
+
+                elif metricDefinition[0] == 'spurs':
+                    if not spurGullyCalculated:
+                        spursDict, gullyDict = self.check_spurs_gullys_2(
+                            threshold=spurgully_threshold, spurThreshold=spur_threshold, gullyThreshold=gully_threshold)
+                        spurGullyCalculated = True
+                    spurs_conflictingTriangles = self.get_all_immediate_triangles(
+                        spursDict)
+                    # if currentRings > 0:
+                    spurs_extendedConflictingTriangles = self.get_triangle_rings_around_triangles(
+                        spurs_conflictingTriangles, rings=currentRings)
+                    conflictingTriangles.update(spurs_conflictingTriangles)
+                    extendedConflictingTriangles.update(spurs_extendedConflictingTriangles)
+                    print('spur triangles: ', len(spurs_conflictingTriangles))
+                elif metricDefinition[0] == 'gullys':
+                    if not spurGullyCalculated:
+                        spursDict, gullyDict = self.check_spurs_gullys_2(
+                            threshold=spurgully_threshold, spurThreshold=spur_threshold, gullyThreshold=gully_threshold)
+                        spurGullyCalculated = True
+                    gully_conflictingTriangles = self.get_all_immediate_triangles(
+                        gullyDict)
+                    # if currentRings > 0:
+                    gully_extendedConflictingTriangles = self.get_triangle_rings_around_triangles(
+                        gully_conflictingTriangles, rings=currentRings)
+                    conflictingTriangles.update(gully_conflictingTriangles)
+                    extendedConflictingTriangles.update(gully_extendedConflictingTriangles)
+                    print('gully triangles: ', len(gully_conflictingTriangles))
+
+            print('conflictingTriangles ', len(conflictingTriangles))
+            print('extendedConflictingTriangles ', len(extendedConflictingTriangles))
+
+            if len(extendedConflictingTriangles) == 0:
+                self.msg('> no conflicts found, ending routine', 'warning')
+                break
+
+            verticesToUpdate = self.get_vertices_from_triangles(extendedConflictingTriangles)
+            numberUpdatedVertices = self.smooth_vertices_new(
+                verticesToUpdate)
+
+            if numberUpdatedVertices == 0:
+                self.msg('> no updated vertices ! Adding a ring', 'warning')
+                processNumber += 1
+            else:
+                self.msg('> setting process back to zero', 'info')
+                processNumber = 0
+
+        '''
+
+        # REST OF PROCESS
+        routine = True
+        process = True
+        processNumber = 0
+        while routine:
+
+            if processNumber >= len(paramDict['process']):
+                self.msg('\n> no process left', 'warning')
+                break
+            if iterations >= paramDict['maxiter']:
+                self.msg('> max iterations exceeded', 'warning')
+                routine = False
+                break
+
+            processStartIteration = iterations
+            processList = paramDict['process'][processNumber]
+            self.msg('\nprocess number: '.format(processNumber), 'header')
+            for processMetric in processList[:-1]:
+                print('metric: {}\t region: {}\t extended: {}'.format(
+                    processMetric[0], processMetric[1], processMetric[2]))
+            print('stop criterion: {}'.format(processList[-1]))
+            # print(processList)
+
+            while process and routine:
+                self.msg('\n====== executing process, iteration: {}'.format(iterations), 'header')
+                iterations += 1
+
+                self.generate_isobaths5()
+                if statistics:
+                    self.generate_statistics()
+
+                # Conflicting triangles
+                conflictingTriangles = set()
+                conflictingVertices = set()
+                extendedConflictingTriangles = set()
+                extendedConflictingVertices = set()
+                verticesToUpdate = set()
+
+                # Calculate metrics
+                spurGullyCalculated = False
+                for metricDefinition in processList[:-1]:
+                    # print(metricDefinition)
+
+                    if metricDefinition[0] == 'angularity':
+                        sharpPointsDict, allSharpPoints = self.check_isobath_angularity(
+                            threshold=angularity_threshold)
+                        sharp_conflictingTriangles = self.get_all_immediate_triangles(
+                            sharpPointsDict)
+                        if metricDefinition[1] == 'r':
+                            sharp_extendedConflictingTriangles = self.get_triangle_rings_around_triangles(
+                                sharp_conflictingTriangles, rings=metricDefinition[2])
+                        elif metricDefinition[1] == 'n':
+                            pass
+                        elif metricDefinition[1] == 'nn':
+                            pass
+                        conflictingTriangles.update(sharp_conflictingTriangles)
+                        extendedConflictingTriangles.update(sharp_extendedConflictingTriangles)
+                        print('sharp points: ', len(allSharpPoints))
+
+                    elif metricDefinition[0] == 'spurs':
+                        if not spurGullyCalculated:
+                            spursDict, gullyDict = self.check_spurs_gullys_2(
+                                threshold=spurgully_threshold, spurThreshold=spur_threshold, gullyThreshold=gully_threshold)
+                            spurGullyCalculated = True
+                        spurs_conflictingTriangles = self.get_all_immediate_triangles(
+                            spursDict)
+                        if metricDefinition[1] == 'r':
+                            spurs_extendedConflictingTriangles = self.get_triangle_rings_around_triangles(
+                                spurs_conflictingTriangles, rings=metricDefinition[2])
+                        elif metricDefinition[1] == 'n':
+                            pass
+                        elif metricDefinition[1] == 'nn':
+                            pass
+                        conflictingTriangles.update(spurs_conflictingTriangles)
+                        extendedConflictingTriangles.update(spurs_extendedConflictingTriangles)
+                        print('spur triangles: ', len(spurs_conflictingTriangles))
+
+                    elif metricDefinition[0] == 'gullys':
+                        if not spurGullyCalculated:
+                            spursDict, gullyDict = self.check_spurs_gullys_2(
+                                threshold=spurgully_threshold, spurThreshold=spur_threshold, gullyThreshold=gully_threshold)
+                            spurGullyCalculated = True
+                        gully_conflictingTriangles = self.get_all_immediate_triangles(
+                            gullyDict)
+                        if metricDefinition[1] == 'r':
+                            gully_extendedConflictingTriangles = self.get_triangle_rings_around_triangles(
+                                gully_conflictingTriangles, rings=metricDefinition[2])
+                        elif metricDefinition[1] == 'n':
+                            pass
+                        elif metricDefinition[1] == 'nn':
+                            pass
+                        conflictingTriangles.update(gully_conflictingTriangles)
+                        extendedConflictingTriangles.update(gully_extendedConflictingTriangles)
+                        print('gully triangles: ', len(gully_conflictingTriangles))
+
+                print('conflictingTriangles ', len(conflictingTriangles))
+                print('extendedConflictingTriangles ', len(extendedConflictingTriangles))
+
+                if len(conflictingTriangles) == 0:
+                    self.msg('> no conflicts found, skipping process', 'warning')
+                    processNumber += 1
+                    if iterations-1 >= paramDict['maxiter']:
+                        self.msg('> max iterations exceeded', 'warning')
+                        routine = False
+
+                    break
+
+                verticesToUpdate = self.get_vertices_from_triangles(extendedConflictingTriangles)
+                # print('verticesToUpdate ', len(verticesToUpdate))
+
+                # verticesAreUpdated, numberUpdatedVertices = self.smooth_vertices_helper2(
+                #     verticesToUpdate)
+                numberUpdatedVertices = self.smooth_vertices_new(
+                    verticesToUpdate)
+                # verticesAreUpdated, numberUpdatedVertices = self.simple_smooth_and_rebuild(
+                # verticesToUpdate)
+                # print('something updated: ', numberUpdatedVertices)
+
+                # iterations += 1
+                if iterations >= paramDict['maxiter']:
+                    self.msg('> max iterations exceeded', 'warning')
+                    routine = False
+                    break
+                if processList[-1] > 0 and iterations - processStartIteration >= processList[-1]:
+                    self.msg('> max process iteration, next process', 'warning')
+                    processNumber += 1
+                    break
+                if numberUpdatedVertices == 0:
+                    self.msg('> no updated vertices !', 'warning')
+                    processNumber += 1
+                    break
+        '''
 
         # DENSIFICATION
 
