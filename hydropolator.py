@@ -3,7 +3,7 @@
 # @Email:  willemvanopstal home nl
 # @Project: Hydropolator
 # @Last modified by:   Bonny
-# @Last modified time: 15-Mar-2020
+# @Last modified time: 20-Mar-2020
 
 
 from ElevationDict import ElevationDict
@@ -988,6 +988,407 @@ class Hydropolator:
         # print(self.triangleRegions, regions, isobathValues)
         self.msg('> regions-list established', 'info')
 
+    def add_triangle_to_interval_inventory(self, interval, triangle):
+        triangle = tuple(self.pseudo_triangle(triangle))
+
+        if triangle in self.triangleIntervalInventory:
+            self.triangleIntervalInventory[triangle].add(interval)
+        else:
+            self.triangleIntervalInventory[triangle] = {interval}
+
+    def is_triangle_already_indexed_in_interval(self, interval, triangle):
+        triangle = tuple(self.pseudo_triangle(triangle))
+
+        if triangle not in self.triangleIntervalInventory:
+            return False
+
+        if interval in self.triangleIntervalInventory[triangle]:
+            return True
+        else:
+            return False
+
+    def expand_current_node(self, currentNode, interval):
+
+        currentQueue = self.get_queue(currentNode, 'current')
+        deepNeighbors = self.get_neighboring_nodes(currentNode, 'deep')
+        shallowNeighbors = self.get_neighboring_nodes(currentNode, 'shallow')
+
+        # print('\nresolving current', currentNode)
+
+        unresolved = True
+        while unresolved:
+
+            for triangle in currentQueue.copy():
+                # print(currentNode, triangle)
+                adjacentTriangles = self.adjacent_triangles(triangle)
+                # print(adjacentTriangles)
+                for neighbouringTriangle in adjacentTriangles:
+                    if 0 not in neighbouringTriangle:
+                        neighbouringIntervals = self.find_intervals(
+                            neighbouringTriangle, indexOnly=True)
+
+                        if (int(interval) in neighbouringIntervals and
+                                not self.saddle_test(triangle, neighbouringTriangle, int(interval)) and
+                                not self.is_triangle_already_indexed_in_interval(interval, neighbouringTriangle)):
+                            self.add_triangle_to_node(neighbouringTriangle, currentNode)
+                            self.add_triangle_to_interval_inventory(
+                                interval, neighbouringTriangle)
+                            self.add_triangle_to_queue(
+                                neighbouringTriangle, currentNode, 'current')
+
+                            for deepNeighbor in deepNeighbors:
+                                self.remove_triangle_from_queue(
+                                    neighbouringTriangle, deepNeighbor, 'shallow')
+                            for shallowNeighbor in shallowNeighbors:
+                                self.remove_triangle_from_queue(
+                                    neighbouringTriangle, shallowNeighbor, 'deep')
+
+                        if (int(interval) + 1 in neighbouringIntervals and
+                                not self.is_triangle_already_indexed_in_interval(str(int(interval) + 1), neighbouringTriangle)):
+                            # self.add_triangle_to_queue(
+                            #     neighbouringTriangle, currentNode, 'deep')
+                            alreadyInOtherShallowQueue = False
+                            for deepNeighbor in deepNeighbors:
+                                if self.triangle_in_queue(neighbouringTriangle, deepNeighbor, 'shallow'):
+                                    alreadyInOtherShallowQueue = True
+                                    self.remove_triangle_from_queue(
+                                        neighbouringTriangle, deepNeighbor, 'shallow')
+                            if not alreadyInOtherShallowQueue:
+                                self.add_triangle_to_queue(
+                                    neighbouringTriangle, currentNode, 'deep')
+
+                        if (int(interval) - 1 in neighbouringIntervals and
+                                not self.is_triangle_already_indexed_in_interval(str(int(interval) - 1), neighbouringTriangle)):
+                            # self.add_triangle_to_queue(
+                            #     neighbouringTriangle, currentNode, 'shallow')
+                            alreadyInOtherDeepQueue = False
+                            for shallowNeighbor in shallowNeighbors:
+                                if self.triangle_in_queue(neighbouringTriangle, shallowNeighbor, 'deep'):
+                                    alreadyInOtherDeepQueue = True
+                                    self.remove_triangle_from_queue(
+                                        neighbouringTriangle, shallowNeighbor, 'deep')
+                            if not alreadyInOtherDeepQueue:
+                                self.add_triangle_to_queue(
+                                    neighbouringTriangle, currentNode, 'shallow')
+
+                self.remove_triangle_from_queue(triangle, currentNode, 'current')
+
+            if len(self.get_queue(currentNode, 'current')) == 0:
+                # print('expanded the current queue, finished')
+                unresolved = False
+
+    def build_graph_new2(self):
+        self.msg('> building new TRG...', 'info')
+
+        self.triangleIntervalInventory = dict()
+
+        # find a starting triangle, and for simplicity
+        # make sure this only belongs to one interval
+        for triangle in self.triangles:
+            tri_intervals = self.find_intervals(triangle, indexOnly=True)
+            if len(tri_intervals) == 1:
+                triangle = tuple(self.pseudo_triangle(triangle))
+                interval = str(tri_intervals[0])
+                break
+
+        currentNode = self.add_triangle_to_new_node(interval, triangle)
+        self.add_triangle_to_interval_inventory(interval, triangle)
+        self.add_triangle_to_queue(triangle, currentNode, 'current')
+        currentQueue = {triangle}
+        currentInterval = interval
+
+        nodesToResolve = {currentNode}
+        nodeToResolve = currentNode
+
+        finished = False
+        bgi = 0
+        resolveCurrent = True
+        while not finished:
+
+            # if resolveCurrent:
+
+            print('currentNode: ', currentNode, 'resolving node: ', nodeToResolve)
+            self.expand_current_node(nodeToResolve, str(self.get_interval_from_node(nodeToResolve)))
+            deepQueue = self.get_queue(currentNode, 'deep')
+            shallowQueue = self.get_queue(currentNode, 'shallow')
+            deeperInterval = str(int(currentInterval) + 1)
+            shallowerInterval = str(int(currentInterval) - 1)
+            print(currentNode, currentInterval, 'dq: ', len(deepQueue), 'sq: ', len(shallowQueue))
+
+            # self.print_graph()
+
+            if len(deepQueue) != 0:
+                for triangle in deepQueue:
+                    break
+                if self.is_triangle_already_indexed_in_interval(deeperInterval, triangle):
+                    self.remove_triangle_from_queue(triangle, currentNode, 'deep')
+                    # print('ERROR DEEP')
+                    continue
+
+                deeperNode = self.add_triangle_to_new_node(deeperInterval, triangle)
+                self.add_triangle_to_interval_inventory(deeperInterval, triangle)
+                self.add_triangle_to_queue(triangle, deeperNode, 'current')
+                nodesToResolve.add(deeperNode)
+                self.remove_triangle_from_queue(triangle, currentNode, 'deep')
+                self.add_new_edge(currentNode, deeperNode)
+                nodeToResolve = deeperNode
+            elif len(shallowQueue) != 0:
+                for triangle in shallowQueue:
+                    break
+                if self.is_triangle_already_indexed_in_interval(shallowerInterval, triangle):
+                    self.remove_triangle_from_queue(triangle, currentNode, 'shallow')
+                    # print('ERROR SHALLOW')
+                    continue
+                shallowerNode = self.add_triangle_to_new_node(shallowerInterval, triangle)
+                self.add_triangle_to_interval_inventory(shallowerInterval, triangle)
+                self.add_triangle_to_queue(triangle, shallowerNode, 'current')
+                nodesToResolve.add(shallowerNode)
+                self.remove_triangle_from_queue(triangle, currentNode, 'shallow')
+                self.add_new_edge(shallowerNode, currentNode)
+                nodeToResolve = shallowerNode
+            else:
+                # print('passing else')
+                # pass
+
+                # print('node no queues anymore, new node selection')
+                # print(nodesToResolve)
+                nodesToResolve.remove(currentNode)
+                for ntr in nodesToResolve:
+                    break
+                currentNode = ntr
+                currentInterval = str(self.get_interval_from_node(currentNode))
+                # print('new node: ', ntr, currentInterval)
+
+            if len(nodesToResolve) == 0:
+                # print('no unresolved nodes anymore')
+                finished = True
+
+            bgi += 0
+            if bgi >= 100:
+                finished = True
+                print('max iteration limit exceeded')
+
+    def build_graph_new(self):
+        self.msg('> building new TRG...', 'info')
+
+        self.triangleIntervalInventory = dict()
+
+        # find a starting triangle, and for simplicity
+        # make sure this only belongs to one interval
+        for triangle in self.triangles:
+            tri_intervals = self.find_intervals(triangle, indexOnly=True)
+            if len(tri_intervals) == 1:
+                triangle = tuple(self.pseudo_triangle(triangle))
+                interval = str(tri_intervals[0])
+                break
+
+        currentNode = self.add_triangle_to_new_node(interval, triangle)
+        self.add_triangle_to_interval_inventory(interval, triangle)
+        self.add_triangle_to_queue(triangle, currentNode, 'current')
+
+        nodesToResolve = set()
+
+        finished = False
+        bgi = 0
+        resolveCurrent = True
+        resolveDeep = False
+        resolveShallow = False
+        while not finished:
+            # this loop should always start with:
+            # currentNodeId available
+            # working interval (str) available
+            # currentQueue, deepQueue, shallowQueue
+
+            deepNeighbors = self.get_neighboring_nodes(currentNode, 'deep')
+            shallowNeighbors = self.get_neighboring_nodes(currentNode, 'shallow')
+
+            if resolveCurrent:
+                currentQueue = self.get_queue(currentNode, 'current')
+
+                print('\nresolving current', currentNode)
+
+                for triangle in currentQueue.copy():
+                    # print(currentNode, triangle)
+                    adjacentTriangles = self.adjacent_triangles(triangle)
+                    # print(adjacentTriangles)
+                    for neighbouringTriangle in adjacentTriangles:
+                        if 0 not in neighbouringTriangle:
+                            neighbouringIntervals = self.find_intervals(
+                                neighbouringTriangle, indexOnly=True)
+
+                            if (int(interval) in neighbouringIntervals and
+                                    not self.saddle_test(triangle, neighbouringTriangle, int(interval)) and
+                                    not self.is_triangle_already_indexed_in_interval(interval, neighbouringTriangle)):
+                                self.add_triangle_to_node(neighbouringTriangle, currentNode)
+                                self.add_triangle_to_interval_inventory(
+                                    interval, neighbouringTriangle)
+                                self.add_triangle_to_queue(
+                                    neighbouringTriangle, currentNode, 'current')
+
+                            if (int(interval) + 1 in neighbouringIntervals and
+                                    not self.is_triangle_already_indexed_in_interval(str(int(interval) + 1), neighbouringTriangle)):
+                                self.add_triangle_to_queue(
+                                    neighbouringTriangle, currentNode, 'deep')
+
+                            if (int(interval) - 1 in neighbouringIntervals and
+                                    not self.is_triangle_already_indexed_in_interval(str(int(interval) - 1), neighbouringTriangle)):
+                                self.add_triangle_to_queue(
+                                    neighbouringTriangle, currentNode, 'shallow')
+
+                    self.remove_triangle_from_queue(triangle, currentNode, 'current')
+
+            elif resolveDeep:
+                deepQueue = self.get_queue(currentNode, 'deep')
+                # print(deepQueue)
+                deeperInterval = str(int(interval) + 1)
+
+                for triangle in deepQueue:
+                    break
+                deeperNode = self.add_triangle_to_new_node(deeperInterval, triangle)
+                nodesToResolve.add(deeperNode)
+                self.add_triangle_to_interval_inventory(deeperInterval, triangle)
+                self.add_triangle_to_queue(triangle, deeperNode, 'current')
+                self.add_new_edge(currentNode, deeperNode)
+                # print('fd', currentNode, deeperNode)
+                self.remove_triangle_from_queue(triangle, currentNode, 'deep')
+                # deepIndexed = set()
+                # deepTempQueue = set()
+                deepTempQueue = {triangle}
+                deepIndexed = {triangle}
+                print('resolving deep', deeperNode)
+
+                deepFinished = False
+                while not deepFinished:
+
+                    additions = 0
+                    for triangle in deepTempQueue.copy():
+                        adjacentTriangles = self.adjacent_triangles(triangle)
+                        for adjacentTriangle in adjacentTriangles:
+                            if (adjacentTriangle in deepQueue and
+                                    adjacentTriangle not in deepIndexed):
+                                deepTempQueue.add(adjacentTriangle)
+                                deepIndexed.add(adjacentTriangle)
+                                self.remove_triangle_from_queue(
+                                    adjacentTriangle, currentNode, 'deep')
+                                additions += 1
+                        deepTempQueue.remove(triangle)
+
+                    print(deepTempQueue)
+
+                    if additions == 0:
+                        deepQueue = self.get_queue(currentNode, 'deep')
+                        if len(deepQueue) != 0:
+                            for triangle in deepQueue:
+                                break
+                            print('extra deeper node')
+                            # print(deepQueue)
+                            deeperNode = self.add_triangle_to_new_node(deeperInterval, triangle)
+                            nodesToResolve.add(deeperNode)
+                            self.add_triangle_to_interval_inventory(deeperInterval, triangle)
+                            self.add_triangle_to_queue(triangle, deeperNode, 'current')
+                            self.add_new_edge(currentNode, deeperNode)
+                            # print('ed', currentNode, deeperNode)
+                            self.remove_triangle_from_queue(triangle, currentNode, 'deep')
+                            # deepIndexed = set()
+                            # deepTempQueue = set()
+                            deepTempQueue = {triangle}
+                            deepIndexed = {triangle}
+                        else:
+                            deepFinished = True
+
+                print(nodesToResolve)
+
+            elif resolveShallow:
+                shallowQueue = self.get_queue(currentNode, 'shallow')
+                shallowerInterval = str(int(interval) - 1)
+                # print('cns', currentNode, self.get_interval_from_node(currentNode))
+                # print('shallownode interval', shallowerInterval)
+
+                for triangle in shallowQueue:
+                    break
+                shallowerNode = self.add_triangle_to_new_node(shallowerInterval, triangle)
+                nodesToResolve.add(shallowerNode)
+                self.add_triangle_to_interval_inventory(shallowerInterval, triangle)
+                self.add_triangle_to_queue(triangle, shallowerNode, 'current')
+                self.add_new_edge(shallowerNode, currentNode)
+                # print('fs', shallowerNode, currentNode)
+                self.remove_triangle_from_queue(triangle, currentNode, 'shallow')
+                # deepIndexed = set()
+                # deepTempQueue = set()
+                shallowTempQueue = {triangle}
+                shallowIndexed = {triangle}
+                print('resolving shallow', shallowerNode)
+
+                shallowFinished = False
+                while not shallowFinished:
+
+                    additions = 0
+                    for triangle in shallowTempQueue.copy():
+                        adjacentTriangles = self.adjacent_triangles(triangle)
+                        for adjacentTriangle in adjacentTriangles:
+                            if (adjacentTriangle in shallowQueue and
+                                    adjacentTriangle not in shallowIndexed):
+                                shallowTempQueue.add(adjacentTriangle)
+                                shallowIndexed.add(adjacentTriangle)
+                                self.remove_triangle_from_queue(
+                                    adjacentTriangle, currentNode, 'shallow')
+                                additions += 1
+                        shallowTempQueue.remove(triangle)
+
+                    if additions == 0:
+                        shallowQueue = self.get_queue(currentNode, 'shallow')
+                        if len(shallowQueue) != 0:
+                            for triangle in shallowQueue:
+                                break
+                            print('extra shallow node')
+                            shallowerNode = self.add_triangle_to_new_node(
+                                shallowerInterval, triangle)
+                            nodesToResolve.add(shallowerNode)
+                            self.add_triangle_to_interval_inventory(shallowerInterval, triangle)
+                            self.add_triangle_to_queue(triangle, shallowerNode, 'current')
+                            self.add_new_edge(shallowerNode, currentNode)
+                            # print('es', shallowerNode, currentNode)
+                            self.remove_triangle_from_queue(triangle, currentNode, 'shallow')
+                            # deepIndexed = set()
+                            # deepTempQueue = set()
+                            shallowTempQueue = {triangle}
+                            shallowIndexed = {triangle}
+                        else:
+                            shallowFinished = True
+
+                print(nodesToResolve)
+
+            if (resolveCurrent and
+                    len(self.get_queue(currentNode, 'current')) == 0):
+                print('resolved current')
+                resolveCurrent = False
+                resolveDeep = True
+            elif (resolveDeep and
+                    len(self.get_queue(currentNode, 'deep')) == 0):
+                print('resolved deep')
+                resolveDeep = False
+                resolveShallow = True
+            elif (resolveShallow and
+                    len(self.get_queue(currentNode, 'shallow')) == 0):
+                print('resolved shallow')
+                resolveShallow = False
+                # finished = True
+
+                for nodeToResolve in nodesToResolve:
+                    break
+                # print(nodeToResolve, str(self.get_interval_from_node(nodeToResolve)))
+
+                currentNode = nodeToResolve
+                nodesToResolve.discard(currentNode)
+                interval = str(self.get_interval_from_node(nodeToResolve))
+                resolveCurrent = True
+                print('step next resolve node: ', currentNode, interval)
+
+            bgi += 1
+            if bgi >= 250:
+                finished = True
+                print('max iteration limit exceeded')
+
     def build_graph2(self):
         self.msg('> building triangle region graph...', 'info')
         self.msg('> splitting all triangles in regions...', 'info')
@@ -1560,6 +1961,7 @@ class Hydropolator:
                                     # in oldTriangleInventory[adjacentTriangle]:
                                     if adjacentTriangle in self.get_triangles(previousNode):
                                         match = True
+                                        print('merging: ', previousNode, tempNode)
                                         self.merge_nodes(previousNode, tempNode)
                                         affectedNodes.add(previousNode)
                                         affectedNodes.discard(tempNode)
@@ -1586,6 +1988,7 @@ class Hydropolator:
                                         # sameIntervalNode in oldTriangleInventory[adjacentTriangle]:
                                         if adjacentTriangle in self.get_triangles(oldEdgingNode):
                                             match = True
+                                            print('merging nodes: ', oldEdgingNode, tempNode)
                                             self.merge_nodes(oldEdgingNode, tempNode)
                                             affectedNodes.add(oldEdgingNode)
                                             affectedNodes.discard(tempNode)
@@ -1889,7 +2292,8 @@ class Hydropolator:
         for triangle in shallowsToAdd:
             self.add_triangle_to_queue(triangle, keepNode, 'shallow')
 
-        self.delete_node(mergeNode)
+        # self.delete_node(mergeNode)
+        self.remove_node_and_all_contents(mergeNode)
 
     def check_deleted_nodes(self, listOfPossibleNodes):
         deletedNodes = set()
@@ -1913,6 +2317,8 @@ class Hydropolator:
         for edgeId in self.graph['edges'].keys():
             if self.graph['edges'][edgeId]['edge'] == [shallowNode, deepNode]:
                 del self.graph['edges'][edgeId]
+                self.graph['nodes'][shallowNode]['edges'].remove(edgeId)
+                self.graph['nodes'][deepNode]['edges'].remove(edgeId)
                 self.debug('removed edge')
                 break
 
@@ -1932,7 +2338,8 @@ class Hydropolator:
 
         # removes triangles from inventory
         for triangle in self.get_triangles(nodeId):
-            self.triangleInventory.pop(triangle, None)
+            # self.triangleInventory.pop(triangle, None)
+            self.triangleInventory[triangle].discard(nodeId)
 
         # remove from regionNodes dict
         self.regionNodes[str(nodeInterval)].remove(nodeId)
@@ -1981,6 +2388,7 @@ class Hydropolator:
             # print('=== updated vertex: ', updatedVertex)
             incidentTriangles = self.triangulation.incident_triangles_to_vertex(updatedVertex)
             for incidentTriangle in incidentTriangles:
+                incidentTriangle = tuple(self.pseudo_triangle(incidentTriangle))
                 # check whether the vertical intervals actually changed, otherwise updating is not needed
                 previousIntervals = self.find_previous_intervals(incidentTriangle)
                 updatedIntervals = self.find_intervals(incidentTriangle, indexOnly=True)
@@ -2188,7 +2596,8 @@ class Hydropolator:
         #     print('couldnt remove triangle')
         #     pass
 
-        self.graph['nodes'][nodeId][queueType].remove(tuple(self.pseudo_triangle(triangle)))
+        self.graph['nodes'][nodeId][queueType].discard(tuple(self.pseudo_triangle(triangle)))
+        # self.graph['nodes'][nodeId][queueType].remove(tuple(self.pseudo_triangle(triangle)))
 
     def add_triangle_to_limit(self, triangle, nodeId, type):
         queueType = type + 'Neighbors'
@@ -3600,6 +4009,94 @@ class Hydropolator:
 
         return True, len(allChangedVertices)
 
+    def smooth_vertices_new(self, vertexSet):
+        self.msg('\n==== Smoothing pass ====', 'header')
+        print('input vertices: ', len(vertexSet))
+
+        changedVertices = self.smooth_vertices(vertexSet)
+        self.vertexDict.update_previous_z_from_queue()
+        self.vertexDict.update_values_from_queue()
+        print('vertices with updated depth: ', len(changedVertices))
+
+        print('allnodesfirst: ', self.graph['nodes'].keys())
+        changedTriangles, changedNodes = self.get_changed_triangles(
+            changedVertices, self.triangleInventory.copy())
+
+        # nodesInTI = set()
+        # for tri in self.triangleInventory.keys():
+        #     # print(self.triangleInventory[tri])
+        #     nodesInTI.update(self.triangleInventory[tri])
+        #
+        # print('tinodes1: ', nodesInTI, '\nallnodes: ', self.graph['nodes'].keys())
+
+        print('changed nodes: ', changedNodes)
+        print('changed triangles: ', len(changedTriangles))
+        if len(changedTriangles) == 0:
+            print('no triangles were changed in interval, returning without updating!')
+            return False, 0
+
+        allDeletedTriangles = set()
+        oldNeighboringNodes = set()
+        changedEdges = set()
+        for changedNode in changedNodes:
+            nodeTriangles = self.get_triangles(changedNode)
+            deepNeighbors = self.get_neighboring_nodes(changedNode, 'deep')
+            for deepNeighbor in deepNeighbors:
+                changedEdges.add((changedNode, deepNeighbor))
+            shallowNeighbors = self.get_neighboring_nodes(changedNode, 'shallow')
+            for shallowNeighbor in shallowNeighbors:
+                changedEdges.add((shallowNeighbor, changedNode))
+            allDeletedTriangles.update(nodeTriangles)
+            oldNeighboringNodes.update(deepNeighbors)
+            oldNeighboringNodes.update(shallowNeighbors)
+
+        print(len(allDeletedTriangles), oldNeighboringNodes)
+        print(oldNeighboringNodes.difference(changedNodes))
+
+        poppedNodes = set()
+        for triangle in allDeletedTriangles:
+            # print(triangle)
+            # print(self.triangleInventory[triangle])
+            poppedNodes.update(self.triangleInventory[triangle])
+            for reffedNode in self.triangleInventory[triangle]:
+                self.delete_triangle_from_node(triangle, reffedNode)
+            # print(self.triangleInventory[triangle])
+            del self.triangleInventory[triangle]
+
+        print(poppedNodes)
+
+        for changedEdge in changedEdges:
+            self.delete_edge(changedEdge)
+
+        for changedNode in changedNodes:
+            self.remove_node_and_all_contents(changedNode)
+
+        # nodesInTI = set()
+        # for tri in self.triangleInventory.keys():
+        #     # print(self.triangleInventory[tri])
+        #     nodesInTI.update(self.triangleInventory[tri])
+        # print('tinodes2: ', nodesInTI)
+
+        # remove previous_z because region graph is built again
+        for changedVertex in changedVertices:
+            self.vertexDict.remove_previous_z(self.triangulation.get_point(
+                changedVertex))
+
+        # insert all deleted triangles back in the graph
+        affectedNodes = self.insert_triangles_into_region_graph2(
+            allDeletedTriangles, poppedNodes)
+        # newly inserted nodes are not connected yet
+        self.debug(affectedNodes)
+
+        # self.print_graph()
+        # establish edges again
+        self.establish_edges_on_affected_nodes(affectedNodes)
+
+        # self.print_graph()
+        print(self.availableNodeIds)
+
+        return True, len(changedVertices)
+
     def smooth_vertices_helper2(self, vertexSet):
 
         self.msg('\n==== Smoothing pass ====', 'header')
@@ -4418,7 +4915,7 @@ class Hydropolator:
                 self.generate_statistics()
 
             allVertices = self.vertices[1:]
-            self.smooth_vertices_helper2(allVertices)
+            verticesAreUpdatedPre, numberUpdatedVerticesPre = self.smooth_vertices_new(allVertices)
 
             iterations += 1
 
@@ -4534,7 +5031,7 @@ class Hydropolator:
 
                 # verticesAreUpdated, numberUpdatedVertices = self.smooth_vertices_helper2(
                 #     verticesToUpdate)
-                verticesAreUpdated, numberUpdatedVertices = self.simple_smooth_and_rebuild(
+                verticesAreUpdated, numberUpdatedVertices = self.smooth_vertices_new(
                     verticesToUpdate)
                 print('something updated: ', verticesAreUpdated, numberUpdatedVertices)
 

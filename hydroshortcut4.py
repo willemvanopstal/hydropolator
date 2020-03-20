@@ -26,7 +26,7 @@ print('\n\n')
 ###############################
 
 surveyData = '../Data/operatorimplications/simulated_surface_points.txt'
-projectName = 'pthree_smoothing_process_four_dense'
+projectName = 'new_updating'
 projectObject = Hydropolator()
 
 # innerNodes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
@@ -75,14 +75,14 @@ projectObject.set_iso_seg_bins(isoLengthBreakpoints)
 ###############################
 
 paramDict = {'prepass': 0,
-             'densification': 3,
+             'densification': 0,
              'process': [],
              'densification_process': [],
              'maxiter': 50,
-             'angularity_threshold': 1.3,
+             'angularity_threshold': 1.1,
              'spurgully_threshold': None,
-             'spur_threshold': 5,
-             'gully_threshold': 10,
+             'spur_threshold': 0.5,
+             'gully_threshold': 1,
              'aspect_threshold': 0.5,
              'size_threshold': 5
              }
