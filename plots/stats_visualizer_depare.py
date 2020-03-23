@@ -2,44 +2,137 @@ import pandas as pd
 from matplotlib import pyplot as plt
 import seaborn as sns
 import numpy as np
-sns.set_style('whitegrid')
 
 data = pd.read_csv('stats_together_data.csv', delimiter=';')
-data.reindex(index=data.index[::-1])
 
-# print(data)
-# ax = sns.lineplot(x="region", y="aandeel", hue="process",
-#                   data=data, palette='deep')
-# # plt.show()
+data['aandeel_diff'] = 0.0
+for i in range(1, len(data) + 1):
+    indexAandeel = data.columns.get_loc('aandeel')
+    indexRegion = data.columns.get_loc('region')
+    indexDiff = data.columns.get_loc('aandeel_diff')
+    regionVal = data.iat[i-1, indexRegion]
+    currentVal = data.iat[i-1, indexAandeel]
+    # print(data.iat[i-1, indexRegion])
+    # print('\nregion: {} aandeel: {}'.format(regionVal, currentVal))
+    originalValue = data.loc[(data['process'] == 'original') &
+                             (data['region'] == regionVal), 'aandeel'].values[0]
+    # print('original aandeel: {}'.format(originalValue))
+    diffAandeel = currentVal - originalValue
+    # print(diffAandeel)
+    data.iat[i-1, indexDiff] = diffAandeel
+
+# for processName in dfs:
+#     print(processName)
 #
-# ax = sns.violinplot(x="process", y="region", data=data, bw=0.2)
+#     data.loc[data["process"] == 'original']
+#     # diffName = processName + '_diff'
+#     # data[diffName] = data[processName] - data['original']
+print(data)
 
+####################################
+# DEPARE HISTOGRAM
+####################################
+plt.figure(1)
+
+sns.set_style('whitegrid')
+sns.set_context('paper', rc={"grid.linewidth": 0.2})
+pal = sns.color_palette("Set2")
+
+dfs = dict(tuple(data.groupby("process")))
+# print(dfs)
+listdfs = [x for x in dfs]
+ax = sns.lineplot(x="region", y="aandeel", hue="process",
+                  data=data, palette="Set2", lw=1)
+
+ax.lines[len(listdfs)-1].set_linestyle(":")
+ax.lines[len(listdfs)-1].set_linewidth(1)
+dfs = dict(tuple(data.groupby("process")))
+# print(dfs)
+# listdfs = [x for x in dfs]
+handles, labels = ax.get_legend_handles_labels()
+# print(labels[1:])
+for i, df in enumerate(labels[1:]):
+    # print(df)
+    # print(pal[i])
+    alphaVal = 0.2
+    if df == "original":
+        alphaVal = 0.01
+    plt.fill_between("region", 0, "aandeel", data=dfs[df], alpha=alphaVal, color=pal[i])
+
+
+# plt.fill_between("region", "aandeel", data=data,
+#                  alpha=0.4, color="r")
+plt.ylim(bottom=0)
+plt.xlim(left=0)
+plt.xticks(data.region[0::1])
+ax.set_title("Morfology histogram")
 # plt.show()
 
-# ax.show()
+####################################
+# DEPARE CHANGE
+####################################
+# print(data)
+plt.figure(2)
+
+data = data.drop(data[data.process == 'original'].index)
+
+
+sns.set_style('whitegrid')
+sns.set_context('paper', rc={"grid.linewidth": 0.2})
+pal = sns.color_palette("Set2")
+
+# data = pd.read_csv('stats_together_data.csv', delimiter=';')
+# dfs = dict(tuple(data.groupby("process")))
+# print(dfs)
+# listdfs = [x for x in dfs]
+ax = sns.lineplot(x="region", y="aandeel_diff", hue="process",
+                  data=data, palette="Set2", lw=1)
+
+ax.lines[len(listdfs)-1].set_linestyle(":")
+ax.lines[len(listdfs)-1].set_linewidth(0)
+dfs = dict(tuple(data.groupby("process")))
+# print(dfs)
+# listdfs = [x for x in dfs]
+handles, labels = ax.get_legend_handles_labels()
+# print(labels[1:])
+for i, df in enumerate(labels[1:]):
+    if df == 'process':
+        continue
+    # print(df)
+    # print(pal[i])
+    alphaVal = 0.2
+    if df == "original":
+        alphaVal = 0.00
+    plt.fill_between("region", 0, "aandeel_diff", data=dfs[df], alpha=alphaVal, color=pal[i])
+
+
+# plt.fill_between("region", "aandeel", data=data,
+#                  alpha=0.4, color="r")
+# plt.ylim(bottom=0)
+plt.xlim(left=0)
+plt.xticks(data.region[0::1])
+ax.set_title("Morfology changes")
+# plt.show()
+
+####################################
+# DEPARE RIDGE PLOT
+####################################
+plt.figure(3)
 
 sns.set(style="whitegrid", rc={"axes.facecolor": (0, 0, 0, 0)})
+sns.set_context('paper', rc={"grid.linewidth": 0.2})
 
-# Create the data
-rs = np.random.RandomState(1979)
-x = rs.randn(500)
-g = np.tile(list("ABCDEFGHIJ"), 50)
-df = pd.DataFrame(dict(x=x, g=g))
-print(df)
-m = df.g.map(ord)
-# df["x"] += m
-print(df)
-df = data
+df = pd.read_csv('stats_together_data.csv', delimiter=';')
+df.loc[df["aandeel"] == 0, "aandeel"] = np.nan
 
 # Initialize the FacetGrid object
-pal = sns.cubehelix_palette(10, rot=-.25, light=.7)
+pal = sns.color_palette("Set2")
 g = sns.FacetGrid(df, row="process", hue="process", aspect=10, height=0.6, palette=pal)
 
 # Draw the densities in a few steps
-g.map(sns.lineplot, "region", "aandeel", clip_on=False, alpha=1, lw=1.5)
-g.map(plt.fill_between, "region", "aandeel")
-g.map(sns.lineplot, "region", "aandeel", clip_on=False, color="w", lw=2)
-g.map(plt.axhline, y=0, lw=1, clip_on=False)
+g.map(sns.lineplot, "region", "aandeel", clip_on=False, alpha=1, lw=0)
+g.map(plt.fill_between, "region", "aandeel", interpolate=True, alpha=0.6)
+# g.map(sns.lineplot, "region", "aandeel", clip_on=False, color="w", lw=1.5)
 
 
 # Define and use a simple function to label the plot in axes coordinates
