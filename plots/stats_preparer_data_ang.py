@@ -1,6 +1,6 @@
 import os
 
-keyword = 'depare'
+keyword = 'ang'
 depare_files = {}
 separator = ';'
 
@@ -27,35 +27,51 @@ for entry in range(i+1):
     sortedProcesses.append(unorderedProcesses[originalIndex])
 print(sortedProcesses)
 
-headerRow = 'process;region;aandeel'
+headerRow = 'process;interval;aandeel;intervalindex'
 rowDict = {}
 
-with open('stats_together_data_depare.csv', 'w') as outfile:
+with open('stats_together_data_ang.csv', 'w') as outfile:
     outfile.write(headerRow + '\n')
 
     for process in sortedProcesses:
         print(process)
-        totalArea = 0.0
+        totalAngles = 0
 
         with open(depare_files[process]) as infile:
-            for line in infile.readlines():
+
+            lines = infile.readlines()
+
+            for line in lines:
                 if not line.startswith('SEP'):
                     rowEntry = line.split(separator)
-                    if rowEntry[0] == 'depares':
+                    if rowEntry[0] == 'sharps':
                         continue
-                    # print(line.split(';'))
-                    if rowEntry[0] == 'total':
-                        totalArea = float(rowEntry[-1].strip().replace(',', '.'))
-                        print(totalArea)
                     else:
+                        rowValue = int(rowEntry[-1].strip())
+                        totalAngles += rowValue
+                        # print(rowValue, totalAngles)
+
+            print("totalAngles: ", totalAngles)
+
+            ii = 0
+            for line in lines:
+                if not line.startswith('SEP'):
+                    rowEntry = line.split(separator)
+                    if rowEntry[0] == 'sharps':
+                        continue
+                    else:
+                        rowValue = int(rowEntry[-1].strip())
                         depare_region = rowEntry[0]
                         rowValue = float(rowEntry[-1].strip().replace(',', '.'))
-                        rowPercentage = round(rowValue / totalArea, 4)
+                        rowPercentage = round(rowValue / totalAngles, 4)
+                        print(rowPercentage)
 
-                        outfile.write('{};{};{}\n'.format(process, depare_region, rowPercentage))
+                        outfile.write('{};{};{};{}\n'.format(
+                            process, depare_region, rowPercentage, ii))
                         # rowPercentage = round(rowValue*100, 0)
                         #
                         # if depare_region in rowDict:
                         #     rowDict[depare_region] = rowDict[depare_region] + ';' + str(rowPercentage)
                         # else:
                         #     rowDict[depare_region] = depare_region + ';' + str(rowPercentage)
+                        ii += 1

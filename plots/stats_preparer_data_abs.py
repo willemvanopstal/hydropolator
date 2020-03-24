@@ -1,6 +1,6 @@
 import os
 
-keyword = 'depare'
+keyword = 'abs'
 depare_files = {}
 separator = ';'
 
@@ -27,10 +27,10 @@ for entry in range(i+1):
     sortedProcesses.append(unorderedProcesses[originalIndex])
 print(sortedProcesses)
 
-headerRow = 'process;region;aandeel'
+headerRow = 'process;interval;num_changes;intervalindex'
 rowDict = {}
 
-with open('stats_together_data_depare.csv', 'w') as outfile:
+with open('stats_together_data_abs.csv', 'w') as outfile:
     outfile.write(headerRow + '\n')
 
     for process in sortedProcesses:
@@ -38,10 +38,11 @@ with open('stats_together_data_depare.csv', 'w') as outfile:
         totalArea = 0.0
 
         with open(depare_files[process]) as infile:
+            ii = 0
             for line in infile.readlines():
                 if not line.startswith('SEP'):
                     rowEntry = line.split(separator)
-                    if rowEntry[0] == 'depares':
+                    if rowEntry[0] == 'abs_change':
                         continue
                     # print(line.split(';'))
                     if rowEntry[0] == 'total':
@@ -50,12 +51,13 @@ with open('stats_together_data_depare.csv', 'w') as outfile:
                     else:
                         depare_region = rowEntry[0]
                         rowValue = float(rowEntry[-1].strip().replace(',', '.'))
-                        rowPercentage = round(rowValue / totalArea, 4)
+                        # rowPercentage = round(rowValue / totalArea, 4)
 
-                        outfile.write('{};{};{}\n'.format(process, depare_region, rowPercentage))
+                        outfile.write('{};{};{};{}\n'.format(process, depare_region, rowValue, ii))
                         # rowPercentage = round(rowValue*100, 0)
                         #
                         # if depare_region in rowDict:
                         #     rowDict[depare_region] = rowDict[depare_region] + ';' + str(rowPercentage)
                         # else:
                         #     rowDict[depare_region] = depare_region + ';' + str(rowPercentage)
+                        ii += 1
