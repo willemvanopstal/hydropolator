@@ -81,7 +81,7 @@ ax.set_title("Morfology histogram")
 
 fig = plt.gcf()
 fig.set_size_inches(14/2.54, 10/2.54)
-fig.savefig('hist_depare.pdf', dpi=100)
+fig.savefig('hist_depare.pdf', dpi=100, tranparent=True)
 
 # plt.show()
 
@@ -136,7 +136,7 @@ sns.despine()
 
 fig = plt.gcf()
 fig.set_size_inches(14/2.54, 10/2.54)
-fig.savefig('changes_depare.pdf', dpi=100)
+fig.savefig('changes_depare.pdf', dpi=100, transparent=True)
 # plt.show()
 
 
@@ -259,7 +259,7 @@ ax.set_title("Morfology changes")
 
 fig = plt.gcf()
 fig.set_size_inches(14/2.54, 16/2.54)
-fig.savefig('together_depare.pdf', dpi=100)
+fig.savefig('together_depare.pdf', dpi=100, transparent=True)
 
 ####################################
 # DEPARE RIDGE PLOT
@@ -303,4 +303,4 @@ g.despine(bottom=True, left=True)
 # plt.show()
 fig = plt.gcf()
 fig.set_size_inches(14/2.54, 10/2.54)
-fig.savefig('ridge_depare.pdf', dpi=100)
+fig.savefig('ridge_depare.pdf', dpi=100, transparent=True)
