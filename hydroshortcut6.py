@@ -75,10 +75,10 @@ projectObject.set_iso_seg_bins(isoLengthBreakpoints)
 ###############################
 
 paramDict = {'prepass': 2,
-             'densification': 2,
+             'densification': 0,
              'process': [],
              'densification_process': [],
-             'maxiter': 4,
+             'maxiter': 10,
              'angularity_threshold': 1.6,
              'spurgully_threshold': None,
              'spur_threshold': 0.5,
@@ -99,8 +99,8 @@ paramDict = {'prepass': 2,
 #                         [['angularity', 'r', 2], ['spurs', 'r', 2], ['gullys', 'r', 2], 0],
 #                         [['angularity', 'r', 4], 3]
 #                         ]
-paramDict['process'] = [[['angularity', 'r', 1], 0]]
-paramDict['process'] = [['spurs', 0], ['gullys', 0]]
+# paramDict['process'] = [[['angularity', 'r', 1], 0]]
+paramDict['process'] = [['spurs', 0], ['gullys', 0], ['angularity', 0]]
 
 # paramDict['densification_process'] = [['angularity', 'r', 1],
 #                                       ['aspect-edges', 'r', 0],
@@ -123,7 +123,7 @@ projectObject.generate_isobaths5()
 
 startTime = datetime.now()
 
-projectObject.start_routine_new(paramDict, statistics=False)
+projectObject.start_routine_new(paramDict, statistics=True)
 
 endTime = datetime.now()
 print('elapsed time: ', endTime - startTime)

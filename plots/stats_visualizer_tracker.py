@@ -2,6 +2,7 @@ import pandas as pd
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 import matplotlib.font_manager as fm
+import matplotlib.ticker as ticker
 import seaborn as sns
 import numpy as np
 
@@ -13,75 +14,204 @@ robotoRegularFont_title = fm.FontProperties(
 robotoRegularFont_legend = fm.FontProperties(fname=rrPath, size=7)
 robotoRegularFont_axislabel = fm.FontProperties(fname=rrPath, size=10)
 robotoRegularFont_ticks = fm.FontProperties(fname=rrPath, size=6)
-depareTogetherDataFile = "stats_together_data_depare.csv"
 
-data = pd.read_csv(depareTogetherDataFile, delimiter=';')
+trackerData = "stats_data_tracker6.csv"
 
-data['aandeel_diff'] = 0.0
-for i in range(1, len(data) + 1):
-    indexAandeel = data.columns.get_loc('aandeel')
-    indexRegion = data.columns.get_loc('region')
-    indexDiff = data.columns.get_loc('aandeel_diff')
-    regionVal = data.iat[i-1, indexRegion]
-    currentVal = data.iat[i-1, indexAandeel]
-    originalValue = data.loc[(data['process'] == 'original') &
-                             (data['region'] == regionVal), 'aandeel'].values[0]
-    diffAandeel = currentVal - originalValue
-    data.iat[i-1, indexDiff] = diffAandeel
+data = pd.read_csv(trackerData, delimiter=';')
+
+# filter data stats
+# 0           0        conflicting_iso_vertices    209
+# 1           0           conflicting_triangles    219
+# 2           0  extended_conflicting_triangles   1078
+# 3           0              vertices_to_smooth    832
+# 4           0                updated_vertices    377
+# 5           0      conflicting_sharp_vertices      0
+# 6           0       conflicting_spur_vertices     89
+# 7           0      conflicting_gully_vertices    120
+# 8           0     conflicting_sharp_triangles      0
+# 9           0      conflicting_spur_triangles    108
+# 10          0     conflicting_gully_triangles    149
+statsToKeep = ['conflicting_iso_vertices',
+               'vertices_to_smooth', 'updated_vertices']
+individualsToKeep = ['conflicting_sharp_vertices', 'conflicting_spur_vertices', 'conflicting_gully_vertices',
+                     'conflicting_sharp_triangles', 'conflicting_spur_triangles', 'conflicting_gully_triangles',
+                     'conflicting_iso_vertices', 'conflicting_triangles']
+individualsToKeep = ['conflicting_sharp_vertices',
+                     'conflicting_spur_vertices', 'conflicting_gully_vertices']
+
+individual_data = data[data['stat'].isin(individualsToKeep)]
+
+data = data[data['stat'].isin(statsToKeep)]
+
 
 print(data)
 
 ####################################
-# DEPARE HISTOGRAM
+# PROGRESS
 ####################################
 plt.figure(1)
 
 sns.set_style('whitegrid')
 sns.set_context('paper', rc={"grid.linewidth": 0.2})
-pal = sns.color_palette("Set2")
 
-dfs = dict(tuple(data.groupby("process")))
+dfs = dict(tuple(data.groupby("stat")))
 listdfs = [x for x in dfs]
-ax = sns.lineplot(x="region", y="aandeel", hue="process",
-                  data=data, palette="Set2", lw=1)
+ax = sns.lineplot(x="iteration", y="counter", hue="stat",
+                  data=data, palette='colorblind', lw=1)
 # ax.set(xlabel='region index', ylabel='portion [%]')
-ax.set_xlabel('region index', fontproperties=robotoRegularFont_axislabel)
-ax.set_ylabel('portion [%]', fontproperties=robotoRegularFont_axislabel)
+ax.set_xlabel('iteration', fontproperties=robotoRegularFont_axislabel)
+ax.set_ylabel('count', fontproperties=robotoRegularFont_axislabel)
 
 sns.despine()
 
-ax.lines[len(listdfs)-1].set_linestyle(":")
-ax.lines[len(listdfs)-1].set_linewidth(1)
-leg = ax.legend()
-leg_lines = leg.get_lines()
-leg_lines[len(listdfs)].set_linestyle(":")
+# ax.lines[len(listdfs)-1].set_linestyle(":")
+# ax.lines[len(listdfs)-1].set_linewidth(1)
+# leg = ax.legend()
+# leg_lines = leg.get_lines()
+# leg_lines[len(listdfs)].set_linestyle(":")
 
-dfs = dict(tuple(data.groupby("process")))
-handles, labels = ax.get_legend_handles_labels()
-print(handles)
-for i, df in enumerate(labels[1:]):
-    print(df)
-    alphaVal = 0.2
-    if df == "original":
-        alphaVal = 0.01
-    plt.fill_between("region", 0, "aandeel", data=dfs[df], alpha=alphaVal, color=pal[i])
+# dfs = dict(tuple(data.groupby("stat")))
+# handles, labels = ax.get_legend_handles_labels()
+# print(handles)
+# for i, df in enumerate(labels[1:]):
+#     print(df)
+#     alphaVal = 0.2
+#     if df == "original":
+#         alphaVal = 0.01
+#     plt.fill_between("region", 0, "aandeel", data=dfs[df], alpha=alphaVal, color=pal[i])
 
 
 plt.ylim(bottom=0)
 plt.xlim(left=0)
-# plt.xticks()
-plt.xticks(data.region[0::1], fontproperties=robotoRegularFont_ticks)
+plt.xticks(data.iteration[0::1], fontproperties=robotoRegularFont_ticks)
+ax.xaxis.set_major_locator(ticker.MultipleLocator(5))
 plt.yticks(fontproperties=robotoRegularFont_ticks)
-ax.set_title("Morfology histogram", fontproperties=robotoRegularFont_title)
+ax.set_title("Conflicts and smoothened vertices", fontproperties=robotoRegularFont_title)
 plt.legend(prop=robotoRegularFont_legend)
 
 
-fig = plt.gcf()
-fig.set_size_inches(14/2.54, 10/2.54)
-fig.savefig('hist_depare.pdf', dpi=100, tranparent=True)
+# fig = plt.gcf()
+# fig.set_size_inches(14/2.54, 10/2.54)
+# fig.savefig('iteration_tracker.pdf', dpi=100, tranparent=True)
 
 # plt.show()
 
+
+####################################
+# INDIVIDUAL
+####################################
+plt.figure(2)
+
+sns.set_style('whitegrid')
+sns.set_context('paper', rc={"grid.linewidth": 0.2})
+pal = sns.color_palette("Set2")
+
+dfs = dict(tuple(individual_data.groupby("stat")))
+listdfs = [x for x in dfs]
+ax = sns.lineplot(x="iteration", y="counter", hue="stat",
+                  data=individual_data, palette="Set2", lw=1, hue_order=listdfs)
+# ax.set(xlabel='region index', ylabel='portion [%]')
+ax.set_xlabel('iteration', fontproperties=robotoRegularFont_axislabel)
+ax.set_ylabel('count', fontproperties=robotoRegularFont_axislabel)
+
+sns.despine()
+
+# ax.lines[len(listdfs)-1].set_linestyle(":")
+# ax.lines[len(listdfs)-1].set_linewidth(1)
+# leg = ax.legend()
+# leg_lines = leg.get_lines()
+# leg_lines[len(listdfs)].set_linestyle(":")
+
+# dfs = dict(tuple(data.groupby("stat")))
+# handles, labels = ax.get_legend_handles_labels()
+# print(handles)
+# for i, df in enumerate(labels[1:]):
+#     print(df)
+#     alphaVal = 0.2
+#     if df == "original":
+#         alphaVal = 0.01
+#     plt.fill_between("region", 0, "aandeel", data=dfs[df], alpha=alphaVal, color=pal[i])
+
+
+plt.ylim(bottom=0)
+plt.xlim(left=0)
+plt.xticks(individual_data.iteration[0::1], fontproperties=robotoRegularFont_ticks)
+ax.xaxis.set_major_locator(ticker.MultipleLocator(5))
+plt.yticks(fontproperties=robotoRegularFont_ticks)
+ax.set_title("Conflicts and smoothened vertices", fontproperties=robotoRegularFont_title)
+plt.legend(prop=robotoRegularFont_legend)
+
+
+# fig = plt.gcf()
+# fig.set_size_inches(14/2.54, 10/2.54)
+# fig.savefig('iteration_tracker_individual.pdf', dpi=100, tranparent=True)
+
+# plt.show()
+
+
+####################################
+# INDIVIDUAL STACKED
+####################################
+plt.figure(3)
+
+sns.set_style('whitegrid')
+sns.set_context('paper', rc={"grid.linewidth": 0.2})
+pal = sns.color_palette("Set2")
+
+dfs = dict(tuple(individual_data.groupby("stat")))
+listdfs = [x for x in dfs]
+print(listdfs)
+
+# ax = sns.stackplot(x="iteration", y="count", hue="stat",
+#                    data=individual_data, palette="Set2", lw=1)
+
+iters = individual_data.iteration[individual_data.stat == listdfs[0]]
+yValues = []
+for stat in listdfs:
+    yValues.append(list(individual_data.counter[individual_data.stat == stat]))
+
+plt.stackplot(iters, yValues, labels=listdfs, colors=pal)
+ax = plt.gca()
+
+# ax.set(xlabel='region index', ylabel='portion [%]')
+ax.set_xlabel('iteration', fontproperties=robotoRegularFont_axislabel)
+ax.set_ylabel('counter', fontproperties=robotoRegularFont_axislabel)
+
+sns.despine()
+
+# ax.lines[len(listdfs)-1].set_linestyle(":")
+# ax.lines[len(listdfs)-1].set_linewidth(1)
+# leg = ax.legend()
+# leg_lines = leg.get_lines()
+# leg_lines[len(listdfs)].set_linestyle(":")
+
+# dfs = dict(tuple(data.groupby("stat")))
+# handles, labels = ax.get_legend_handles_labels()
+# print(handles)
+# for i, df in enumerate(labels[1:]):
+#     print(df)
+#     alphaVal = 0.2
+#     if df == "original":
+#         alphaVal = 0.01
+#     plt.fill_between("region", 0, "aandeel", data=dfs[df], alpha=alphaVal, color=pal[i])
+
+
+plt.ylim(bottom=0)
+plt.xlim(left=0)
+plt.xticks(individual_data.iteration[0::1], fontproperties=robotoRegularFont_ticks)
+ax.xaxis.set_major_locator(ticker.MultipleLocator(5))
+plt.yticks(fontproperties=robotoRegularFont_ticks)
+ax.set_title("Conflicting iso vertices per metric", fontproperties=robotoRegularFont_title)
+plt.legend(prop=robotoRegularFont_legend)
+
+
+# fig = plt.gcf()
+# fig.set_size_inches(14/2.54, 10/2.54)
+# fig.savefig('iteration_tracker_individual.pdf', dpi=100, tranparent=True)
+
+plt.show()
+
+'''
 ####################################
 # DEPARE CHANGE
 ####################################
@@ -274,3 +404,4 @@ g.fig.suptitle("Morfology histograms", fontproperties=robotoRegularFont_title)
 fig = plt.gcf()
 fig.set_size_inches(14/2.54, 8/2.54)
 fig.savefig('ridge_depare.pdf', dpi=100, transparent=True)
+'''

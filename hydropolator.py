@@ -3,7 +3,7 @@
 # @Email:  willemvanopstal home nl
 # @Project: Hydropolator
 # @Last modified by:   Bonny
-# @Last modified time: 20-Mar-2020
+# @Last modified time: 01-Apr-2020
 
 
 from ElevationDict import ElevationDict
@@ -85,7 +85,8 @@ class Hydropolator:
                   'sharp_points': [],
                   'abs_change': [],
                   'min_change': [],
-                  'iso_seg_lengths': []}
+                  'iso_seg_lengths': [],
+                  'iter_tracker': []}
 
     projectName = None
     initDate = None
@@ -3635,6 +3636,8 @@ class Hydropolator:
     def generate_depth_areas(self, nodeIds=[]):
         self.msg('> generating depth areas...', 'header')
 
+        # self.print_graph()
+
         depare_areas_current = {'total': 0.0, 'regions': []}
 
         for r in self.regions:
@@ -3656,10 +3659,16 @@ class Hydropolator:
             # interval = self.get_interval_from_node(nodeId)
             # region = self.regions[interval]
             nodeEdgeIds = node['edges']
+            # print('nodeedges: ', nodeId, nodeEdgeIds)
+            if len(nodeEdgeIds) == 0:
+                self.msg('> buggy node detected! nodeId: {}'.format(nodeId), 'warning')
+                continue
             # print('----new node ', nodeId, nodeEdgeIds)
 
             for edgeId in nodeEdgeIds:
                 edge = self.graph['edges'][edgeId]
+
+                # print('depare: ', nodeId, edgeId)
 
                 if not edge['closed']:
                     nonClosed = True
@@ -4063,7 +4072,15 @@ class Hydropolator:
             # print(self.triangleInventory[triangle])
             del self.triangleInventory[triangle]
 
+        # for nodeId in poppedNodes:
+        #     print(nodeId, len(self.get_triangles(nodeId)),
+        #           len(self.graph['nodes'][nodeId]['edges']))
+        #     if len(self.get_triangles(nodeId)) == 0 and len(self.graph['nodes'][nodeId]['edges']) == 0:
+        #         changedNodes.add(nodeId)
+        #         self.msg('poppednode will be deleted {}'.format(nodeId), 'warning')
+
         # print(poppedNodes)
+        # print('changedNodes: ', changedNodes, '\npoppedNodes: ', poppedNodes)
 
         for changedEdge in changedEdges:
             self.delete_edge(changedEdge)
@@ -4086,8 +4103,10 @@ class Hydropolator:
         if len(allDeletedTriangles) > 0:
             affectedNodes = self.insert_triangles_into_region_graph2(
                 allDeletedTriangles, poppedNodes)
+            print(affectedNodes)
             self.establish_edges_on_affected_nodes(affectedNodes)
             self.debug(affectedNodes)
+
         # newly inserted nodes are not connected yet
 
         # self.print_graph()
@@ -4096,6 +4115,15 @@ class Hydropolator:
 
         # self.print_graph()
         # print(self.availableNodeIds)
+
+        keysCopy = list(self.graph['nodes'].keys())
+
+        for nodeId in keysCopy:
+            # print(nodeId, len(self.get_triangles(nodeId)),
+                  # len(self.graph['nodes'][nodeId]['edges']))
+            if len(self.get_triangles(nodeId)) == 0 and len(self.graph['nodes'][nodeId]['edges']) == 0:
+                self.msg('poppednode will be deleted {}'.format(nodeId), 'warning')
+                self.remove_node_and_all_contents(nodeId)
 
         return len(changedVertices)
 
@@ -4739,7 +4767,7 @@ class Hydropolator:
         # print(self.isobathValues)
         return abs_diffs, min_diffs
 
-    def generate_statistics(self):
+    def generate_statistics(self, tracker_dict=None):
 
         depare_area_dict = self.generate_depth_areas()
         sharp_points_dict = self.check_all_sharp_points()
@@ -4754,6 +4782,9 @@ class Hydropolator:
         stats['min_change'].append(min_diffs_dict)
         stats['iso_seg_lengths'].append(iso_lengths_dict)
 
+        if tracker_dict:
+            stats['iter_tracker'].append(tracker_dict)
+
     def export_statistics(self):
 
         stats = self.statistics
@@ -4764,6 +4795,7 @@ class Hydropolator:
         abs_change_header = 'SEP={}\nabs_change'.format(separator)
         min_change_header = 'SEP={}\nmin_change'.format(separator)
         isoseg_header = 'SEP={}\nisoseg'.format(separator)
+        tracker_header = 'iteration{}stat{}counter'.format(separator, separator)
 
         for iter in range(stats['iterations']):
             depare_header = depare_header + '{}{}'.format(separator, iter)
@@ -4830,9 +4862,11 @@ class Hydropolator:
                     '{}{}'.format(separator, stats['iso_seg_lengths'][iteration][row])
 
         self.msg('> saving statistics...', 'info')
+
         depareName = 'stats_{}_depare.csv'.format(self.now())
         depareFile = os.path.join(os.getcwd(), 'projects', self.projectName, depareName)
         print('depare statistics file: ', depareFile)
+
         sharpsName = 'stats_{}_sharps.csv'.format(self.now())
         sharpsFile = os.path.join(os.getcwd(), 'projects', self.projectName, sharpsName)
         print('sharp statistics file: ', sharpsFile)
@@ -4848,6 +4882,10 @@ class Hydropolator:
         isoSegName = 'stats_{}_isosegs.csv'.format(self.now())
         isoSegFile = os.path.join(os.getcwd(), 'projects', self.projectName, isoSegName)
         print('iso lengths statistics file: ', isoSegFile)
+
+        trackerName = 'stats_{}_tracker.csv'.format(self.now())
+        trackerFile = os.path.join(os.getcwd(), 'projects', self.projectName, trackerName)
+        print('triacker statistics file: ', trackerFile)
 
         with open(depareFile, 'w') as depFile:
             # print(depare_header)
@@ -4883,6 +4921,15 @@ class Hydropolator:
             for isoRow in isoseg_rows:
                 isoSegFile.write(isoRow + '\n')
 
+        with open(trackerFile, 'w') as trackerFile:
+            trackerFile.write(tracker_header + '\n')
+            for iterationDict in stats['iter_tracker']:
+                iterationNumber = iterationDict['iterations']
+                for statKey in iterationDict.keys():
+                    if not statKey == 'iterations':
+                        statCount = iterationDict[statKey]
+                        trackerFile.write('{};{};{}\n'.format(iterationNumber, statKey, statCount))
+
     # ====================================== #
     #
     #   Routine
@@ -4913,6 +4960,7 @@ class Hydropolator:
             self.msg('> prepass {}'.format(iterations), 'info')
 
             if statistics:
+                # trackerDict = {'iteration': iterations}
                 self.generate_isobaths5()
                 self.generate_statistics()
 
@@ -5141,12 +5189,14 @@ class Hydropolator:
         iterations = 0
 
         # PREPASS
+        # prepass start statistics
+        allVertices = set()
+        for tri in self.triangles:
+            if 0 not in tri:
+                allVertices.update(tri)
+        numberUpdatedVerticesPre = 0
         for prepassIteration in range(paramDict['prepass']):
             self.msg('> prepass {}'.format(iterations), 'info')
-
-            if statistics:
-                self.generate_isobaths5()
-                self.generate_statistics()
 
             # allVertices = self.vertices[1:]
             allVertices = set()
@@ -5155,6 +5205,22 @@ class Hydropolator:
                     allVertices.update(tri)
             numberUpdatedVerticesPre = self.smooth_vertices_new(allVertices)
 
+            if statistics:
+                trackerDict = {'iterations': iterations,
+                               'conflicting_iso_vertices': 0,
+                               'conflicting_triangles': 0,
+                               'extended_conflicting_triangles': 0,
+                               'vertices_to_smooth': len(allVertices),
+                               'updated_vertices': numberUpdatedVerticesPre,
+                               'conflicting_sharp_vertices': 0,
+                               'conflicting_spur_vertices': 0,
+                               'conflicting_gully_vertices': 0,
+                               'conflicting_sharp_triangles': 0,
+                               'conflicting_spur_triangles': 0,
+                               'conflicting_gully_triangles': 0}
+                self.generate_isobaths5()
+                self.generate_statistics(tracker_dict=trackerDict)
+
             iterations += 1
 
         routine = True
@@ -5162,6 +5228,19 @@ class Hydropolator:
         print(list(ring_range))
         processNumber = 0
         metricsToTest = paramDict['process']
+
+        # start statistics
+        conflictingTriangles = set()
+        extendedConflictingTriangles = set()
+        verticesToUpdate = set()
+        numberUpdatedVertices = numberUpdatedVerticesPre
+        conflictingSharpVertices = 0
+        conflictingSpurVertices = 0
+        conflictingGullyVertices = 0
+        # conflictingIsoVertices = 0
+        conflictingSharpTriangles = 0
+        conflictingSpurTriangles = 0
+        conflictingGullyTriangles = 0
 
         while routine:
 
@@ -5177,16 +5256,19 @@ class Hydropolator:
 
             self.msg('\n====== executing process, iteration: {}'.format(iterations), 'header')
             print('currentRings: ', currentRings)
-            iterations += 1
 
             self.generate_isobaths5()
-            if statistics:
-                self.generate_statistics()
 
             # Conflicting triangles
             conflictingTriangles = set()
             extendedConflictingTriangles = set()
             verticesToUpdate = set()
+            conflictingSharpVertices = 0
+            conflictingSpurVertices = 0
+            conflictingGullyVertices = 0
+            conflictingSharpTriangles = 0
+            conflictingSpurTriangles = 0
+            conflictingGullyTriangles = 0
 
             # Calculate metrics
             spurGullyCalculated = False
@@ -5196,8 +5278,10 @@ class Hydropolator:
                 if metricDefinition[0] == 'angularity':
                     sharpPointsDict, allSharpPoints = self.check_isobath_angularity(
                         threshold=angularity_threshold)
+                    conflictingSharpVertices = len(allSharpPoints)
                     sharp_conflictingTriangles = self.get_all_immediate_triangles(
                         sharpPointsDict)
+                    conflictingSharpTriangles = len(sharp_conflictingTriangles)
                     # if currentRings > 0:
                     sharp_extendedConflictingTriangles = self.get_triangle_rings_around_triangles(
                         sharp_conflictingTriangles, rings=currentRings)
@@ -5210,8 +5294,15 @@ class Hydropolator:
                         spursDict, gullyDict = self.check_spurs_gullys_2(
                             threshold=spurgully_threshold, spurThreshold=spur_threshold, gullyThreshold=gully_threshold)
                         spurGullyCalculated = True
+
+                    conflictingSpurVertices = set()
+                    for skey in spursDict.keys():
+                        conflictingSpurVertices.update(spursDict[skey])
+                    conflictingSpurVertices = len(conflictingSpurVertices)
+
                     spurs_conflictingTriangles = self.get_all_immediate_triangles(
                         spursDict)
+                    conflictingSpurTriangles = len(spurs_conflictingTriangles)
                     # if currentRings > 0:
                     spurs_extendedConflictingTriangles = self.get_triangle_rings_around_triangles(
                         spurs_conflictingTriangles, rings=currentRings)
@@ -5223,8 +5314,15 @@ class Hydropolator:
                         spursDict, gullyDict = self.check_spurs_gullys_2(
                             threshold=spurgully_threshold, spurThreshold=spur_threshold, gullyThreshold=gully_threshold)
                         spurGullyCalculated = True
+
+                    conflictingGullyVertices = set()
+                    for skey in gullyDict.keys():
+                        conflictingGullyVertices.update(gullyDict[skey])
+                    conflictingGullyVertices = len(conflictingGullyVertices)
+
                     gully_conflictingTriangles = self.get_all_immediate_triangles(
                         gullyDict)
+                    conflictingGullyTriangles = len(gully_conflictingTriangles)
                     # if currentRings > 0:
                     gully_extendedConflictingTriangles = self.get_triangle_rings_around_triangles(
                         gully_conflictingTriangles, rings=currentRings)
@@ -5242,6 +5340,24 @@ class Hydropolator:
             verticesToUpdate = self.get_vertices_from_triangles(extendedConflictingTriangles)
             numberUpdatedVertices = self.smooth_vertices_new(
                 verticesToUpdate)
+
+            if statistics:
+                self.generate_isobaths5()
+                trackerDict = {'iterations': iterations,
+                               'conflicting_iso_vertices': conflictingSharpVertices + conflictingSpurVertices + conflictingGullyVertices,
+                               'conflicting_triangles': len(conflictingTriangles),
+                               'extended_conflicting_triangles': len(extendedConflictingTriangles),
+                               'vertices_to_smooth': len(verticesToUpdate),
+                               'updated_vertices': numberUpdatedVertices,
+                               'conflicting_sharp_vertices': conflictingSharpVertices,
+                               'conflicting_spur_vertices': conflictingSpurVertices,
+                               'conflicting_gully_vertices': conflictingGullyVertices,
+                               'conflicting_sharp_triangles': conflictingSharpTriangles,
+                               'conflicting_spur_triangles': conflictingSpurTriangles,
+                               'conflicting_gully_triangles': conflictingGullyTriangles}
+                self.generate_statistics(tracker_dict=trackerDict)
+
+            iterations += 1
 
             if numberUpdatedVertices == 0:
                 self.msg('> no updated vertices ! Adding a ring', 'warning')
