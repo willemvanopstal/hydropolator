@@ -701,7 +701,50 @@ class Hydropolator:
         # placeholder for Atom symbol-tree-view
         pass
 
-    def load_pointfile(self, pointFile, fileType, delimiter, flip=False):
+    def load_pointfile(self, pointFile, fileType, delimiter, xName='x', yName='y', dName='depth', flip=False):
+        pointFilePath = os.path.normpath(os.path.join(os.getcwd(), pointFile))
+        print(pointFilePath)
+
+        if fileType == 'csv':
+
+            with open(pointFile) as fi:
+
+                lineNumber = 0
+                for line in fi.readlines():
+                    if line.startswith('\"SEP') or line.startswith('SEP'):
+                        print('skipping excel separator')
+                        continue
+                    if lineNumber == 0:
+                        headerRow = [val.strip() for val in line.split(delimiter)]
+                        xPlace = headerRow.index(xName)
+                        yPlace = headerRow.index(yName)
+                        dPlace = headerRow.index(dName)
+                        lineNumber += 1
+                        continue
+
+                    point = line.split(delimiter)
+                    if flip:
+                        point = [float(point[xPlace]), float(point[yPlace]),
+                                 round(-1*float(point[dPlace])+18, 4)]
+                    elif not flip:
+                        point = [float(point[xPlace]), float(point[yPlace]),
+                                 round(float(point[dPlace])+18, 4)]
+
+                    print(point)
+
+                    self.check_minmax(point)
+                    self.pointQueue.append(point)
+                    self.pointCount += 1
+
+        elif fileType == 'shapefile':
+            print('> ShapeFile not supported yet.')
+
+        self.triangulation_insert()
+
+        self.modifiedDate = self.now()
+        self.write_metafile()
+
+    def load_pointfile_old(self, pointFile, fileType, delimiter, flip=False):
         pointFilePath = os.path.normpath(os.path.join(os.getcwd(), pointFile))
         print(pointFilePath)
 
@@ -713,6 +756,8 @@ class Hydropolator:
                         point = [float(point[0]), float(point[1]), round(-1*float(point[2])+18, 4)]
                     elif not flip:
                         point = [float(point[0]), float(point[1]), round(float(point[2])+18, 4)]
+
+                    print(point)
 
                     # if point[0] < 238 or point[0] > 380:
                     #     continue
@@ -4661,7 +4706,7 @@ class Hydropolator:
             if closed:
                 angularity = self.angularity(geom[-2], geom[0], geom[1])
                 angularity = round(math.degrees(angularity), 1)
-                print(angularity)
+                # print(angularity)
                 # print(angularity)
 
                 for bin, sharpBin in enumerate(self.sharpPointBins):
@@ -4675,7 +4720,7 @@ class Hydropolator:
             for i in range(1, len(geom)-1):
                 angularity = self.angularity(geom[i-1], geom[i], geom[i+1])
                 angularity = round(math.degrees(angularity), 1)
-                print(angularity)
+                # print(angularity)
 
                 for bin, sharpBin in enumerate(self.sharpPointBins):
                     if angularity > sharpBin[0] and angularity <= sharpBin[1]:

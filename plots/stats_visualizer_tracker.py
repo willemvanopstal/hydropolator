@@ -176,7 +176,7 @@ yValues = []
 for stat in listdfs:
     yValues.append(list(individual_data.counter[individual_data.stat == stat]))
 
-plt.stackplot(iters, yValues, labels=listdfs, colors=pal)
+plt.stackplot(iters, yValues, labels=listdfs, colors=pal, alpha=0.8)
 ax = plt.gca()
 
 # ax.set(xlabel='region index', ylabel='portion [%]')

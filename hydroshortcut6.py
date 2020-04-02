@@ -25,8 +25,8 @@ print('\n\n')
 # Input
 ###############################
 
-surveyData = '../Data/operatorimplications/simulated_surface_points.txt'
-projectName = 'new_routine'
+surveyData = '../Data/operatorimplications/simulated_surface_points.csv'
+projectName = 'new_routine_new_loadingpoint_old_nnn'
 projectObject = Hydropolator()
 
 # innerNodes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
@@ -59,8 +59,9 @@ if projectExists:
 else:
     msg('> init new project', 'header')
     projectObject.init_project(projectName)
-    projectObject.load_pointfile(surveyData, 'csv', ' ', flip=True)
-
+    projectObject.load_pointfile(surveyData, 'csv', delimiter=';',
+                                 xName='x', yName='y', dName='depth', flip=True)
+    # projectObject.load_pointfile_old(surveyData, 'csv', delimiter=' ', flip=True)
 ###############################
 # Set statistics
 ###############################
@@ -74,11 +75,11 @@ projectObject.set_iso_seg_bins(isoLengthBreakpoints)
 # Process parameters
 ###############################
 
-paramDict = {'prepass': 2,
+paramDict = {'prepass': 0,
              'densification': 0,
              'process': [],
              'densification_process': [],
-             'maxiter': 10,
+             'maxiter': 5,
              'angularity_threshold': 1.6,
              'spurgully_threshold': None,
              'spur_threshold': 0.5,
