@@ -15,7 +15,7 @@ robotoRegularFont_legend = fm.FontProperties(fname=rrPath, size=7)
 robotoRegularFont_axislabel = fm.FontProperties(fname=rrPath, size=10)
 robotoRegularFont_ticks = fm.FontProperties(fname=rrPath, size=6)
 
-trackerData = "stats_data_tracker6.csv"
+trackerData = "stats_data_tracker4.csv"
 
 data = pd.read_csv(trackerData, delimiter=';')
 
@@ -61,6 +61,8 @@ ax = sns.lineplot(x="iteration", y="counter", hue="stat",
 # ax.set(xlabel='region index', ylabel='portion [%]')
 ax.set_xlabel('iteration', fontproperties=robotoRegularFont_axislabel)
 ax.set_ylabel('count', fontproperties=robotoRegularFont_axislabel)
+# ax.set_yscale("log")
+
 
 sns.despine()
 
@@ -86,13 +88,14 @@ plt.xlim(left=0)
 plt.xticks(data.iteration[0::1], fontproperties=robotoRegularFont_ticks)
 ax.xaxis.set_major_locator(ticker.MultipleLocator(5))
 plt.yticks(fontproperties=robotoRegularFont_ticks)
-ax.set_title("Conflicts and smoothened vertices", fontproperties=robotoRegularFont_title)
+ax.set_title("Development of conflicts, smoothing queue and updated vertices",
+             fontproperties=robotoRegularFont_title)
 plt.legend(prop=robotoRegularFont_legend)
 
 
-# fig = plt.gcf()
-# fig.set_size_inches(14/2.54, 10/2.54)
-# fig.savefig('iteration_tracker.pdf', dpi=100, tranparent=True)
+fig = plt.gcf()
+fig.set_size_inches(14/2.54, 10/2.54)
+fig.savefig('iteration_tracker.pdf', dpi=100, tranparent=True)
 
 # plt.show()
 
@@ -113,6 +116,7 @@ ax = sns.lineplot(x="iteration", y="counter", hue="stat",
 # ax.set(xlabel='region index', ylabel='portion [%]')
 ax.set_xlabel('iteration', fontproperties=robotoRegularFont_axislabel)
 ax.set_ylabel('count', fontproperties=robotoRegularFont_axislabel)
+
 
 sns.despine()
 
@@ -138,13 +142,15 @@ plt.xlim(left=0)
 plt.xticks(individual_data.iteration[0::1], fontproperties=robotoRegularFont_ticks)
 ax.xaxis.set_major_locator(ticker.MultipleLocator(5))
 plt.yticks(fontproperties=robotoRegularFont_ticks)
-ax.set_title("Conflicts and smoothened vertices", fontproperties=robotoRegularFont_title)
+# plt.set_tick_params(axis='y', which='minor', fontproperties=robotoRegularFont_ticks)
+ax.set_title("Development of conflicting isovertices, per metric",
+             fontproperties=robotoRegularFont_title)
 plt.legend(prop=robotoRegularFont_legend)
 
 
-# fig = plt.gcf()
-# fig.set_size_inches(14/2.54, 10/2.54)
-# fig.savefig('iteration_tracker_individual.pdf', dpi=100, tranparent=True)
+fig = plt.gcf()
+fig.set_size_inches(14/2.54, 10/2.54)
+fig.savefig('iteration_tracker_individual.pdf', dpi=100, tranparent=True)
 
 # plt.show()
 
@@ -175,7 +181,7 @@ ax = plt.gca()
 
 # ax.set(xlabel='region index', ylabel='portion [%]')
 ax.set_xlabel('iteration', fontproperties=robotoRegularFont_axislabel)
-ax.set_ylabel('counter', fontproperties=robotoRegularFont_axislabel)
+ax.set_ylabel('count', fontproperties=robotoRegularFont_axislabel)
 
 sns.despine()
 
@@ -201,15 +207,16 @@ plt.xlim(left=0)
 plt.xticks(individual_data.iteration[0::1], fontproperties=robotoRegularFont_ticks)
 ax.xaxis.set_major_locator(ticker.MultipleLocator(5))
 plt.yticks(fontproperties=robotoRegularFont_ticks)
-ax.set_title("Conflicting iso vertices per metric", fontproperties=robotoRegularFont_title)
+ax.set_title("Development of conflicting isovertices, per metric (stacked)",
+             fontproperties=robotoRegularFont_title)
 plt.legend(prop=robotoRegularFont_legend)
 
 
-# fig = plt.gcf()
-# fig.set_size_inches(14/2.54, 10/2.54)
-# fig.savefig('iteration_tracker_individual.pdf', dpi=100, tranparent=True)
+fig = plt.gcf()
+fig.set_size_inches(14/2.54, 10/2.54)
+fig.savefig('iteration_tracker_individual_stacked.pdf', dpi=100, tranparent=True)
 
-plt.show()
+# plt.show()
 
 '''
 ####################################

@@ -3,7 +3,7 @@
 # @Email:  willemvanopstal home nl
 # @Project: Hydropolator
 # @Last modified by:   Bonny
-# @Last modified time: 01-Apr-2020
+# @Last modified time: 02-Apr-2020
 
 
 from ElevationDict import ElevationDict
@@ -4103,7 +4103,7 @@ class Hydropolator:
         if len(allDeletedTriangles) > 0:
             affectedNodes = self.insert_triangles_into_region_graph2(
                 allDeletedTriangles, poppedNodes)
-            print(affectedNodes)
+            # print(affectedNodes)
             self.establish_edges_on_affected_nodes(affectedNodes)
             self.debug(affectedNodes)
 
@@ -4601,7 +4601,7 @@ class Hydropolator:
         sharpPointRegions.append([0, breakpoints[0]])
         for i in range(len(breakpoints))[1:]:
             sharpPointRegions.append([breakpoints[i - 1], breakpoints[i]])
-        sharpPointRegions.append([breakpoints[-1], 10])
+        sharpPointRegions.append([breakpoints[-1], 360])
 
         # print(sharpPointRegions)
 
@@ -4660,6 +4660,8 @@ class Hydropolator:
 
             if closed:
                 angularity = self.angularity(geom[-2], geom[0], geom[1])
+                angularity = round(math.degrees(angularity), 1)
+                print(angularity)
                 # print(angularity)
 
                 for bin, sharpBin in enumerate(self.sharpPointBins):
@@ -4672,7 +4674,8 @@ class Hydropolator:
 
             for i in range(1, len(geom)-1):
                 angularity = self.angularity(geom[i-1], geom[i], geom[i+1])
-                # print(angularity)
+                angularity = round(math.degrees(angularity), 1)
+                print(angularity)
 
                 for bin, sharpBin in enumerate(self.sharpPointBins):
                     if angularity > sharpBin[0] and angularity <= sharpBin[1]:
