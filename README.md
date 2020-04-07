@@ -1,12 +1,53 @@
 # Hydropolator
 
 ## Methods
-
+---
 #### `start_routine_new(paramDict, statistics) -> None`
-
 This initiates the smoothing and densification routine. Make sure to pass all parameters needed. The function returns nothing, but changes the data in the parent class.
 > `paramDict <- dict (None)` parameters for the process. (see paramDict)  
 > `statistics <- Bool (False)` Generates statistics for each iteration 
+
+---
+
+#### `start_routine_new(paramDict, statistics) -> None`
+This initiates the smoothing and densification routine. Make sure to pass all parameters needed. The function returns nothing, but changes the data in the parent class.
+> `paramDict <- dict (None)` parameters for the process. (see paramDict)  
+> `statistics <- Bool (False)` Generates statistics for each iteration 
+
+---
+## Arguments
+---
+#### `paramDict <- dict`
+This dictionary is used to collect all parameters for the smoothing and densification process. It *must* have all these keys:
+> `prepass <- int` number of smoothing iterations, applied on all vertices in the dataset  
+> `densification <- int` number of densification iterations, applied after the overall smoothing  
+> `maxiter <- int` maximum iteration count, including prepasses, excluding densification  
+> `min_ring <- int` number of rings which is always added around identifief conflicting triangles  
+> `max_ring <- int` number of rings on which the smoothing process will stop. Conflicts are unlikely to be resolved further  
+> `process <- dict` parameters dictating what metrics should be used in the smoothing routine (see process)  
+> `densification_process <- dict` parameters dictating what metrics should be used in the densification routine (see densification_process)  
+> `..._threshold <- float` threshold for ...  
+> `..._threshold <- float` threshold for ...  
+> `..._threshold <- float` threshold for ...  
+> `..._threshold <- float` threshold for ...  
+> `..._threshold <- float` threshold for ...  
+
+##### `paramDict['process'] <- list`
+Parameters dictating what metrics should be used in the smoothing routine.  
+It must be a list with possible entries: `['angularity', 0], ['spurs', 0], ['gullys', 0]`. The second entry of each entry is deprecated, but may be activated manually.
+
+##### `paramDict['densification_process'] <- list`
+Parameters dictating what metrics should be used in the densification routine.  
+It must be a list with possible entries: `['angularity', 'r', 0], ['aspect-edges', 'r', 0], ['size-edges', 'r', 0]`. The second entry in each entry (`'r'`) dictates how each identified conflicting triangle should be extended, and the third entry (`0`) dictates the amount of extension.
+
+---
+
+## Variables
+
+#### `prepass
+
+## Attributes
+
 
 # Interaction
 
