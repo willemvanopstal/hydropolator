@@ -15,7 +15,7 @@ robotoRegularFont_legend = fm.FontProperties(fname=rrPath, size=7)
 robotoRegularFont_axislabel = fm.FontProperties(fname=rrPath, size=10)
 robotoRegularFont_ticks = fm.FontProperties(fname=rrPath, size=6)
 
-trackerData = "stats_data_tracker4.csv"
+trackerData = "tracker_newclassification.csv"
 
 data = pd.read_csv(trackerData, delimiter=';')
 

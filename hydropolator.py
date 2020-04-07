@@ -3,7 +3,7 @@
 # @Email:  willemvanopstal home nl
 # @Project: Hydropolator
 # @Last modified by:   Bonny
-# @Last modified time: 02-Apr-2020
+# @Last modified time: 07-Apr-2020
 
 
 from ElevationDict import ElevationDict
@@ -723,6 +723,7 @@ class Hydropolator:
                         continue
 
                     point = line.split(delimiter)
+
                     if flip:
                         point = [float(point[xPlace]), float(point[yPlace]),
                                  round(-1*float(point[dPlace])+18, 4)]
@@ -757,7 +758,7 @@ class Hydropolator:
                     elif not flip:
                         point = [float(point[0]), float(point[1]), round(float(point[2])+18, 4)]
 
-                    print(point)
+                    # print(point)
 
                     # if point[0] < 238 or point[0] > 380:
                     #     continue
