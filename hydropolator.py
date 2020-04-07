@@ -23,6 +23,7 @@ from datetime import datetime
 import shapefile
 import bisect
 import pickle
+from tabulate import tabulate
 # from shapely import geometry, ops
 import colorama
 colorama.init()
@@ -214,6 +215,46 @@ class Hydropolator:
         regionGraphName = 'regiongraph_{}.pdf'.format(self.now())
         regionGraphFile = os.path.join(os.getcwd(), 'projects', self.projectName, regionGraphName)
         plt.savefig(regionGraphFile)
+
+    def print_peaks_pits(self):
+
+        peaks = self.peaks
+        pits = self.pits
+
+        self.msg('\nPEAKS (minimum {} m2)'.format(peaks['threshold']), 'header')
+        header = ['nodeId', 'closed', 'fullArea', 'bArea', 'conflict']
+        peakRows = []
+
+        for peakId in peaks.keys():
+            if peakId == 'threshold':
+                continue
+            peak = peaks[peakId]
+            conflicting = False
+            if peak['conflictBool'] == 1:
+                conflicting = "\033[1;31m{}\033[0m".format(True)
+            elif peak['conflictBool'] == 2:
+                conflicting = "\033[1;31m{}\033[0m".format(True)
+            peakRows.append([peakId, peak['closed'], peak['fullArea'],
+                             peak['boundaryArea'], conflicting])
+
+        print(tabulate(peakRows, headers=header))
+
+        self.msg('\nPITS (minimum {} m2)'.format(pits['threshold']), 'header')
+        pitRows = []
+
+        for pitId in pits.keys():
+            if pitId == 'threshold':
+                continue
+            pit = pits[pitId]
+            conflicting = False
+            if pit['conflictBool'] == 1:
+                conflicting = "\033[1;31m{}\033[0m".format(True)
+            elif pit['conflictBool'] == 2:
+                conflicting = "\033[1;33m{}\033[0m".format(True)
+            pitRows.append([pitId, pit['closed'], pit['fullArea'],
+                            pit['boundaryArea'], conflicting])
+
+        print(tabulate(pitRows, headers=header))
 
     # ====================================== #
     #
@@ -514,6 +555,8 @@ class Hydropolator:
             wt.field('shallowNbs', 'C')
             wt.field('deepNbs', 'C')
             wt.field('full_area', 'F', decimal=3)
+            wt.field('boundary_area', 'F', decimal=3)
+            wt.field('classification', 'C')
             for node in nodeIds:
                 geom = []
                 for triangle in self.graph['nodes'][node]['triangles']:
@@ -524,9 +567,12 @@ class Hydropolator:
                 shallowNeighbors = str(self.get_neighboring_nodes(node, 'shallow'))
                 deepNeighbors = str(self.get_neighboring_nodes(node, 'deep'))
                 nodeArea = self.graph['nodes'][node]['full_area']
+                bArea = self.graph['nodes'][node]['boundary_area']
+                classification = self.graph['nodes'][node]['classification']
 
                 wt.poly(geom)
-                wt.record(int(node), region, interval, shallowNeighbors, deepNeighbors, nodeArea)
+                wt.record(int(node), region, interval, shallowNeighbors,
+                          deepNeighbors, nodeArea, bArea, classification)
 
         self.msg('> selected node triangles saved', 'info')
 
@@ -731,7 +777,7 @@ class Hydropolator:
                         point = [float(point[xPlace]), float(point[yPlace]),
                                  round(float(point[dPlace])+18, 4)]
 
-                    print(point)
+                    # print(point)
 
                     self.check_minmax(point)
                     self.pointQueue.append(point)
@@ -1649,6 +1695,83 @@ class Hydropolator:
                 #     finished = True
 
         self.msg('> edges established', 'info')
+
+    def classify_peaks_pits(self, minPeak=100, minPit=100):
+
+        self.msg('> classifying peaks and pits...', 'info')
+
+        self.generate_depth_areas(nodeIds=[])
+
+        peaks = {}
+        pits = {}
+
+        peaks['threshold'] = minPeak
+        pits['threshold'] = minPit
+
+        for nodeId in self.graph['nodes'].keys():
+            node = self.graph['nodes'][nodeId]
+            if len(node['shallowNeighbors']) == 0:
+                node['classification'] = 'peak'
+                edges = node['edges']
+                self.compute_node_area(nodeIds=[nodeId])
+                fullNodeArea = node['full_area']
+                peaks[nodeId] = {}
+                peaks[nodeId]['fullArea'] = fullNodeArea
+                peaks[nodeId]['closed'] = True
+                peaks[nodeId]['conflictBool'] = 0
+                # print('peak', nodeId, edges)
+
+                if node['outer_boundary']:
+                    boundaryEdge = node['outer_boundary']
+                    # print(boundaryEdge)
+                    boundaryArea = self.graph['edges'][boundaryEdge]['iso_area']
+                    peaks[nodeId]['boundaryArea'] = boundaryArea
+                    if boundaryArea <= minPeak:
+                        peaks[nodeId]['conflictBool'] = 1
+
+                else:
+                    boundaryArea = fullNodeArea
+                    peaks[nodeId]['boundaryArea'] = None
+                    peaks[nodeId]['closed'] = False
+                    if fullNodeArea <= minPeak:
+                        peaks[nodeId]['conflictBool'] = 2
+
+                # print(fullNodeArea, boundaryArea)
+
+            elif len(node['deepNeighbors']) == 0:
+                node['classification'] = 'pit'
+                edges = node['edges']
+                self.compute_node_area(nodeIds=[nodeId])
+                fullNodeArea = node['full_area']
+                pits[nodeId] = {}
+                pits[nodeId]['fullArea'] = fullNodeArea
+                pits[nodeId]['closed'] = True
+                pits[nodeId]['conflictBool'] = 0
+                # print('pit', nodeId, edges)
+
+                if node['outer_boundary']:
+                    boundaryEdge = node['outer_boundary']
+                    # print(boundaryEdge)
+                    boundaryArea = self.graph['edges'][boundaryEdge]['iso_area']
+                    pits[nodeId]['boundaryArea'] = boundaryArea
+                    if boundaryArea <= minPit:
+                        pits[nodeId]['conflictBool'] = 1
+                else:
+                    boundaryArea = fullNodeArea
+                    pits[nodeId]['boundaryArea'] = None
+                    pits[nodeId]['closed'] = False
+                    if fullNodeArea <= minPit:
+                        pits[nodeId]['conflictBool'] = 2
+
+                # print(fullNodeArea, boundaryArea)
+
+        # print(peaks)
+        # print(pits)
+
+        self.peaks = peaks
+        self.pits = pits
+
+        self.msg('> peaks and pits classified', 'info')
 
     def classify_nodes(self):
         self.msg('> classifying nodes...', 'info')
@@ -3702,6 +3825,7 @@ class Hydropolator:
             innerHoles = []
 
             node = self.graph['nodes'][nodeId]
+            node['boundary_area'] = 0.0
             # interval = self.get_interval_from_node(nodeId)
             # region = self.regions[interval]
             nodeEdgeIds = node['edges']
@@ -3757,6 +3881,7 @@ class Hydropolator:
             # print('total:', round(bArea - hArea, 3))
 
             totalArea = round(bArea - hArea, 3)
+            node['boundary_area'] = bArea
             regionIndex = self.get_interval_from_node(nodeId)
 
             depare_areas_current['regions'][regionIndex] = round(
@@ -4481,7 +4606,7 @@ class Hydropolator:
             nodeIds = self.graph['nodes'].keys()
 
         for nodeId in nodeIds:
-            print(nodeId, 'node_area ')
+            # print(nodeId, 'node_area ')
             node = self.graph['nodes'][nodeId]
             nodeTriangles = self.get_triangles(nodeId)
             node['full_area'] = 0
@@ -4639,6 +4764,11 @@ class Hydropolator:
         # edgeBends = BendDetector(edgeId, edge, self.projectName)
 
         pass
+
+    def check_aggregation(self, nodeIds=[], threshold=None):
+        print('checking aggregation possibilities')
+
+        return True
 
     def set_sharp_points_bins(self, breakpoints):
         # print(breakpoints)
@@ -5220,6 +5350,8 @@ class Hydropolator:
 
         self.msg('> starting routine...', 'header')
 
+        # self.classify_nodes()
+
         # for param in paramDict.keys():
         #     print(param, paramDict[param])
 
@@ -5229,11 +5361,12 @@ class Hydropolator:
         angularity_threshold = paramDict['angularity_threshold']
         aspect_threshold = paramDict['aspect_threshold']
         size_threshold = paramDict['size_threshold']
+        aggregation_threshold = paramDict['aggregation_threshold']
         min_ring = paramDict['min_ring']
         max_ring = paramDict['max_ring']
 
-        print('========\nthresholds:\nspurgully: {}\nspur: {}\ngully: {}\nangularity: {}\naspect: {}\nsize: {}\n========'.format(
-            spurgully_threshold, spur_threshold, gully_threshold, angularity_threshold, aspect_threshold, size_threshold))
+        print('========\nthresholds:\nspurgully: {}\nspur: {}\ngully: {}\nangularity: {}\naspect: {}\nsize: {}\naggregation: {}\n========'.format(
+            spurgully_threshold, spur_threshold, gully_threshold, angularity_threshold, aspect_threshold, size_threshold, aggregation_threshold))
 
         iterations = 0
 
@@ -5318,6 +5451,12 @@ class Hydropolator:
             conflictingSharpTriangles = 0
             conflictingSpurTriangles = 0
             conflictingGullyTriangles = 0
+
+            # aggregation
+            if ['aggregation', 0] in metricsToTest:
+                self.msg('AGGREGATION', 'warning')
+
+                self.check_aggregation(nodeIds=[], threshold=aggregation_threshold)
 
             # Calculate metrics
             spurGullyCalculated = False
@@ -5414,141 +5553,6 @@ class Hydropolator:
             else:
                 self.msg('> setting process back to zero', 'info')
                 processNumber = 0
-
-        '''
-
-        # REST OF PROCESS
-        routine = True
-        process = True
-        processNumber = 0
-        while routine:
-
-            if processNumber >= len(paramDict['process']):
-                self.msg('\n> no process left', 'warning')
-                break
-            if iterations >= paramDict['maxiter']:
-                self.msg('> max iterations exceeded', 'warning')
-                routine = False
-                break
-
-            processStartIteration = iterations
-            processList = paramDict['process'][processNumber]
-            self.msg('\nprocess number: '.format(processNumber), 'header')
-            for processMetric in processList[:-1]:
-                print('metric: {}\t region: {}\t extended: {}'.format(
-                    processMetric[0], processMetric[1], processMetric[2]))
-            print('stop criterion: {}'.format(processList[-1]))
-            # print(processList)
-
-            while process and routine:
-                self.msg('\n====== executing process, iteration: {}'.format(iterations), 'header')
-                iterations += 1
-
-                self.generate_isobaths5()
-                if statistics:
-                    self.generate_statistics()
-
-                # Conflicting triangles
-                conflictingTriangles = set()
-                conflictingVertices = set()
-                extendedConflictingTriangles = set()
-                extendedConflictingVertices = set()
-                verticesToUpdate = set()
-
-                # Calculate metrics
-                spurGullyCalculated = False
-                for metricDefinition in processList[:-1]:
-                    # print(metricDefinition)
-
-                    if metricDefinition[0] == 'angularity':
-                        sharpPointsDict, allSharpPoints = self.check_isobath_angularity(
-                            threshold=angularity_threshold)
-                        sharp_conflictingTriangles = self.get_all_immediate_triangles(
-                            sharpPointsDict)
-                        if metricDefinition[1] == 'r':
-                            sharp_extendedConflictingTriangles = self.get_triangle_rings_around_triangles(
-                                sharp_conflictingTriangles, rings=metricDefinition[2])
-                        elif metricDefinition[1] == 'n':
-                            pass
-                        elif metricDefinition[1] == 'nn':
-                            pass
-                        conflictingTriangles.update(sharp_conflictingTriangles)
-                        extendedConflictingTriangles.update(sharp_extendedConflictingTriangles)
-                        print('sharp points: ', len(allSharpPoints))
-
-                    elif metricDefinition[0] == 'spurs':
-                        if not spurGullyCalculated:
-                            spursDict, gullyDict = self.check_spurs_gullys_2(
-                                threshold=spurgully_threshold, spurThreshold=spur_threshold, gullyThreshold=gully_threshold)
-                            spurGullyCalculated = True
-                        spurs_conflictingTriangles = self.get_all_immediate_triangles(
-                            spursDict)
-                        if metricDefinition[1] == 'r':
-                            spurs_extendedConflictingTriangles = self.get_triangle_rings_around_triangles(
-                                spurs_conflictingTriangles, rings=metricDefinition[2])
-                        elif metricDefinition[1] == 'n':
-                            pass
-                        elif metricDefinition[1] == 'nn':
-                            pass
-                        conflictingTriangles.update(spurs_conflictingTriangles)
-                        extendedConflictingTriangles.update(spurs_extendedConflictingTriangles)
-                        print('spur triangles: ', len(spurs_conflictingTriangles))
-
-                    elif metricDefinition[0] == 'gullys':
-                        if not spurGullyCalculated:
-                            spursDict, gullyDict = self.check_spurs_gullys_2(
-                                threshold=spurgully_threshold, spurThreshold=spur_threshold, gullyThreshold=gully_threshold)
-                            spurGullyCalculated = True
-                        gully_conflictingTriangles = self.get_all_immediate_triangles(
-                            gullyDict)
-                        if metricDefinition[1] == 'r':
-                            gully_extendedConflictingTriangles = self.get_triangle_rings_around_triangles(
-                                gully_conflictingTriangles, rings=metricDefinition[2])
-                        elif metricDefinition[1] == 'n':
-                            pass
-                        elif metricDefinition[1] == 'nn':
-                            pass
-                        conflictingTriangles.update(gully_conflictingTriangles)
-                        extendedConflictingTriangles.update(gully_extendedConflictingTriangles)
-                        print('gully triangles: ', len(gully_conflictingTriangles))
-
-                print('conflictingTriangles ', len(conflictingTriangles))
-                print('extendedConflictingTriangles ', len(extendedConflictingTriangles))
-
-                if len(conflictingTriangles) == 0:
-                    self.msg('> no conflicts found, skipping process', 'warning')
-                    processNumber += 1
-                    if iterations-1 >= paramDict['maxiter']:
-                        self.msg('> max iterations exceeded', 'warning')
-                        routine = False
-
-                    break
-
-                verticesToUpdate = self.get_vertices_from_triangles(extendedConflictingTriangles)
-                # print('verticesToUpdate ', len(verticesToUpdate))
-
-                # verticesAreUpdated, numberUpdatedVertices = self.smooth_vertices_helper2(
-                #     verticesToUpdate)
-                numberUpdatedVertices = self.smooth_vertices_new(
-                    verticesToUpdate)
-                # verticesAreUpdated, numberUpdatedVertices = self.simple_smooth_and_rebuild(
-                # verticesToUpdate)
-                # print('something updated: ', numberUpdatedVertices)
-
-                # iterations += 1
-                if iterations >= paramDict['maxiter']:
-                    self.msg('> max iterations exceeded', 'warning')
-                    routine = False
-                    break
-                if processList[-1] > 0 and iterations - processStartIteration >= processList[-1]:
-                    self.msg('> max process iteration, next process', 'warning')
-                    processNumber += 1
-                    break
-                if numberUpdatedVertices == 0:
-                    self.msg('> no updated vertices !', 'warning')
-                    processNumber += 1
-                    break
-        '''
 
         # DENSIFICATION
 

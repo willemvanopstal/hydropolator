@@ -26,7 +26,7 @@ print('\n\n')
 ###############################
 
 surveyData = '../Data/operatorimplications/simulated_surface_points.txt'
-projectName = 'new_classification'
+projectName = 'new_classification_nodes'
 projectObject = Hydropolator()
 
 # innerNodes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
@@ -79,13 +79,14 @@ paramDict = {'prepass': 0,
              'densification': 0,
              'process': [],
              'densification_process': [],
-             'maxiter': 5,
+             'maxiter': 1,
              'angularity_threshold': 1.6,
              'spurgully_threshold': None,
              'spur_threshold': 0.5,
              'gully_threshold': 0.5,
              'aspect_threshold': 0.5,
              'size_threshold': 5,
+             'aggregation_threshold': 20,
              'min_ring': 1,
              'max_ring': 4
              }
@@ -102,6 +103,7 @@ paramDict = {'prepass': 0,
 #                         ]
 # paramDict['process'] = [[['angularity', 'r', 1], 0]]
 paramDict['process'] = [['spurs', 0], ['gullys', 0], ['angularity', 0]]
+paramDict['process'] = [['aggregation', 0]]
 
 # paramDict['densification_process'] = [['angularity', 'r', 1],
 #                                       ['aspect-edges', 'r', 0],
@@ -133,6 +135,8 @@ print('elapsed time: ', endTime - startTime)
 projectObject.generate_isobaths5()
 # projectObject.generate_statistics()
 
+projectObject.classify_peaks_pits(minPeak=100, minPit=100)
+projectObject.make_network_graph()
 
 ###############################
 # Exporting shapefiles
@@ -143,7 +147,7 @@ projectObject.export_all_isobaths()
 projectObject.export_all_node_triangles()
 projectObject.export_all_edge_triangles()
 # projectObject.export_shapefile('output')
-projectObject.export_statistics()
+# projectObject.export_statistics()
 
 
 ###############################
@@ -151,6 +155,7 @@ projectObject.export_statistics()
 ###############################
 
 projectObject.print_errors()
+projectObject.print_peaks_pits()
 
 msg('\n> shutting down...', 'header')
 projectObject.write_metafile()
