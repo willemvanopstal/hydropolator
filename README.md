@@ -1,5 +1,15 @@
 # Hydropolator
 
+## Methods
+
+#### `start_routine_new(paramDict, statistics) -> None`
+
+This initiates the smoothing and densification routine. Make sure to pass all parameters needed. The function returns nothing, but changes the data in the parent class.
+- `paramDict <- dict (None)` parameters for the process. (see paramDict)
+- `statistics <- Bool (False)` Generates statistics for each iteration 
+
+# Interaction
+
 ## hydroshortcut.py
  **Starting a project:**
  - Possibly need to create a directory `projects`
