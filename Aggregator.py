@@ -64,14 +64,14 @@ class Aggregator():
         self.yMax = yMax
 
     def clean_output_files(self):
-        outputFiles = ['ele', 'neigh', 'node', 'poly']
+        outputFiles = ['ele', 'node', 'poly']
         for fileType in outputFiles:
-            fileName = '{}.1.{}'.format(self.edgeId, fileType)
+            fileName = 'aggregator_{}.1.{}'.format(self.connectingNodeId, fileType)
             filePath = os.path.join(self.projectPath, fileName)
             os.remove(filePath)
 
     def clean_input_file(self):
-        fileName = '{}.poly'.format(self.edgeId)
+        fileName = 'aggregator_{}.poly'.format(self.connectingNodeId)
         filePath = os.path.join(self.projectPath, fileName)
         os.remove(filePath)
 
@@ -96,7 +96,7 @@ class Aggregator():
 
         return geoms
 
-    def export_triangles_shp(self, triangle_ids=[], name='tris', multi=None):
+    def export_triangles_shp(self, triangle_ids=[], name='agg', multi=None):
         # multi = { 'name': {triangle_ids} }
         if len(triangle_ids) == 0:
             triangle_ids = self.triangles.keys()
@@ -107,18 +107,17 @@ class Aggregator():
         for multiName in exportDict.keys():
             multiTriangles = exportDict[multiName]
             triangleShpFile = os.path.join(
-                self.projectPath, 'constrained_triangles_{}_{}_{}.shp'.format(multiName, self.edgeId, self.now()))
+                self.projectPath, 'tris_to_aggregate_{}_{}_{}.shp'.format(multiName, self.connectingNodeId, self.now()))
 
             with shapefile.Writer(triangleShpFile) as wt:
                 wt.field('triid', 'C')
                 wt.field('vertices', 'C')
-                wt.field('neighbors', 'C')
                 for triangle in multiTriangles:
+                    print(triangle)
                     geom = self.triangle_geom(triangle)
                     vertices = str(self.triangles[triangle]['vertices'])
-                    neighbors = str(self.triangles[triangle]['neighbors'])
                     wt.poly([geom])
-                    wt.record(triangle, vertices, neighbors)
+                    wt.record(triangle, vertices)
 
     # ====================================== #
     #
@@ -132,7 +131,7 @@ class Aggregator():
     def triangle_geom(self, triangle_id):
         # vertices = self.triangulation.all_vertices()
         triPoly = []
-        for vId in self.triangles[triangle_id]['vertices']:
+        for vId in self.triangles[triangle_id]['vertices']:  # strip boundarymarker
             vertex = self.get_point(vId)
             triPoly.append([vertex[0], vertex[1]])
             # elevations.append(vertex[2])
@@ -186,6 +185,12 @@ class Aggregator():
         dX = vertexTwo[0] - vertexOne[0]
         dY = vertexTwo[1] - vertexOne[1]
         # print(dX, dY)
+
+        return math.hypot(dX, dY)
+
+    def point_distance(self, ptA, ptB):
+        dX = ptA[0] - ptB[0]
+        dY = ptA[1] - ptB[1]
 
         return math.hypot(dX, dY)
 
@@ -579,6 +584,60 @@ class Aggregator():
 
         pass
 
+    def get_area_to_aggregate(self, threshold):
+        bridgingTriangles = self.get_bridging_triangles()
+
+        trianglesToAggregate = set()
+
+        for triangleId in bridgingTriangles:
+            triangle = self.triangles[triangleId]
+            vertices = triangle['vertices']
+            edges = [[self.vertices[vertices[0]], self.vertices[vertices[1]]]]
+            edges.append([self.vertices[vertices[1]], self.vertices[vertices[2]]])
+            edges.append([self.vertices[vertices[2]], self.vertices[vertices[0]]])
+
+            fullBridge = True
+            for edge in edges:
+                if edge[0][2] != edge[1][2]:
+                    # this segment bridges two contours
+                    # print('bridge')
+                    # still includes the marker, but is handles
+                    edgeLength = self.point_distance(edge[0], edge[1])
+                    # print(edgeLength)
+                    if edgeLength <= threshold:
+                        # print('tobe aggregated')
+                        # trianglesToAggregate.add(triangleId)
+                        pass
+                    else:
+                        fullBridge = False
+            if fullBridge:
+                trianglesToAggregate.add(triangleId)
+
+        print(trianglesToAggregate)
+        if len(trianglesToAggregate) > 0:
+            self.export_triangles_shp(triangle_ids=trianglesToAggregate, name='agg', multi=None)
+
+    def get_bridging_triangles(self):
+        # print('\n----------------\nbridging triangles')
+
+        bridgingTriangles = set()
+
+        allTriangles = self.triangles.keys()
+        for triangleId in allTriangles:
+            tri = self.triangles[triangleId]
+            # print(tri['vertices'])
+            boundaryMarkers = set()
+            for vertex in tri['vertices']:
+                vertexMarker = self.vertices[vertex][2]
+                boundaryMarkers.add(vertexMarker)
+                # print(vertex, self.vertices[vertex])
+
+            if len(boundaryMarkers) > 1:
+                # vertices have different markers, thus are part of other edges
+                bridgingTriangles.add(triangleId)
+
+        return bridgingTriangles
+
     # ====================================== #
     #
     #   Shewchuk
@@ -605,14 +664,14 @@ class Aggregator():
             firstEntry = vertexCounter
             boundaryMarker = boundaryMarker + 1
             edge = self.edges[edgeId]
-            print(edgeId, boundaryMarker, edge['closed'])
+            # print(edgeId, boundaryMarker, edge['closed'])
 
-            print(edge['geom'][0], edge['geom'][-2], edge['geom'][-1])
+            # print(edge['geom'][0], edge['geom'][-2], edge['geom'][-1])
 
             if not edge['closed']:
                 for v in edge['geom'][:-1]:
                     vertexEntry = '{} {} {} {}\n'.format(vertexCounter, v[0], v[1], boundaryMarker)
-                    self.vertices[str(vertexCounter)] = (v[0], v[1])
+                    self.vertices[str(vertexCounter)] = (v[0], v[1], boundaryMarker)
                     verticesString = verticesString + vertexEntry
 
                     segmentEntry = '{} {} {} {}\n'.format(
@@ -624,8 +683,9 @@ class Aggregator():
                     segmentCounter += 1
 
                 # adding final vertex
+                v = edge['geom'][-1]
                 vertexEntry = '{} {} {} {}\n'.format(vertexCounter, v[0], v[1], boundaryMarker)
-                self.vertices[str(vertexCounter)] = (v[0], v[1])
+                self.vertices[str(vertexCounter)] = (v[0], v[1], boundaryMarker)
                 verticesString = verticesString + vertexEntry
 
                 # segmentEntry = segmentEntry = '{} {} {} {}\n'.format(
@@ -639,7 +699,7 @@ class Aggregator():
             elif edge['closed']:
                 for v in edge['geom'][:-2]:
                     vertexEntry = '{} {} {} {}\n'.format(vertexCounter, v[0], v[1], boundaryMarker)
-                    self.vertices[str(vertexCounter)] = (v[0], v[1])
+                    self.vertices[str(vertexCounter)] = (v[0], v[1], boundaryMarker)
                     verticesString = verticesString + vertexEntry
 
                     segmentEntry = '{} {} {} {}\n'.format(
@@ -651,8 +711,9 @@ class Aggregator():
                     segmentCounter += 1
 
                 # close the parts
+                v = edge['geom'][-2]
                 vertexEntry = '{} {} {} {}\n'.format(vertexCounter, v[0], v[1], boundaryMarker)
-                self.vertices[str(vertexCounter)] = (v[0], v[1])
+                self.vertices[str(vertexCounter)] = (v[0], v[1], boundaryMarker)
                 verticesString = verticesString + vertexEntry
 
                 segmentEntry = segmentEntry = '{} {} {} {}\n'.format(
@@ -749,19 +810,14 @@ class Aggregator():
             of.write(segmentHeader)
             of.write(segmentList)
             of.write(holeHeader)
-        # print(vertexHeader)
-        # print(vertexList)
-        # print(segmentHeader)
-        # print(segmentList)
 
     def triangulate(self):
         # only takes into account one simple closed isobath
-        polyName = '{}.poly'.format(self.edgeId)
+        polyName = 'aggregator_{}.poly'.format(self.connectingNodeId)
         polyPath = os.path.join(self.projectPath, polyName)
         # print(polyPath)
 
         self.execute_constrained(polyPath)
-
         self.parse_output(polyPath)
         # print(self.vertices)
         # print(self.triangles)
@@ -771,7 +827,7 @@ class Aggregator():
         # print(pathToFile)
         FNULL = open(os.devnull, 'w')
 
-        runCommand = './triangle -pcn "{}"'.format(pathToFile)
+        runCommand = './triangle -pc "{}"'.format(pathToFile)
         # print(runCommand)
         subprocess.run(runCommand, shell=True, stdout=FNULL)
 
@@ -791,16 +847,16 @@ class Aggregator():
                     self.triangles[tri[0]] = {'vertices': [
                         tri[1], tri[2], tri[3]], 'neighbors': []}
 
-        with open(self.neighPath) as neighf:
-            # print('neighFile: ')
-            for line in neighf.readlines()[1:]:
-                if not line.startswith('#'):
-                    neigh = line.split()
-                    # print(neigh)
-                    triangleNeighbors = self.triangles[neigh[0]]['neighbors']
-
-                    for i in [1, 2, 3]:
-                        # if neigh[i] != '-1':
-                        triangleNeighbors.append(neigh[i])
+        # with open(self.neighPath) as neighf:
+        #     # print('neighFile: ')
+        #     for line in neighf.readlines()[1:]:
+        #         if not line.startswith('#'):
+        #             neigh = line.split()
+        #             # print(neigh)
+        #             triangleNeighbors = self.triangles[neigh[0]]['neighbors']
+        #
+        #             for i in [1, 2, 3]:
+        #                 # if neigh[i] != '-1':
+        #                 triangleNeighbors.append(neigh[i])
 
         self.clean_output_files()

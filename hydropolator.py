@@ -4808,6 +4808,8 @@ class Hydropolator:
                 edge = self.graph['edges'][edgeId]
                 connectingNode['Aggregator'].add_edge(edgeId=edgeId, edgeObject=edge)
             connectingNode['Aggregator'].write_poly_file()
+            connectingNode['Aggregator'].triangulate()
+            connectingNode['Aggregator'].get_area_to_aggregate(threshold=threshold)
 
         return True
 
