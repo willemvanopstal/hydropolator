@@ -5,6 +5,10 @@ import math
 from datetime import datetime
 import numpy as np
 
+from shapely import geometry
+from shapely.geometry import Polygon, Point
+from shapely.ops import unary_union
+
 
 class Aggregator():
 
@@ -113,7 +117,7 @@ class Aggregator():
                 wt.field('triid', 'C')
                 wt.field('vertices', 'C')
                 for triangle in multiTriangles:
-                    print(triangle)
+                    # print(triangle)
                     geom = self.triangle_geom(triangle)
                     vertices = str(self.triangles[triangle]['vertices'])
                     wt.poly([geom])
@@ -126,7 +130,8 @@ class Aggregator():
     # ====================================== #
 
     def get_point(self, vertex_id):
-        return self.vertices[vertex_id]  # tuple (x,y)
+        vertexTuple = self.vertices[vertex_id]
+        return (vertexTuple[0], vertexTuple[1])  # tuple (x,y)
 
     def triangle_geom(self, triangle_id):
         # vertices = self.triangulation.all_vertices()
@@ -613,9 +618,36 @@ class Aggregator():
             if fullBridge:
                 trianglesToAggregate.add(triangleId)
 
-        print(trianglesToAggregate)
+        # print(trianglesToAggregate)
+
+        if len(trianglesToAggregate) == 0:
+            return []
+
+        allPolygons = []
+        for triangleId in trianglesToAggregate:
+            triangleGeom = self.triangle_geom(triangleId)[:-1]
+            trianglePoly = Polygon(triangleGeom)
+            allPolygons.append(trianglePoly)
+            # print(triangleGeom)
+
+        unionedPolygons = unary_union(allPolygons)
+        # print(unionedPolygons)
+        if unionedPolygons.geom_type == 'MultiPolygon':
+            listedPolygons = list(unionedPolygons)
+        else:
+            listedPolygons = [unionedPolygons]
+        # print(listedPolygons)
+
+        exteriorsList = []
+        for poly in listedPolygons:
+            exteriorsList.append(list(poly.exterior.coords))
+
         if len(trianglesToAggregate) > 0:
             self.export_triangles_shp(triangle_ids=trianglesToAggregate, name='agg', multi=None)
+
+        self.areasList = exteriorsList
+
+        return exteriorsList
 
     def get_bridging_triangles(self):
         # print('\n----------------\nbridging triangles')
@@ -637,6 +669,18 @@ class Aggregator():
                 bridgingTriangles.add(triangleId)
 
         return bridgingTriangles
+
+    def find_vertices_in_areas(self, vertexLocDict, areas=None):
+        if areas == None:
+            areas = self.areasList
+
+        candidatePoints = []
+        for point in vertexLocDict.keys():
+            candidatePoints.append(Point(point[0], point[1]))
+
+        # print(candidatePoints)
+
+        pass
 
     # ====================================== #
     #

@@ -15,7 +15,7 @@ import startin
 from decimal import *
 import math
 import networkx as nx
-from matplotlib import cm, colors
+from matplotlib import cm, colors, path
 import matplotlib.pyplot as plt
 import numpy as np
 # from PointInTriangle import point_in_triangle
@@ -4809,7 +4809,46 @@ class Hydropolator:
                 connectingNode['Aggregator'].add_edge(edgeId=edgeId, edgeObject=edge)
             connectingNode['Aggregator'].write_poly_file()
             connectingNode['Aggregator'].triangulate()
-            connectingNode['Aggregator'].get_area_to_aggregate(threshold=threshold)
+            bridgeAreas = connectingNode['Aggregator'].get_area_to_aggregate(threshold=threshold)
+            # list of bridging polygons, can be empty if nothing is found
+
+            print(bridgeAreas)
+            if bridgeAreas == []:
+                # no bridges found
+                continue
+
+            connectingNodeTriangles = self.get_triangles(connectingNodeId)
+            connectingNodeVertices = self.get_vertices_from_triangles(connectingNodeTriangles)
+            # print('\n--------------connectingNodeVertices: ', connectingNodeVertices)
+            cnvDict = {}
+            pointList = []
+            insidePoints = set()
+            for vertex in connectingNodeVertices:
+                pointVal = self.triangulation.get_point(vertex)
+                cnvDict[(pointVal[0], pointVal[1])] = vertex
+                pointList.append((pointVal[0], pointVal[1]))
+
+            for areaPolygon in bridgeAreas:
+                searchPath = path.Path(areaPolygon)
+                insides = searchPath.contains_points(pointList)
+                # print(insides)
+
+                for vIndex, insideTest in enumerate(insides):
+                    # print(insideTest, type(insideTest))
+                    if insideTest == True:  # np.bool_
+                        insidePoints.add(cnvDict[pointList[vIndex]])
+
+                print(insidePoints)
+
+            exportPointList = []
+            for point in insidePoints:
+                point = self.triangulation.get_point(point)
+                exportPointList.append((point[0], point[1]))
+
+            self.export_points(exportPointList, 'pointbridges_{}'.format(connectingNodeId))
+
+            # connectingNode['Aggregator'].find_vertices_in_areas(
+            #     vertexLocDict=cnvDict, areas=bridgeAreas)
 
         return True
 

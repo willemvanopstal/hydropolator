@@ -86,7 +86,7 @@ paramDict = {'prepass': 0,
              'gully_threshold': 0.5,
              'aspect_threshold': 0.5,
              'size_threshold': 5,
-             'aggregation_threshold': 20,
+             'aggregation_threshold': 40,
              'min_ring': 1,
              'max_ring': 4
              }
