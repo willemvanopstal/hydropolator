@@ -8,6 +8,7 @@
 
 from ElevationDict import ElevationDict
 from BendDetector import BendDetector
+from Aggregator import Aggregator
 
 import startin
 
@@ -4768,6 +4769,46 @@ class Hydropolator:
     def check_aggregation(self, nodeIds=[], threshold=None):
         print('checking aggregation possibilities')
 
+        connectingNodes = {}
+
+        for region in self.regionNodes.keys():
+            # print('region: ', region, self.regionNodes[region])
+            regionNodes = self.regionNodes[region]
+            for regionNode in regionNodes:
+                shallowNodes = self.get_neighboring_nodes(regionNode, 'shallow')
+                if len(shallowNodes) > 1:
+                    # print('connectingNode: ', regionNode,
+                    #       self.get_neighboring_nodes(regionNode, 'shallow'))
+                    connectingNodes[regionNode] = {}
+
+        # print(connectingNodes)
+
+        for connectingNode in connectingNodes.keys():
+            connectingNodes[connectingNode]['edges'] = set()
+            # print('\n----------------------\nconnecting node: ', connectingNode)
+            nodeEdges = self.graph['nodes'][connectingNode]['edges']
+            # print('nodeEdges: ', nodeEdges)
+            for edgeId in nodeEdges:
+                edge = self.graph['edges'][edgeId]
+                # print('edgeiterator: ', edge['edge'])
+                if connectingNode == edge['edge'][1]:
+                    # the connecting node is the deeper node
+                    # print('aggregation edge: ', edgeId, 'connectingNode: ',
+                    #       connectingNode, 'shallowNode: ', edge['edge'][0])
+                    connectingNodes[connectingNode]['edges'].add(edgeId)
+                    connectingNodes[connectingNode]['aggregation_level'] = edge['value']
+
+        print(connectingNodes)
+
+        for connectingNodeId in connectingNodes.keys():
+            connectingNode = connectingNodes[connectingNodeId]
+            connectingNode['Aggregator'] = Aggregator(
+                connectingNodeId=connectingNodeId, project_name=self.projectName)
+            for edgeId in connectingNode['edges']:
+                edge = self.graph['edges'][edgeId]
+                connectingNode['Aggregator'].add_edge(edgeId=edgeId, edgeObject=edge)
+            connectingNode['Aggregator'].write_poly_file()
+
         return True
 
     def set_sharp_points_bins(self, breakpoints):
@@ -5017,8 +5058,7 @@ class Hydropolator:
                 else:
                     value = str(stats['depare_areas'][iteration]['regions']
                                 [rowIndex - 1]).replace('.', ',')
-                    depare_rows[rowIndex] = row + \
-                        '{}{}'.format(separator, value)
+                    depare_rows[rowIndex] = row + '{}{}'.format(separator, value)
 
             # SHARP Points
             for rowIndex, row in enumerate(stats['sharp_points'][0].keys()):
@@ -5456,7 +5496,7 @@ class Hydropolator:
             if ['aggregation', 0] in metricsToTest:
                 self.msg('AGGREGATION', 'warning')
 
-                self.check_aggregation(nodeIds=[], threshold=aggregation_threshold)
+                aggregated = self.check_aggregation(nodeIds=[], threshold=aggregation_threshold)
 
             # Calculate metrics
             spurGullyCalculated = False

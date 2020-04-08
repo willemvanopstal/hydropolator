@@ -155,7 +155,8 @@ projectObject.export_all_edge_triangles()
 ###############################
 
 projectObject.print_errors()
-projectObject.print_peaks_pits()
+# projectObject.print_graph()
+# projectObject.print_peaks_pits()
 
 msg('\n> shutting down...', 'header')
 projectObject.write_metafile()
