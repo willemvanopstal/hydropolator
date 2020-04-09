@@ -29,6 +29,19 @@ class ElevationDict:
         else:
             return previousZ
 
+    def get_queued_z(self, vertex_tuple):
+        if tuple(vertex_tuple) in self.updateQueue:
+            queuedZ = self.updateQueue[tuple(vertex_tuple)]
+            return queuedZ
+        else:
+            return False
+
+        # previousZ = self.elevationDict[tuple(vertex_tuple)]['previous_z']
+        # if previousZ is None:
+        #     return self.get_z(vertex_tuple)
+        # else:
+        #     return previousZ
+
     def get_original_z(self, vertex_tuple):
         originalZ = self.elevationDict[tuple(vertex_tuple)]['original_z']
         return originalZ

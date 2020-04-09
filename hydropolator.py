@@ -975,6 +975,14 @@ class Hydropolator:
             parsedVertex = self.triangulation.get_point(vertex)
             return self.vertexDict.get_previous_z(parsedVertex)
 
+    def get_queued_z(self, vertex, idOnly=False):
+        # return self.vertexDict[tuple(vertex)]['z']
+        if not idOnly:
+            return self.vertexDict.get_queued_z(vertex)
+        else:
+            parsedVertex = self.triangulation.get_point(vertex)
+            return self.vertexDict.get_queued_z(parsedVertex)
+
     def add_vertex_to_queue(self, vertex, new_z, idOnly=False):
         # return self.vertexDict[tuple(vertex)]['z']
         if not idOnly:
@@ -4079,6 +4087,38 @@ class Hydropolator:
 
         # print(adjacentVertex, leftPseudoTriangle, rightPseudoTriangle)
 
+    def displace_vertices(self, displaceDict):
+        # disabled the convex hull vertices
+
+        # print('smoothing ...')
+
+        updatedVertices = set()
+        updates = 0
+
+        for connectingNodeId in displaceDict.keys():
+            # print('connectingNodeId: ', connectingNodeId)
+            aggLevel = displaceDict[connectingNodeId]['aggregation_level']
+            # set of ids
+            verticesToAggregate = displaceDict[connectingNodeId]['vertices_to_aggregate']
+
+            for vertex in verticesToAggregate:
+
+                originalZ = self.get_z(vertex, idOnly=True)
+                queuedZ = self.get_queued_z(vertex, idOnly=True)
+
+                if queuedZ:
+                    if aggLevel < queuedZ:
+                        self.add_vertex_to_queue(vertex, aggLevel, idOnly=True)
+                        updatedVertices.add(vertex)
+                elif aggLevel < originalZ:
+                    updates += 1
+                    self.add_vertex_to_queue(vertex, aggLevel, idOnly=True)
+                    updatedVertices.add(vertex)
+
+        self.msg('updated vertices: {}'.format(updates), 'info')
+
+        return updatedVertices
+
     def get_triangles_to_isopoints_in_edge(self, isopoints, edgeId):
         # print(edgeId, isopoints)
         edgeObject = self.graph['edges'][edgeId]
@@ -4189,6 +4229,116 @@ class Hydropolator:
         # self.print_graph()
 
         return True, len(allChangedVertices)
+
+    def displace_vertices_helper(self, displaceDict):
+        self.msg('\n==== Displacement pass ====', 'header')
+        print('input connecting nodes: ', len(displaceDict))
+
+        changedVertices = self.displace_vertices(displaceDict)
+
+        self.vertexDict.update_previous_z_from_queue()
+        self.vertexDict.update_values_from_queue()
+        # print('vertices with updated depth: ', len(changedVertices))
+
+        # print('allnodesfirst: ', self.graph['nodes'].keys())
+        changedTriangles, changedNodes = self.get_changed_triangles(
+            changedVertices, self.triangleInventory.copy())
+
+        # nodesInTI = set()
+        # for tri in self.triangleInventory.keys():
+        #     # print(self.triangleInventory[tri])
+        #     nodesInTI.update(self.triangleInventory[tri])
+        #
+        # print('tinodes1: ', nodesInTI, '\nallnodes: ', self.graph['nodes'].keys())
+
+        print('changed nodes: ', len(changedNodes))
+        # print('changed triangles: ', len(changedTriangles))
+        # if len(changedTriangles) == 0:
+        #     print('no triangles were changed in interval, returning without updating!')
+        #     return False, 0
+
+        allDeletedTriangles = set()
+        oldNeighboringNodes = set()
+        changedEdges = set()
+        for changedNode in changedNodes:
+            nodeTriangles = self.get_triangles(changedNode)
+            deepNeighbors = self.get_neighboring_nodes(changedNode, 'deep')
+            for deepNeighbor in deepNeighbors:
+                changedEdges.add((changedNode, deepNeighbor))
+            shallowNeighbors = self.get_neighboring_nodes(changedNode, 'shallow')
+            for shallowNeighbor in shallowNeighbors:
+                changedEdges.add((shallowNeighbor, changedNode))
+            allDeletedTriangles.update(nodeTriangles)
+            oldNeighboringNodes.update(deepNeighbors)
+            oldNeighboringNodes.update(shallowNeighbors)
+
+        # print(len(allDeletedTriangles), oldNeighboringNodes)
+        # print(oldNeighboringNodes.difference(changedNodes))
+
+        poppedNodes = set()
+        for triangle in allDeletedTriangles:
+            # print(triangle)
+            # print(self.triangleInventory[triangle])
+            poppedNodes.update(self.triangleInventory[triangle])
+            for reffedNode in self.triangleInventory[triangle]:
+                self.delete_triangle_from_node(triangle, reffedNode)
+            # print(self.triangleInventory[triangle])
+            del self.triangleInventory[triangle]
+
+        # for nodeId in poppedNodes:
+        #     print(nodeId, len(self.get_triangles(nodeId)),
+        #           len(self.graph['nodes'][nodeId]['edges']))
+        #     if len(self.get_triangles(nodeId)) == 0 and len(self.graph['nodes'][nodeId]['edges']) == 0:
+        #         changedNodes.add(nodeId)
+        #         self.msg('poppednode will be deleted {}'.format(nodeId), 'warning')
+
+        # print(poppedNodes)
+        # print('changedNodes: ', changedNodes, '\npoppedNodes: ', poppedNodes)
+
+        for changedEdge in changedEdges:
+            self.delete_edge(changedEdge)
+
+        for changedNode in changedNodes:
+            self.remove_node_and_all_contents(changedNode)
+
+        # nodesInTI = set()
+        # for tri in self.triangleInventory.keys():
+        #     # print(self.triangleInventory[tri])
+        #     nodesInTI.update(self.triangleInventory[tri])
+        # print('tinodes2: ', nodesInTI)
+
+        # remove previous_z because region graph is built again
+        for changedVertex in changedVertices:
+            self.vertexDict.remove_previous_z(self.triangulation.get_point(
+                changedVertex))
+
+        # insert all deleted triangles back in the graph
+        if len(allDeletedTriangles) > 0:
+            affectedNodes = self.insert_triangles_into_region_graph2(
+                allDeletedTriangles, poppedNodes)
+            # print(affectedNodes)
+            self.establish_edges_on_affected_nodes(affectedNodes)
+            self.debug(affectedNodes)
+
+        # newly inserted nodes are not connected yet
+
+        # self.print_graph()
+        # establish edges again
+        # self.establish_edges_on_affected_nodes(affectedNodes)
+
+        # self.print_graph()
+        # print(self.availableNodeIds)
+
+        keysCopy = list(self.graph['nodes'].keys())
+
+        for nodeId in keysCopy:
+            # print(nodeId, len(self.get_triangles(nodeId)),
+                  # len(self.graph['nodes'][nodeId]['edges']))
+            if len(self.get_triangles(nodeId)) == 0 and len(self.graph['nodes'][nodeId]['edges']) == 0:
+                self.msg('poppednode will be deleted {}'.format(nodeId), 'warning')
+                self.remove_node_and_all_contents(nodeId)
+
+        return len(changedVertices)
 
     def smooth_vertices_new(self, vertexSet):
         # self.msg('\n==== Smoothing pass ====', 'header')
@@ -4798,8 +4948,9 @@ class Hydropolator:
                     connectingNodes[connectingNode]['edges'].add(edgeId)
                     connectingNodes[connectingNode]['aggregation_level'] = edge['value']
 
-        print(connectingNodes)
+        # print(connectingNodes)
 
+        noBridgeDetected = set()
         for connectingNodeId in connectingNodes.keys():
             connectingNode = connectingNodes[connectingNodeId]
             connectingNode['Aggregator'] = Aggregator(
@@ -4812,9 +4963,10 @@ class Hydropolator:
             bridgeAreas = connectingNode['Aggregator'].get_area_to_aggregate(threshold=threshold)
             # list of bridging polygons, can be empty if nothing is found
 
-            print(bridgeAreas)
+            # print(bridgeAreas)
             if bridgeAreas == []:
                 # no bridges found
+                noBridgeDetected.add(connectingNodeId)
                 continue
 
             connectingNodeTriangles = self.get_triangles(connectingNodeId)
@@ -4838,19 +4990,25 @@ class Hydropolator:
                     if insideTest == True:  # np.bool_
                         insidePoints.add(cnvDict[pointList[vIndex]])
 
-                print(insidePoints)
+                # print(insidePoints)
 
-            exportPointList = []
-            for point in insidePoints:
-                point = self.triangulation.get_point(point)
-                exportPointList.append((point[0], point[1]))
+            connectingNode['vertices_to_aggregate'] = insidePoints
 
-            self.export_points(exportPointList, 'pointbridges_{}'.format(connectingNodeId))
+            # exportPointList = []
+            # for point in insidePoints:
+            #     point = self.triangulation.get_point(point)
+            #     exportPointList.append((point[0], point[1]))
+            # self.export_points(exportPointList, 'pointbridges_{}'.format(connectingNodeId))
 
             # connectingNode['Aggregator'].find_vertices_in_areas(
             #     vertexLocDict=cnvDict, areas=bridgeAreas)
 
-        return True
+            del connectingNode['Aggregator']
+
+        for invalidNodeId in noBridgeDetected:
+            connectingNodes.pop(invalidNodeId, None)
+
+        return connectingNodes
 
     def set_sharp_points_bins(self, breakpoints):
         # print(breakpoints)
@@ -5533,11 +5691,31 @@ class Hydropolator:
             conflictingSpurTriangles = 0
             conflictingGullyTriangles = 0
 
-            # aggregation
+            # AGGREGATION
             if ['aggregation', 0] in metricsToTest:
+                # this is a small subroutinge, it will not generate new
+                # iteration count, nor statistics
                 self.msg('AGGREGATION', 'warning')
 
-                aggregated = self.check_aggregation(nodeIds=[], threshold=aggregation_threshold)
+                connectingNodes = self.check_aggregation(
+                    nodeIds=[], threshold=aggregation_threshold)
+                # connectingNodes is a dict of conenctingNodeIds, being
+                # the bridges between multiple peaks. It also has pointers
+                # to vertices to be displaces, and a value to
+                print(connectingNodes)
+                numberUpdatedVertices = self.displace_vertices_helper(connectingNodes)
+                print('displaced vertices: ', numberUpdatedVertices)
+
+                if numberUpdatedVertices > 0:
+                    # if aggregated something, it will redo the entire
+                    # routine loop.
+                    print('some vertices displaced, redoing loop')
+                    continue
+                else:
+                    # Else it will just continue with the smoothing routine
+                    # self.generate_isobaths5()
+                    print('no vertices updated, continuing routine')
+                    pass
 
             # Calculate metrics
             spurGullyCalculated = False

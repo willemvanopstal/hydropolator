@@ -692,7 +692,7 @@ class Aggregator():
 
         polyName = 'aggregator_{}.poly'.format(self.connectingNodeId)
         polyPath = os.path.join(self.projectPath, polyName)
-        print(polyPath)
+        # print(polyPath)
 
         fileHeader = '# aggregator input\n'
         vertexCounter = 1
@@ -904,3 +904,4 @@ class Aggregator():
         #                 triangleNeighbors.append(neigh[i])
 
         self.clean_output_files()
+        self.clean_input_file()
