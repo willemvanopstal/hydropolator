@@ -4231,7 +4231,7 @@ class Hydropolator:
         return True, len(allChangedVertices)
 
     def displace_vertices_helper(self, displaceDict):
-        self.msg('\n==== Displacement pass ====', 'header')
+        self.msg('Aggregation pass...', 'header')
         print('input connecting nodes: ', len(displaceDict))
 
         changedVertices = self.displace_vertices(displaceDict)
@@ -4916,7 +4916,7 @@ class Hydropolator:
 
         pass
 
-    def check_aggregation(self, nodeIds=[], threshold=None):
+    def check_aggregation(self, nodeIds=[], threshold=None, extendByIntersectedTriangles=False):
         print('checking aggregation possibilities ...')
 
         connectingNodes = {}
@@ -4931,7 +4931,7 @@ class Hydropolator:
                     #       self.get_neighboring_nodes(regionNode, 'shallow'))
                     connectingNodes[regionNode] = {}
 
-        # print(connectingNodes)
+        print('found {} connecting nodes'.format(len(connectingNodes)))
 
         for connectingNode in connectingNodes.keys():
             connectingNodes[connectingNode]['edges'] = set()
@@ -4963,6 +4963,8 @@ class Hydropolator:
             bridgeAreas = connectingNode['Aggregator'].get_area_to_aggregate(threshold=threshold)
             # list of bridging polygons, can be empty if nothing is found
 
+            print('found {} bridge areas'.format(len(bridgeAreas)))
+
             # print(bridgeAreas)
             if bridgeAreas == []:
                 # no bridges found
@@ -4993,6 +4995,22 @@ class Hydropolator:
                 # print(insidePoints)
 
             connectingNode['vertices_to_aggregate'] = insidePoints
+
+            # tryout on extension of region
+            if extendByIntersectedTriangles:
+                print('extending the inside points to all its incident triangles within the connecting node')
+                extendedPoints = set()
+                for vId in insidePoints:
+                    incidentTriangles = self.triangulation.incident_triangles_to_vertex(vId)
+                    incidentTriangles = [tuple(self.pseudo_triangle(tri))
+                                         for tri in incidentTriangles]
+                    for incidentTriangle in incidentTriangles:
+                        if 0 not in incidentTriangle:
+                            if incidentTriangle in connectingNodeTriangles:
+                                extendedPoints.update(
+                                    self.get_vertices_from_triangles([incidentTriangle]))
+
+                connectingNode['vertices_to_aggregate'] = extendedPoints
 
             # exportPointList = []
             # for point in insidePoints:
@@ -5587,7 +5605,8 @@ class Hydropolator:
 
     def start_routine_new(self, paramDict, statistics=False):
 
-        self.msg('> starting routine...', 'header')
+        self.msg(
+            '\n\n===============================\n       START OF ROUTINE\n===============================\n', 'header')
 
         # self.classify_nodes()
 
@@ -5675,8 +5694,9 @@ class Hydropolator:
 
             currentRings = ring_range[processNumber]
 
-            self.msg('\n====== executing process, iteration: {}'.format(iterations), 'header')
-            print('currentRings: ', currentRings)
+            self.msg('\n===============\nNEW STEP r{} i{}\n===============\n'.format(
+                currentRings, iterations), 'header')
+            # print('currentRings: ', currentRings)
 
             self.generate_isobaths5()
 
@@ -5692,13 +5712,16 @@ class Hydropolator:
             conflictingGullyTriangles = 0
 
             # AGGREGATION
-            if ['aggregation', 0] in metricsToTest:
+            metricTypeList = [val[0] for val in metricsToTest]
+            if 'aggregation' in metricTypeList:
                 # this is a small subroutinge, it will not generate new
                 # iteration count, nor statistics
                 # self.msg('AGGREGATION', 'warning')
 
+                aggregationSelection = metricsToTest[metricTypeList.index('aggregation')][1]
+
                 connectingNodes = self.check_aggregation(
-                    nodeIds=[], threshold=aggregation_threshold)
+                    nodeIds=[], threshold=aggregation_threshold, extendByIntersectedTriangles=aggregationSelection)
                 # connectingNodes is a dict of conenctingNodeIds, being
                 # the bridges between multiple peaks. It also has pointers
                 # to vertices to be displaces, and a value to
@@ -5706,6 +5729,7 @@ class Hydropolator:
                     print('no aggregation')
                 else:
                     # print(connectingNodes)
+                    print('aggregating nodes..')
                     numberDisplacedVertices = self.displace_vertices_helper(connectingNodes)
                     print('displaced vertices: ', numberDisplacedVertices)
 
@@ -5881,6 +5905,9 @@ class Hydropolator:
             print('extendedConflictingTriangles ', len(extendedTrianglesToDensify))
 
             self.simple_densify_and_rebuild(trianglesToDensify=extendedTrianglesToDensify)
+
+        self.msg(
+            '\n\n===============================\n       END OF ROUTINE\n===============================\n\n', 'header')
 
     def get_all_edge_triangles(self):
 

@@ -79,7 +79,7 @@ paramDict = {'prepass': 0,
              'densification': 0,
              'process': [],
              'densification_process': [],
-             'maxiter': 1,
+             'maxiter': 5,
              'angularity_threshold': 1.6,
              'spurgully_threshold': None,
              'spur_threshold': 0.5,
@@ -103,7 +103,7 @@ paramDict = {'prepass': 0,
 #                         ]
 # paramDict['process'] = [[['angularity', 'r', 1], 0]]
 paramDict['process'] = [['spurs', 0], ['gullys', 0], ['angularity', 0]]
-paramDict['process'] = [['aggregation', 0], ['spurs', 0], ['gullys', 0], ['angularity', 0]]
+paramDict['process'] = [['aggregation', 1], ['spurs', 0], ['gullys', 0], ['angularity', 0]]
 
 # paramDict['densification_process'] = [['angularity', 'r', 1],
 #                                       ['aspect-edges', 'r', 0],
@@ -156,7 +156,7 @@ projectObject.export_all_edge_triangles()
 
 projectObject.print_errors()
 # projectObject.print_graph()
-# projectObject.print_peaks_pits()
+projectObject.print_peaks_pits()
 
 msg('\n> shutting down...', 'header')
 projectObject.write_metafile()
