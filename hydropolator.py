@@ -4088,9 +4088,8 @@ class Hydropolator:
         # print(adjacentVertex, leftPseudoTriangle, rightPseudoTriangle)
 
     def displace_vertices(self, displaceDict):
-        # disabled the convex hull vertices
 
-        # print('smoothing ...')
+        displacementOvershoot = 0.01  # one centimeter up
 
         updatedVertices = set()
         updates = 0
@@ -4098,6 +4097,7 @@ class Hydropolator:
         for connectingNodeId in displaceDict.keys():
             # print('connectingNodeId: ', connectingNodeId)
             aggLevel = displaceDict[connectingNodeId]['aggregation_level']
+            aggLevel = aggLevel - displacementOvershoot
             # set of ids
             verticesToAggregate = displaceDict[connectingNodeId]['vertices_to_aggregate']
 
@@ -4917,7 +4917,7 @@ class Hydropolator:
         pass
 
     def check_aggregation(self, nodeIds=[], threshold=None):
-        print('checking aggregation possibilities')
+        print('checking aggregation possibilities ...')
 
         connectingNodes = {}
 
@@ -5695,27 +5695,30 @@ class Hydropolator:
             if ['aggregation', 0] in metricsToTest:
                 # this is a small subroutinge, it will not generate new
                 # iteration count, nor statistics
-                self.msg('AGGREGATION', 'warning')
+                # self.msg('AGGREGATION', 'warning')
 
                 connectingNodes = self.check_aggregation(
                     nodeIds=[], threshold=aggregation_threshold)
                 # connectingNodes is a dict of conenctingNodeIds, being
                 # the bridges between multiple peaks. It also has pointers
                 # to vertices to be displaces, and a value to
-                print(connectingNodes)
-                numberUpdatedVertices = self.displace_vertices_helper(connectingNodes)
-                print('displaced vertices: ', numberUpdatedVertices)
-
-                if numberUpdatedVertices > 0:
-                    # if aggregated something, it will redo the entire
-                    # routine loop.
-                    print('some vertices displaced, redoing loop')
-                    continue
+                if len(connectingNodes) == 0:
+                    print('no aggregation')
                 else:
-                    # Else it will just continue with the smoothing routine
-                    # self.generate_isobaths5()
-                    print('no vertices updated, continuing routine')
-                    pass
+                    # print(connectingNodes)
+                    numberDisplacedVertices = self.displace_vertices_helper(connectingNodes)
+                    print('displaced vertices: ', numberDisplacedVertices)
+
+                    if numberDisplacedVertices > 0:
+                        # if aggregated something, it will redo the entire
+                        # routine loop.
+                        self.msg('some vertices displaced, redoing loop', 'header')
+                        continue
+                    else:
+                        # Else it will just continue with the smoothing routine
+                        # self.generate_isobaths5()
+                        print('no vertices displaced, continuing routine')
+                        pass
 
             # Calculate metrics
             spurGullyCalculated = False
