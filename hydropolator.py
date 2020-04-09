@@ -25,6 +25,7 @@ import shapefile
 import bisect
 import pickle
 from tabulate import tabulate
+from random import uniform
 # from shapely import geometry, ops
 import colorama
 colorama.init()
@@ -608,12 +609,16 @@ class Hydropolator:
         with shapefile.Writer(lineShpFile) as wt:
             wt.field('value', 'F', decimal=4)
             wt.field('id', 'N')
+            wt.field('shallowNode', 'N')
+            wt.field('deepNode', 'N')
             wt.field('iso_area', 'F', decimal=3)
             wt.field('classification', 'C')
             for edgeId in self.graph['edges'].keys():
                 # geom = [[list(value) for value in self.graph['edges'][edgeId]['geom']]]
                 geom = self.graph['edges'][edgeId]['geom']
                 isoArea = self.graph['edges'][edgeId]['iso_area']
+                shallowNode = self.graph['edges'][edgeId]['edge'][0]
+                deepNode = self.graph['edges'][edgeId]['edge'][1]
                 classification = ''
                 if 'classification' in self.graph['edges'][edgeId]:
                     classification = self.graph['edges'][edgeId]['classification']
@@ -627,7 +632,8 @@ class Hydropolator:
                 #     geom.append(self.poly_from_triangle(triangle))
                 wt.line([geom])
                 isoValue = self.graph['edges'][edgeId]['value']
-                wt.record(isoValue, int(edgeId), isoArea, classification)
+                wt.record(isoValue, int(edgeId), int(shallowNode),
+                          int(deepNode), isoArea, classification)
 
         self.msg('> isobaths saved', 'info')
 
@@ -778,12 +784,23 @@ class Hydropolator:
 
                     point = line.split(delimiter)
 
+                    xValue = float(point[xPlace])
+                    yValue = float(point[yPlace])
+                    # randomize uniform
+                    min, max = -3.0, 3.0
+                    xValue = round(xValue + uniform(min, max), 3)
+                    yValue = round(yValue + uniform(min, max), 3)
+
+                    depthValue = float(point[dPlace])
+                    # # offset
+                    depthValue = depthValue - 18
+                    # # randomize
+                    # depthValue
+
                     if flip:
-                        point = [float(point[xPlace]), float(point[yPlace]),
-                                 round(-1*float(point[dPlace])+18, 4)]
+                        point = [xValue, yValue, round(-1*depthValue, 4)]
                     elif not flip:
-                        point = [float(point[xPlace]), float(point[yPlace]),
-                                 round(float(point[dPlace])+18, 4)]
+                        point = [xValue, yValue, round(depthValue, 4)]
 
                     # print(point)
 
@@ -2521,8 +2538,10 @@ class Hydropolator:
         for edgeId in self.graph['edges'].keys():
             if self.graph['edges'][edgeId]['edge'] == [shallowNode, deepNode]:
                 del self.graph['edges'][edgeId]
-                self.graph['nodes'][shallowNode]['edges'].remove(edgeId)
-                self.graph['nodes'][deepNode]['edges'].remove(edgeId)
+                if shallowNode in self.graph['nodes']:
+                    self.graph['nodes'][shallowNode]['edges'].remove(edgeId)
+                if deepNode in self.graph['nodes']:
+                    self.graph['nodes'][deepNode]['edges'].remove(edgeId)
                 self.debug('removed edge')
                 break
 
@@ -3231,17 +3250,20 @@ class Hydropolator:
             self.graph['edges'][edge]['geom'] = isoGeom
 
     def generate_isobaths5(self, edgeIds=[]):  # ['6', '10', '22', '29']):
+        self.print_graph()
         if len(edgeIds) == 0:
             edgeIds = list(self.graph['edges'].keys())
 
         for edge in edgeIds:
-            # self.msg('--new edge', 'header')
+            self.msg('--new edge', 'header')
             edgeObject = self.graph['edges'][edge]
             isoValue = edgeObject['value']
-            # print('isoValue: ', isoValue, edgeObject['edge'], edge)
+            print('isoValue: ', isoValue, edgeObject['edge'], edge)
             # print('isoValue: ', isoValue, edge)
 
             edgeTriangles = self.get_edge_triangles(edge)
+
+            print(len(edgeTriangles))
 
             # create some data entries in the edge
             # { '1': { 'triangle': (tvId1, tvId2, tvId3),
@@ -4128,6 +4150,18 @@ class Hydropolator:
 
             for vertex in verticesToAggregate:
 
+                if self.triangulation.is_vertex_convex_hull(vertex):
+                    # handle different...
+                    # discard at all, too few information
+                    # print('im on the hull! skipping')
+                    continue
+
+                adjacentVertices = self.triangulation.adjacent_vertices_to_vertex(vertex)
+                if 0 in adjacentVertices:
+                    # some kind of convex hull. Not sure how to handle this one yet.
+                    # print('Im a neighbor of vertex 0, some sort of convex hull, SKIPPING')
+                    continue
+
                 originalZ = self.get_z(vertex, idOnly=True)
                 queuedZ = self.get_queued_z(vertex, idOnly=True)
 
@@ -4361,6 +4395,11 @@ class Hydropolator:
                   # len(self.graph['nodes'][nodeId]['edges']))
             if len(self.get_triangles(nodeId)) == 0 and len(self.graph['nodes'][nodeId]['edges']) == 0:
                 self.msg('poppednode will be deleted {}'.format(nodeId), 'warning')
+                self.remove_node_and_all_contents(nodeId)
+            elif len(self.get_triangles(nodeId)) == 0:
+                print('poppednode extension\nnodeId: {}, '.format(nodeId))
+                for edgeId in self.graph['nodes'][nodeId]['edges']:
+                    self.delete_edge(self.graph['edges'][edgeId]['edge'])
                 self.remove_node_and_all_contents(nodeId)
 
         return len(changedVertices)

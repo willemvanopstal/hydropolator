@@ -26,7 +26,7 @@ print('\n\n')
 ###############################
 
 surveyData = '../Data/operatorimplications/simulated_surface_points.txt'
-projectName = 'new_classification_nodes'
+projectName = 'new_classification_nodes_randomizer'
 projectObject = Hydropolator()
 
 # innerNodes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
@@ -79,7 +79,7 @@ paramDict = {'prepass': 0,
              'densification': 0,
              'process': [],
              'densification_process': [],
-             'maxiter': 10,
+             'maxiter': 1,
              'angularity_threshold': 1.6,
              'spurgully_threshold': None,
              'spur_threshold': 0.5,
