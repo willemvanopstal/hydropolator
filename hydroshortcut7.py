@@ -79,7 +79,7 @@ paramDict = {'prepass': 0,
              'densification': 0,
              'process': [],
              'densification_process': [],
-             'maxiter': 5,
+             'maxiter': 10,
              'angularity_threshold': 1.6,
              'spurgully_threshold': None,
              'spur_threshold': 0.5,
@@ -102,6 +102,9 @@ paramDict = {'prepass': 0,
 #                         [['angularity', 'r', 4], 3]
 #                         ]
 # paramDict['process'] = [[['angularity', 'r', 1], 0]]
+
+# 1 on aggregation means the intersected bridge points are extended by their
+# incident triangles
 paramDict['process'] = [['spurs', 0], ['gullys', 0], ['angularity', 0]]
 paramDict['process'] = [['aggregation', 1], ['spurs', 0], ['gullys', 0], ['angularity', 0]]
 
@@ -126,7 +129,7 @@ projectObject.generate_isobaths5()
 
 startTime = datetime.now()
 
-projectObject.start_routine_new(paramDict, statistics=True)
+projectObject.start_routine_new(paramDict, statistics=False)
 
 endTime = datetime.now()
 print('elapsed time: ', endTime - startTime)

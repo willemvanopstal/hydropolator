@@ -223,7 +223,7 @@ class Hydropolator:
         pits = self.pits
 
         self.msg('\nPEAKS (minimum {} m2)'.format(peaks['threshold']), 'header')
-        header = ['nodeId', 'closed', 'fullArea', 'bArea', 'conflict']
+        header = ['nodeId', 'closed', 'fullArea', 'bArea', 'conflict', 'contours']
         peakRows = []
 
         for peakId in peaks.keys():
@@ -235,8 +235,10 @@ class Hydropolator:
                 conflicting = "\033[1;31m{}\033[0m".format(True)
             elif peak['conflictBool'] == 2:
                 conflicting = "\033[1;31m{}\033[0m".format(True)
+
+            contours = ','.join(peak['edges'])
             peakRows.append([peakId, peak['closed'], peak['fullArea'],
-                             peak['boundaryArea'], conflicting])
+                             peak['boundaryArea'], conflicting, contours])
 
         print(tabulate(peakRows, headers=header))
 
@@ -252,8 +254,9 @@ class Hydropolator:
                 conflicting = "\033[1;31m{}\033[0m".format(True)
             elif pit['conflictBool'] == 2:
                 conflicting = "\033[1;33m{}\033[0m".format(True)
+            contours = ','.join(pit['edges'])
             pitRows.append([pitId, pit['closed'], pit['fullArea'],
-                            pit['boundaryArea'], conflicting])
+                            pit['boundaryArea'], conflicting, contours])
 
         print(tabulate(pitRows, headers=header))
 
@@ -606,10 +609,14 @@ class Hydropolator:
             wt.field('value', 'F', decimal=4)
             wt.field('id', 'N')
             wt.field('iso_area', 'F', decimal=3)
+            wt.field('classification', 'C')
             for edgeId in self.graph['edges'].keys():
                 # geom = [[list(value) for value in self.graph['edges'][edgeId]['geom']]]
                 geom = self.graph['edges'][edgeId]['geom']
                 isoArea = self.graph['edges'][edgeId]['iso_area']
+                classification = ''
+                if 'classification' in self.graph['edges'][edgeId]:
+                    classification = self.graph['edges'][edgeId]['classification']
                 # print(geom)
                 # geom = []
                 # print(self.graph['edges'][edgeId]['geom'])
@@ -620,7 +627,7 @@ class Hydropolator:
                 #     geom.append(self.poly_from_triangle(triangle))
                 wt.line([geom])
                 isoValue = self.graph['edges'][edgeId]['value']
-                wt.record(isoValue, int(edgeId), isoArea)
+                wt.record(isoValue, int(edgeId), isoArea, classification)
 
         self.msg('> isobaths saved', 'info')
 
@@ -1728,7 +1735,12 @@ class Hydropolator:
                 peaks[nodeId]['fullArea'] = fullNodeArea
                 peaks[nodeId]['closed'] = True
                 peaks[nodeId]['conflictBool'] = 0
+                peaks[nodeId]['edges'] = edges
                 # print('peak', nodeId, edges)
+
+                # add pointers for the edges, handy for export
+                for edgeId in edges:
+                    self.graph['edges'][edgeId]['classification'] = 'peak'
 
                 if node['outer_boundary']:
                     boundaryEdge = node['outer_boundary']
@@ -1737,6 +1749,8 @@ class Hydropolator:
                     peaks[nodeId]['boundaryArea'] = boundaryArea
                     if boundaryArea <= minPeak:
                         peaks[nodeId]['conflictBool'] = 1
+                        for edgeId in edges:
+                            self.graph['edges'][edgeId]['classification'] = 'invalid peak'
 
                 else:
                     boundaryArea = fullNodeArea
@@ -1744,6 +1758,8 @@ class Hydropolator:
                     peaks[nodeId]['closed'] = False
                     if fullNodeArea <= minPeak:
                         peaks[nodeId]['conflictBool'] = 2
+                        for edgeId in edges:
+                            self.graph['edges'][edgeId]['classification'] = 'invalid (semi) peak'
 
                 # print(fullNodeArea, boundaryArea)
 
@@ -1756,7 +1772,12 @@ class Hydropolator:
                 pits[nodeId]['fullArea'] = fullNodeArea
                 pits[nodeId]['closed'] = True
                 pits[nodeId]['conflictBool'] = 0
+                pits[nodeId]['edges'] = edges
                 # print('pit', nodeId, edges)
+
+                # add pointers for the edges, handy for export
+                for edgeId in edges:
+                    self.graph['edges'][edgeId]['classification'] = 'pit'
 
                 if node['outer_boundary']:
                     boundaryEdge = node['outer_boundary']
@@ -1765,12 +1786,16 @@ class Hydropolator:
                     pits[nodeId]['boundaryArea'] = boundaryArea
                     if boundaryArea <= minPit:
                         pits[nodeId]['conflictBool'] = 1
+                        for edgeId in edges:
+                            self.graph['edges'][edgeId]['classification'] = 'invalid pit'
                 else:
                     boundaryArea = fullNodeArea
                     pits[nodeId]['boundaryArea'] = None
                     pits[nodeId]['closed'] = False
                     if fullNodeArea <= minPit:
                         pits[nodeId]['conflictBool'] = 2
+                        for edgeId in edges:
+                            self.graph['edges'][edgeId]['classification'] = 'invalid (semi) pit'
 
                 # print(fullNodeArea, boundaryArea)
 
