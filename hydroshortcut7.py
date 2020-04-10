@@ -129,7 +129,7 @@ projectObject.generate_isobaths5()
 
 startTime = datetime.now()
 
-projectObject.start_routine_new(paramDict, statistics=False)
+# projectObject.start_routine_new(paramDict, statistics=False)
 
 endTime = datetime.now()
 print('elapsed time: ', endTime - startTime)
@@ -152,6 +152,8 @@ projectObject.export_all_edge_triangles()
 # projectObject.export_shapefile('output')
 # projectObject.export_statistics()
 
+projectObject.rasterize(resolution=1.0, epsg="28992")
+
 
 ###############################
 # Closing project
@@ -159,7 +161,7 @@ projectObject.export_all_edge_triangles()
 
 projectObject.print_errors()
 # projectObject.print_graph()
-projectObject.print_peaks_pits()
+# projectObject.print_peaks_pits()
 
 msg('\n> shutting down...', 'header')
 projectObject.write_metafile()

@@ -26,6 +26,7 @@ import bisect
 import pickle
 from tabulate import tabulate
 from random import uniform
+import subprocess
 # from shapely import geometry, ops
 import colorama
 colorama.init()
@@ -750,6 +751,59 @@ class Hydropolator:
             #         wt.record(i)
 
         self.msg('> spur gully triangles saved to file', 'info')
+
+    def rasterize(self, resolution=100.0, epsg="28992"):
+        self.msg('rasterizing..', 'header')
+
+        rasterName = 'rasterized_{}_{}.tif'.format(resolution, self.now())
+        rasterFile = os.path.join(os.getcwd(), 'projects', self.projectName, rasterName)
+        tempFile = os.path.join(os.getcwd(), 'projects', self.projectName, rasterName+'.xyz')
+        print('rasterfile: ', rasterFile)
+        print('resolution: ', resolution)
+
+        print(self.xMin, self.xMax)
+        print(self.yMin, self.yMax)
+
+        xStart = round(self.xMin + 0.5*resolution, 3)
+        yStart = round(self.yMin + 0.5*resolution, 3)
+        xCurrent, yCurrent = xStart, yStart
+
+        nanValue = 1e6
+
+        points = {}
+        tempFileOut = open(tempFile, 'w')
+        while yCurrent < self.yMax:
+
+            xCurrent = xStart
+            while xCurrent < self.xMax:
+
+                # print('point ', xCurrent, yCurrent)
+                pointLoc = (xCurrent, yCurrent)
+                try:
+                    pointValue = round(
+                        self.triangulation.interpolate_laplace(xCurrent, yCurrent), 2)
+                    # print(pointValue)
+                    points[pointLoc] = pointValue
+                    tempFileOut.write('{} {} {}\n'.format(xCurrent, yCurrent, pointValue))
+                except:
+                    # print('outside convex hull')
+                    tempFileOut.write('{} {} {}\n'.format(xCurrent, yCurrent, nanValue))
+                    pass
+
+                xCurrent = round(xCurrent + resolution, 3)
+
+            yCurrent = round(yCurrent + resolution, 3)
+
+        tempFileOut.close()
+
+        srs = 'EPSG:{}'.format(epsg)
+
+        FNULL = open(os.devnull, 'w')
+        runCommand = 'gdal_translate -a_srs {} -a_nodata {} -mo BAND_1=ELEVATION {} {}'.format(
+            srs, nanValue, tempFile, rasterFile)
+        # print(runCommand)
+        subprocess.run(runCommand, shell=True)  # , stdout=FNULL)
+        os.remove(tempFile)
 
     # ====================================== #
     #
@@ -3250,20 +3304,20 @@ class Hydropolator:
             self.graph['edges'][edge]['geom'] = isoGeom
 
     def generate_isobaths5(self, edgeIds=[]):  # ['6', '10', '22', '29']):
-        self.print_graph()
+        # self.print_graph()
         if len(edgeIds) == 0:
             edgeIds = list(self.graph['edges'].keys())
 
         for edge in edgeIds:
-            self.msg('--new edge', 'header')
+            # self.msg('--new edge', 'header')
             edgeObject = self.graph['edges'][edge]
             isoValue = edgeObject['value']
-            print('isoValue: ', isoValue, edgeObject['edge'], edge)
+            # print('isoValue: ', isoValue, edgeObject['edge'], edge)
             # print('isoValue: ', isoValue, edge)
 
             edgeTriangles = self.get_edge_triangles(edge)
 
-            print(len(edgeTriangles))
+            # print(len(edgeTriangles))
 
             # create some data entries in the edge
             # { '1': { 'triangle': (tvId1, tvId2, tvId3),
@@ -4397,7 +4451,7 @@ class Hydropolator:
                 self.msg('poppednode will be deleted {}'.format(nodeId), 'warning')
                 self.remove_node_and_all_contents(nodeId)
             elif len(self.get_triangles(nodeId)) == 0:
-                print('poppednode extension\nnodeId: {}, '.format(nodeId))
+                self.msg('poppednode also deleted  {}, '.format(nodeId), 'warning')
                 for edgeId in self.graph['nodes'][nodeId]['edges']:
                     self.delete_edge(self.graph['edges'][edgeId]['edge'])
                 self.remove_node_and_all_contents(nodeId)
@@ -5062,7 +5116,7 @@ class Hydropolator:
 
             # tryout on extension of region
             if extendByIntersectedTriangles:
-                print('extending the inside points to all its incident triangles within the connecting node')
+                print('extending aggregation area (incident triangles)')
                 extendedPoints = set()
                 for vId in insidePoints:
                     incidentTriangles = self.triangulation.incident_triangles_to_vertex(vId)
