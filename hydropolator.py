@@ -310,6 +310,7 @@ class Hydropolator:
 
     def write_metafile(self):
         self.msg('> writing metafile...', 'info')
+        self.summarize_project()
         metaFile = os.path.join(os.getcwd(), 'projects', self.projectName, 'metafile')
         with open(metaFile, 'w') as mf:
             mf.write('projectName\t{}\n'.format(self.projectName))
@@ -908,7 +909,7 @@ class Hydropolator:
 
                     depthValue = float(point[dPlace])
                     # # offset
-                    depthValue = depthValue - 18
+                    # depthValue = depthValue - 18
                     # # randomize
                     # depthValue
 
@@ -1633,6 +1634,7 @@ class Hydropolator:
     def build_graph2(self):
         self.msg('> building triangle region graph...', 'info')
         self.msg('> splitting all triangles in regions...', 'info')
+        # print(self.triangles)
         for triangle in self.triangles:
             if 0 not in triangle:
                 intervals = self.find_intervals(triangle, indexOnly=True)
@@ -1652,7 +1654,7 @@ class Hydropolator:
                 self.errors.append(
                     '{} build_graph2\tno triangles in this interval\tinterval: {}'.format(self.now(), interval))
                 # print('no triangles in this region')
-                break
+                continue
 
             indexedTriangles = set()
             queue = set()

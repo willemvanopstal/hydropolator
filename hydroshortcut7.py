@@ -26,8 +26,12 @@ print('\n\n')
 ###############################
 
 surveyData = '../Data/operatorimplications/simulated_surface_points.txt'
+surveyData = '../Data/NOAA_tifs/newyork_5m_30k.csv'
+xField, yField, dField, delimiter = 'X', 'Y', 'depth', ','
+flipDepth = True
 epsg = "28992"
-projectName = 'new_classification_nodes_randomizer'
+epsg = "26918"  # (UTM new york)
+projectName = 'newyork_subset'
 projectObject = Hydropolator()
 
 # innerNodes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
@@ -60,8 +64,8 @@ if projectExists:
 else:
     msg('> init new project', 'header')
     projectObject.init_project(projectName)
-    projectObject.load_pointfile(surveyData, 'csv', delimiter=' ',
-                                 xName='x', yName='y', dName='depth', flip=True)
+    projectObject.load_pointfile(surveyData, 'csv', delimiter=delimiter,
+                                 xName=xField, yName=yField, dName=dField, flip=flipDepth)
     # projectObject.load_pointfile_old(surveyData, 'csv', delimiter=' ', flip=True)
 
 projectObject.set_crs(epsgCode=epsg)
@@ -148,6 +152,8 @@ projectObject.make_network_graph()
 # Exporting shapefiles
 ###############################
 
+projectObject.print_graph()
+
 projectObject.export_all_isobaths()
 # projectObject.export_depth_areas()  # nodeIds=innerNodes)
 projectObject.export_all_node_triangles()
@@ -155,7 +161,7 @@ projectObject.export_all_edge_triangles()
 # projectObject.export_shapefile('output')
 # projectObject.export_statistics()
 
-projectObject.rasterize(resolution=1.0)
+projectObject.rasterize(resolution=5.0)
 
 
 ###############################
