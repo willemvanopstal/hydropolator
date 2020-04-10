@@ -26,6 +26,7 @@ print('\n\n')
 ###############################
 
 surveyData = '../Data/operatorimplications/simulated_surface_points.txt'
+epsg = "28992"
 projectName = 'new_classification_nodes_randomizer'
 projectObject = Hydropolator()
 
@@ -62,6 +63,8 @@ else:
     projectObject.load_pointfile(surveyData, 'csv', delimiter=' ',
                                  xName='x', yName='y', dName='depth', flip=True)
     # projectObject.load_pointfile_old(surveyData, 'csv', delimiter=' ', flip=True)
+
+projectObject.set_crs(epsgCode=epsg)
 ###############################
 # Set statistics
 ###############################
@@ -152,7 +155,7 @@ projectObject.export_all_edge_triangles()
 # projectObject.export_shapefile('output')
 # projectObject.export_statistics()
 
-projectObject.rasterize(resolution=1.0, epsg="28992")
+projectObject.rasterize(resolution=1.0)
 
 
 ###############################

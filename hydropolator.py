@@ -114,6 +114,12 @@ class Hydropolator:
     def now(self):
         return datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    def set_crs(self, epsgCode):
+
+        self.epsg = epsgCode
+        self.srsString = subprocess.check_output(
+            'gdalsrsinfo -o wkt "EPSG:{}"'.format(self.epsg), shell=True)
+
     # ====================================== #
     #
     #   Messaging / Notifications
@@ -475,6 +481,11 @@ class Hydropolator:
                 wt.record(min, max, avg)
             self.msg('> triangles written to shapefile', 'info')
 
+        if self.epsg:
+            prjFile = triangleShpFile[:-4] + '.prj'
+            with open(prjFile, 'wb') as pf:
+                pf.write(self.srsString)
+
     def export_points(self, pointList, shpName):
         pointShpName = 'points_{}_{}.shp'.format(shpName, self.now())
         pointShpFile = os.path.join(os.getcwd(), 'projects', self.projectName, pointShpName)
@@ -489,6 +500,11 @@ class Hydropolator:
                 wp.point(point[0], point[1])
                 wp.record(i)
             self.msg('> points written to shapefile', 'info')
+
+        if self.epsg:
+            prjFile = pointShpFile[:-4] + '.prj'
+            with open(prjFile, 'wb') as pf:
+                pf.write(self.srsString)
 
     def export_shapefile(self, shpName):
         self.msg('> exporting shapefiles...', 'info')
@@ -510,6 +526,11 @@ class Hydropolator:
                 wp.record(point[2], i, point[2]-actualZ)
             self.msg('> points written to shapefile', 'info')
 
+        if self.epsg:
+            prjFile = pointshpFile[:-4] + '.prj'
+            with open(prjFile, 'wb') as pf:
+                pf.write(self.srsString)
+
         with shapefile.Writer(triangleShpFile) as wt:
             wt.field('min_depth', 'F', decimal=4)
             wt.field('max_depth', 'F', decimal=4)
@@ -521,6 +542,11 @@ class Hydropolator:
                 wt.poly([geom])
                 wt.record(min, max, avg)
             self.msg('> triangles written to shapefile', 'info')
+
+        if self.epsg:
+            prjFile = triangleShpFile[:-4] + '.prj'
+            with open(prjFile, 'wb') as pf:
+                pf.write(self.srsString)
 
     def export_region_triangles(self):
         self.msg('> exporting region triangles...', 'info')
@@ -537,6 +563,11 @@ class Hydropolator:
                         geom.append(self.poly_from_triangle(triangle))
                     wt.poly(geom)
                     wt.record(i)
+
+        if self.epsg:
+            prjFile = triangleShpFile[:-4] + '.prj'
+            with open(prjFile, 'wb') as pf:
+                pf.write(self.srsString)
 
         self.msg('> region triangles saved to file', 'info')
 
@@ -580,6 +611,11 @@ class Hydropolator:
                 wt.record(int(node), region, interval, shallowNeighbors,
                           deepNeighbors, nodeArea, bArea, classification)
 
+        if self.epsg:
+            prjFile = triangleShpFile[:-4] + '.prj'
+            with open(prjFile, 'wb') as pf:
+                pf.write(self.srsString)
+
         self.msg('> selected node triangles saved', 'info')
 
     def export_all_edge_triangles(self):
@@ -598,6 +634,11 @@ class Hydropolator:
                 wt.poly(geom)
                 isoValue = self.get_edge_value(edgeId)
                 wt.record(isoValue, int(edgeId))
+
+        if self.epsg:
+            prjFile = triangleShpFile[:-4] + '.prj'
+            with open(prjFile, 'wb') as pf:
+                pf.write(self.srsString)
 
         self.msg('> edge triangles saved', 'info')
 
@@ -636,6 +677,11 @@ class Hydropolator:
                 wt.record(isoValue, int(edgeId), int(shallowNode),
                           int(deepNode), isoArea, classification)
 
+        if self.epsg:
+            prjFile = lineShpFile[:-4] + '.prj'
+            with open(prjFile, 'wb') as pf:
+                pf.write(self.srsString)
+
         self.msg('> isobaths saved', 'info')
 
     def export_all_angularities(self):
@@ -657,6 +703,11 @@ class Hydropolator:
                     point = geom[i]
                     wp.point(point[0], point[1])
                     wp.record(pointAngularities[i])
+
+        if self.epsg:
+            prjFile = pointShpFile[:-4] + '.prj'
+            with open(prjFile, 'wb') as pf:
+                pf.write(self.srsString)
 
     def export_depth_areas(self, nodeIds=[]):
         if nodeIds == []:
@@ -709,6 +760,11 @@ class Hydropolator:
                 wt.poly(geom)
                 wt.record(int(nodeId), region, str(interval), interval[0], interval[1])
 
+        if self.epsg:
+            prjFile = depareFile[:-4] + '.prj'
+            with open(prjFile, 'wb') as pf:
+                pf.write(self.srsString)
+
         self.msg('> depth areas saved', 'info')
 
     def export_spur_gully_geoms(self, geom_summary):
@@ -750,9 +806,14 @@ class Hydropolator:
             #         wt.poly(geom)
             #         wt.record(i)
 
+        if self.epsg:
+            prjFile = triangleShpFile[:-4] + '.prj'
+            with open(prjFile, 'wb') as pf:
+                pf.write(self.srsString)
+
         self.msg('> spur gully triangles saved to file', 'info')
 
-    def rasterize(self, resolution=100.0, epsg="28992"):
+    def rasterize(self, resolution=100.0):
         self.msg('rasterizing..', 'header')
 
         rasterName = 'rasterized_{}_{}.tif'.format(resolution, self.now())
@@ -796,7 +857,7 @@ class Hydropolator:
 
         tempFileOut.close()
 
-        srs = 'EPSG:{}'.format(epsg)
+        srs = 'EPSG:{}'.format(self.epsg)
 
         FNULL = open(os.devnull, 'w')
         runCommand = 'gdal_translate -a_srs {} -a_nodata {} -mo BAND_1=ELEVATION {} {}'.format(
