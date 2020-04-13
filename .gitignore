@@ -4,6 +4,7 @@
 # Ignore folders
 __pycache__
 projects
+pymnet
 
 # Ignore test files
 experiments_startin.py

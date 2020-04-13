@@ -26,13 +26,18 @@ print('\n\n')
 ###############################
 
 surveyData = '../Data/operatorimplications/simulated_surface_points.txt'
-surveyData = '../Data/NOAA_tifs/newyork_5m_30k.csv'
-xField, yField, dField, delimiter = 'X', 'Y', 'depth', ','
+xField, yField, dField, delimiter = 'x', 'y', 'depth', ' '
 flipDepth = True
 epsg = "28992"
-epsg = "26918"  # (UTM new york)
-projectName = 'newyork_subset'
+
+# surveyData = '../Data/NOAA_tifs/newyork_5m_30k.csv'
+# xField, yField, dField, delimiter = 'X', 'Y', 'depth', ','
+# flipDepth = True
+# # epsg = "28992"
+# epsg = "26918"  # (UTM new york)
+projectName = 'networktest'
 projectObject = Hydropolator()
+projectObject.isoType = 'noaa'
 
 # innerNodes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
 #               19, 20, 21, 22, 23, 24, 25, 27, 28, 29, 31, 32, 33, 34, 35, 36, 37]
@@ -86,11 +91,11 @@ paramDict = {'prepass': 0,
              'densification': 0,
              'process': [],
              'densification_process': [],
-             'maxiter': 1,
+             'maxiter': 5,
              'angularity_threshold': 1.6,
              'spurgully_threshold': None,
-             'spur_threshold': 0.5,
-             'gully_threshold': 0.5,
+             'spur_threshold': 100,
+             'gully_threshold': 100,
              'aspect_threshold': 0.5,
              'size_threshold': 5,
              'aggregation_threshold': 40,
@@ -113,7 +118,7 @@ paramDict = {'prepass': 0,
 # 1 on aggregation means the intersected bridge points are extended by their
 # incident triangles
 paramDict['process'] = [['spurs', 0], ['gullys', 0], ['angularity', 0]]
-paramDict['process'] = [['aggregation', 1], ['spurs', 0], ['gullys', 0], ['angularity', 0]]
+# paramDict['process'] = [['aggregation', 1], ['spurs', 0], ['gullys', 0], ['angularity', 0]]
 
 # paramDict['densification_process'] = [['angularity', 'r', 1],
 #                                       ['aspect-edges', 'r', 0],
@@ -131,7 +136,7 @@ paramDict['densification_process'] = [['angularity', 'r', 0],
 projectObject.generate_regions()
 projectObject.build_graph2()
 
-projectObject.generate_isobaths5()
+# projectObject.generate_isobaths5()
 
 
 startTime = datetime.now()
@@ -142,26 +147,27 @@ endTime = datetime.now()
 print('elapsed time: ', endTime - startTime)
 
 
-projectObject.generate_isobaths5()
+# projectObject.generate_isobaths5()
 # projectObject.generate_statistics()
 
 projectObject.classify_peaks_pits(minPeak=100, minPit=100)
 projectObject.make_network_graph()
+projectObject.make_multilayer_graph()
 
 ###############################
 # Exporting shapefiles
 ###############################
 
-projectObject.print_graph()
+# projectObject.print_graph()
 
-projectObject.export_all_isobaths()
+# projectObject.export_all_isobaths()
 # projectObject.export_depth_areas()  # nodeIds=innerNodes)
-projectObject.export_all_node_triangles()
-projectObject.export_all_edge_triangles()
+# projectObject.export_all_node_triangles()
+# projectObject.export_all_edge_triangles()
 # projectObject.export_shapefile('output')
 # projectObject.export_statistics()
 
-projectObject.rasterize(resolution=5.0)
+# projectObject.rasterize(resolution=5.0)
 
 
 ###############################

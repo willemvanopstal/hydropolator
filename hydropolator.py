@@ -76,6 +76,7 @@ class Hydropolator:
     # testingSeries = [0, 2, 4, 6, 8, 10, 12, 15, 20, 25, 30, 35, 40, 45, 50]
     # testingSeries = [float(value/2) for value in range(0, 100, 1)]
     testingSeries = [0, 2, 5, 8, 10, 15, 20, 28, 30, 35, 40, 45, 50]
+    noaaSeries = [0, 1.8, 3.6, 5.4, 9.1, 18.2, 27.4, 36.5, 45.7, 54.8, 73]
     # testingSeries = [0, 5, 10, 15, 20, 25, 50]
     isobathValues = []
     regions = []
@@ -182,6 +183,90 @@ class Hydropolator:
         for region in self.regionNodes.keys():
             print(region, self.regionNodes[region])
 
+    def make_multilayer_graph_pymnet(self):
+        try:
+            import pymnet
+        except:
+            return
+
+        net = pymnet.MultiplexNetwork(couplings='categorical', fullyInterconnected=False)
+
+        for edgeId in self.graph['edges'].keys():
+            edge = self.graph['edges'][edgeId]['edge']
+            shallowNode = edge[0]
+            deepNode = edge[1]
+            shallowValue = self.get_interval_from_node(shallowNode)
+            deepValue = self.get_interval_from_node(deepNode)
+
+            net[shallowNode, 'shallowValue'][deepNode, 'deepValue'] = 1
+
+        fig = pymnet.draw(net, show=True, layerPadding=0.2)
+
+    def make_multilayer_graph(self):
+        G = nx.Graph()
+        for edge in self.graph['edges'].keys():
+            # print(edge)
+            edgingNodes = self.graph['edges'][edge]['edge']
+            # print(edge, edgingNodes)
+            G.add_edge(edgingNodes[0], edgingNodes[1])
+
+        cmap = cm.get_cmap('Spectral')
+        norm = colors.Normalize(vmin=0, vmax=len(self.regions))
+
+        nodelabels = {}
+        colorLabels = []
+        edgeColors = []
+        for node in G.nodes():
+            regionInterval = self.regions[int(self.graph['nodes'][node]['region'])]
+            label = '{}-{}\n{}'.format(regionInterval[0], regionInterval[1], node)
+            color = cmap(norm(int(self.graph['nodes'][node]['region'])))
+
+            # print(self.graph['nodes'][node]['classification'])
+
+            if self.graph['nodes'][node]['classification'] == 'peak':
+                edgeColors.append('red')
+            elif self.graph['nodes'][node]['classification'] == 'pit':
+                edgeColors.append('blue')
+            else:
+                edgeColors.append(color)
+
+            colorLabels.append(color)
+            nodelabels[node] = label
+
+        pos = nx.kamada_kawai_layout(G)
+        # top = nx.bipartite.sets(G)[0]
+        # pos = nx.planar_layout(G)
+
+        newPos = {}
+        existingPos = dict()
+        for node, nodeData in G.nodes(data=True):
+            print(node)
+            print(self.get_interval_from_node(node))
+            yPos = -1 * float(self.get_interval_from_node(node))
+
+            if yPos in existingPos:
+                xPos = existingPos[yPos] + 1.0
+            else:
+                xPos = 0.0
+            existingPos[yPos] = xPos
+            newPos[node] = [xPos, yPos]
+
+        print(pos)
+        print(newPos)
+        print(G.edges())
+        pos = newPos
+        nx.draw(G, pos, node_color=colorLabels, edgecolors=edgeColors,
+                font_size=16, with_labels=False)
+        # for p in pos:  # raise text positions
+        #     pos[p][1] += 0.07
+        nx.draw_networkx_labels(G, pos, nodelabels, font_size=6)
+        # plt.show()
+
+        regionGraphName = 'regiongraph_{}.pdf'.format(self.now())
+        regionGraphFile = os.path.join(os.getcwd(), 'projects', self.projectName, regionGraphName)
+        # plt.savefig(regionGraphFile)
+        plt.show()
+
     def make_network_graph(self):
         G = nx.Graph()
         for edge in self.graph['edges'].keys():
@@ -214,6 +299,9 @@ class Hydropolator:
             nodelabels[node] = label
 
         pos = nx.kamada_kawai_layout(G)
+        # top = nx.bipartite.sets(G)[0]
+        # pos = nx.planar_layout(G)
+        print(pos)
         nx.draw(G, pos, node_color=colorLabels, edgecolors=edgeColors,
                 font_size=16, with_labels=False)
         # for p in pos:  # raise text positions
@@ -903,7 +991,7 @@ class Hydropolator:
                     xValue = float(point[xPlace])
                     yValue = float(point[yPlace])
                     # randomize uniform
-                    min, max = -3.0, 3.0
+                    min, max = -2.4, 2.4
                     xValue = round(xValue + uniform(min, max), 3)
                     yValue = round(yValue + uniform(min, max), 3)
 
@@ -1210,6 +1298,8 @@ class Hydropolator:
             isobathValues = self.hdSeries
         elif self.isoType == 'testing':
             isobathValues = self.testingSeries
+        elif self.isoType == 'noaa':
+            isobathValues = self.noaaSeries
 
         regions = []
         regions.append([-1e9, isobathValues[0]])
