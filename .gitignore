@@ -21,6 +21,7 @@ TriangleRegionGraph.py
 *.prj
 *.qpj
 *.qgz
+triangle
 
 # Ignore files related to API keys
 .env
