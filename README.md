@@ -1,8 +1,26 @@
-Hydropolator is a program to interact with hydrographic survey data with the main purpose of generating and generalizing depth contours for different chart scales. Great attention is given to the fact these contours should be legible, safe, morphological and topological correct.
+**Hydropolator** is a program to interact with hydrographic survey data with the main purpose of generating and generalizing depth contours for different chart scales. Great attention is given to the fact these contours should be legible, safe, morphological and topological correct.
 
 This conceptual implementation is a proof of concept for my MSc. Thesis in Geomatics: *Automatic isobath generalisation for navigational charts*. The report is available [here](https://repository.tudelft.nl).
 
-#### Very simple example
+*While the code is fully functional, it is not an optimal implementation of the proposed methodology. Be aware of long processing times, especially if variation in the survey data is large.*
+
+# TOC
+- [Very simple example](#very-simple-example)
+- [Input](#input)
+- [Output](#output)
+- [Dependencies](#dependencies)
+- [Expected File Structure](#expected-file-structure)
+- [Implementation](#hydropolator)
+    - [Methods](#methods)
+    - [Arguments](#arguments)
+    - [Variables](#variables)
+    - [Attributes](#attributes)
+- [Examples](#examples)
+- [License](#license)
+- [Acknowledgements](#Acknowledgements)
+
+
+# Very simple example
 ```python
 from Hydropolator import Hydropolator
 
@@ -52,28 +70,38 @@ hpl.export_all_isobaths()
 hpl.export_depth_areas()
 hpl.rasterize(resolution=5.0)
 ```
-#### TOC
-- [Input](#input)
-- [Output](#output)
-- [Dependencies](#dependencies)
-- [Expected File Structure](#expected-file-structure)
-- [Implementation](#hydropolator)
-    - [Methods](#methods)
-    - [Arguments](#arguments)
-    - [Variables](#variables)
-    - [Attributes](#attributes)
-- [Examples](#examples)
 
 
 # Input
 Main input is a simple xyz file of depth measurements or soundings. The data should be projected with meter units.
 
+No additional datasets are needed for now. In the future we will possibly support breaklines (coastlines, drying features) and direction (shipping lanes).
+
+While the goal is to generate isobaths *automatically*, this is not yet fully achieved. You should still input some parameters for the process. See the [implementation details](#hydropolator).
 
 # Output
+- Isobaths (shapefile)
+- Points (shapefile)
+- Depth areas (shapefile)  
+- Depth (geotif)
+
+
+- Triangulation faces/triangles (shapefile)
+- TRG Node Triangles (shapefile)
+- TRG Edge Triangles (shapefile)
+- TRG Network visualization (plot)
+- Isobath angularities (shapefile)
+- Aggregation areas (shapefile)
+- Aggregation points (shapefile)
+- Spur/gully triangles (shapefile)
+- Spur/gully points (shapefile)
+- Various statistics w.r.t. the generalisation process (csv/plots)
+- Project files for sharing
+
 
 # Dependencies
 
-Hydropolator is implemented in Python 3. For some metrics use is made of the non-Python library [*triangle*](https://www.cs.cmu.edu/~quake/triangle.html). This program should be downloaded separately en placed in the same directory. However, the main program will run without this extension, but some features will not work. It does rely on the following Python packages:
+Hydropolator is implemented in Python 3.  It does rely on the following Python packages:
 
 - [StarTIN](https://github.com/hugoledoux/startin_python)
 - matplotlib
@@ -85,6 +113,12 @@ Hydropolator is implemented in Python 3. For some metrics use is made of the non
 - subprocess
 - colorama
 - shapely (only for Aggregator.py)
+
+###### Triangle
+For some metrics use is made of the non-Python library [*triangle*](https://www.cs.cmu.edu/~quake/triangle.html). This program should be downloaded separately and placed in the same directory. However, the main program will run without this extension, but some features will not work.
+
+###### GDAL
+Most geographic files will be output as Shapefiles or GeoTiffs. If you specify a project crs (`hpl.set_crs()`), make sure to have GDAL binaries installed and added to your path. Some GDAL programs will be called from Python. If GDAL is not installed, you can still export shapefiles, but these will not be geo-referenced to a crs. Output in the form of a raster is not possible without GDAL.
 
 # Expected file structure
 ```
@@ -113,15 +147,145 @@ Hydropolator
 ├── qgis_styles                    # default styles for qgis
 │   ├── qgis_style_painter.py      # PyQGIS script, can be imported in qgis
 │   └── ... .qml                   # various qgis style files
-└── ...
+└── LICENSE
 ```
-*project directories will be created on initializing a new project. If you want to copy a directory, make sure the included files are present in the structure.*
+*Project directories will be created on initialising a new project. If you want to copy a directory, make sure the included files are present in the structure.*
 
 
 # Hydropolator
 
+Hydropolator basically is one Python class plus an extra class object for storing the vertices on disk more straightforward. If the *triangle* library is available, it can be extended with more classes *Aggregator* and *BendDetector*.
+
+On initializing a new project, a Hydropolator class is initialized. All operations will take place around this object, so assign it to a variable.
+
+## Initialisation
+
+```python
+from Hydropolator import Hydropolator  
+hpl = Hydropolator()
+```
+
 ## Methods
 
+##### Project management
+`self.init_project(projectName)`  
+Initializes a new (empty) project
+
+`self.load_project(projectName)`  
+Loads an existing project. Make sure the five project files specified in the expected file structure are present. Otherwise it will raise an error.
+
+`self.summarize_project()`  
+Prints a basic summary of the project, number of points, isobaths etcetera.
+
+`self.set_crs(epsgCode)`  
+Sets the crs to the given EPSG. This is only used for export functions. Be aware it will only work if you have GDAL installed and added to your path. Otherwise the export functions will raise an error.
+
+##### Points
+
+`self.load_pointfile(pointfile, fileType, delimiter, xName, yName, dName, flip)`  
+This loads a .xyz pointfile, filters on snapping tolerance and triangulates the points for further use.
+
+##### Shutting down
+`self.write_metafile()`  
+Saves some basic data to be able to open the same object again on loading an existing project.
+
+`self.save_triangulation`  
+Saves the triangulation object for loading an existing project later.
+
+`self.save_trGraph()`  
+Saves the triangulation region graph for loading again.
+
+##### Exporting
+
+`self.export_all_isobaths()`  
+Exports all isobaths in the project to shapefiles.
+
+`self.export_depth_areas()`  
+Exports the depth areas to shapefiles. Only DEPAREs which are fully contained by closed isobaths are recognized.
+
+`self.export_all_node_triangles`  
+Exports the nodes from the triangle region graph in the form of a collection of triangles (shapefile).
+
+`self.export_all_edge_triangles`  
+Exports the edges from the triangle region graph in the form of a collection of triangles (shapefile).
+
+`self.export_shapefile()`  
+Exports basic triangles and vertices in two separate shapefiles with some information on the triangle intervals for triangles, and updates and difference in depth for the vertices.
+
+`self.rasterize(resolution)`  
+Rasterizes the data and exports it to a GeoTiff. Make sure to have GDAL binaries installed and that you have set a crs with `self.set_crs()`. Interpolation is now done using LaPlace interpolant on a grid of pixels.
+
+##### Miscellaneous
+`self.print_errors()`  
+Some errors in the process are captured and can be printed through this method. Be aware not all errors are yet printed!
+
+##### Statistics
+Some basic statistics are supported. However we need to set certain bins for visualization of these statistics.
+
+`self.set_sharp_points_bins(sharpPointsBreakpoints)`  
+`self.set_abs_change_bins(absoluteChangedPointsBreakpoints)`  
+`self.set_min_change_bins(minChangedPointsBreakpoints)`  
+`self.set_iso_seg_bins(isoLengthBreakpoints)`  
+All arguments are simple lists with breakpoints.
+
+`self.export_statistics()`  
+Exports various csv files in the project directory.
+
+## Arguments
+
+`pointFile` is simply the path to your survey data.
+
+`flip` determines if the depth value in your source data should be flipped. It defaults to False. Depth should defined as watercolumn below sea-level. If there is water, depth value is positive. Is it is drying, depth value is negative. By setting flip to True, original depth values from datafile will be flipped.
+
+## paramDict
+
+The `paramDict` argument is where most of your input will be defined. It contains all information for the smoothing process to be executed. It *must* contain the following entries:
+
+```python
+paramDict = {'prepass': 1,
+             'densification': 1,
+             'process': [],
+             'densification_process': [],
+             'maxiter': 10,
+             'angularity_threshold': 1.6,
+             'spurgully_threshold': None,
+             'spur_threshold': 100,
+             'gully_threshold': 100,
+             'aspect_threshold': 0.5,
+             'size_threshold': 5,
+             'aggregation_threshold': 40,
+             'min_ring': 1,
+             'max_ring': 4
+             }
+
+paramDict['process'] = [['spurs', 0], ['gullys', 0], ['angularity', 0]]
+paramDict['densification_process'] = [['angularity', 'r', 0],
+                                      ['aspect-edges', 'r', 0],
+                                      ['size-edges', 'r', 0]
+                                      ]
+```
+
+
+
+# License
+
+This project is licensed under a [GPL V3.0 licence](https://github.com/willemvanopstal/hydropolator/blob/master/LICENSE).
+
+The accompanying report -  [my MSc. Thesis](https://repository.tudelft.nl) - is available under a [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) license.
+
+# Acknowledgements
+
+First of all great thanks to my two supervisors for all support during my graduation process: Dr. **Martijn Meijers** and Dr. **Ravi Peters**.
+
+The voronoi surface based approach for generating isobaths was first examined by Dr. **Hugo Ledoux** and later expanded by Dr. Ravi Peters in his MSc. Thesis.
+
+This implementation builds and relies on the [**StarTIN**](https://github.com/hugoledoux/startin_python) triangulation library from Hugo Ledoux. Only because of his simple but versatile implementation of a Delaunay triangulation, hydropolator could function in its current use.
+
+For the more advanced metrics, the [**triangle**](https://www.cs.cmu.edu/~quake/triangle.html) triangulation library is used. It supports a great constrained Delaunay triangulation with lots of controls.
+
+===
+
+# Older (to be removed)
 #### `load_pointfile(pointFile, fileType, delimiter, xName, yName, dName, flip) -> None`
 This loads a .xyz pointfile, filters on snapping tolerance and triangulates the points for further use.
 > `pointFile <- str/os.path (None)` path to pointfile  
