@@ -10,17 +10,22 @@ class ElevationDict:
     def add_new(self, vertex_tuple):
         if not tuple(vertex_tuple) in self.elevationDict:
             self.elevationDict[tuple(vertex_tuple)] = {
-                'z': vertex_tuple[2], 'z_original': vertex_tuple[2], 'previous_z': None}
+                'z': vertex_tuple[2], 'z_original': vertex_tuple[2], 'previous_z': None, 'updates': 0}
 
     def update_z(self, vertex_tuple, new_z):
         # self.elevationDict[tuple(vertex_tuple)]['previous_z'] = self.get_z(vertex_tuple)
-        self.elevationDict[tuple(vertex_tuple)]['z'] = new_z
+        vertexEntry = self.elevationDict[tuple(vertex_tuple)]
+        vertexEntry['z'] = new_z
+        vertexEntry['updates'] = vertexEntry['updates'] + 1
 
     def update_previous_z(self, vertex_tuple):
         self.elevationDict[tuple(vertex_tuple)]['previous_z'] = self.get_z(vertex_tuple)
 
     def get_z(self, vertex_tuple):
         return self.elevationDict[tuple(vertex_tuple)]['z']
+
+    def get_updates(self, vertex_tuple):
+        return self.elevationDict[tuple(vertex_tuple)]['updates']
 
     def get_previous_z(self, vertex_tuple):
         previousZ = self.elevationDict[tuple(vertex_tuple)]['previous_z']
@@ -42,9 +47,9 @@ class ElevationDict:
         # else:
         #     return previousZ
 
-    def get_original_z(self, vertex_tuple):
-        originalZ = self.elevationDict[tuple(vertex_tuple)]['original_z']
-        return originalZ
+    # def get_original_z(self, vertex_tuple):
+    #     originalZ = self.elevationDict[tuple(vertex_tuple)]['original_z']
+    #     return originalZ
 
     def remove_previous_z(self, vertex_tuple):
         self.elevationDict[tuple(vertex_tuple)]['previous_z'] = None

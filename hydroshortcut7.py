@@ -25,17 +25,16 @@ print('\n\n')
 # Input
 ###############################
 
-surveyData = '../Data/operatorimplications/simulated_surface_points.txt'
-xField, yField, dField, delimiter = 'x', 'y', 'depth', ' '
-flipDepth = True
-epsg = "28992"
-
-# surveyData = '../Data/NOAA_tifs/newyork_5m_30k.csv'
-# xField, yField, dField, delimiter = 'X', 'Y', 'depth', ','
+# surveyData = '../Data/operatorimplications/simulated_surface_points.txt'
+# xField, yField, dField, delimiter = 'x', 'y', 'depth', ' '
 # flipDepth = True
-# # epsg = "28992"
-# epsg = "26918"  # (UTM new york)
-projectName = 'networktest'
+# epsg = "28992"
+
+surveyData = '../Data/NOAA_tifs/newyork_5m_30k.csv'
+xField, yField, dField, delimiter = 'X', 'Y', 'depth', ','
+flipDepth = True
+epsg = "26918"  # (UTM new york)
+projectName = 'networktest2'
 projectObject = Hydropolator()
 projectObject.isoType = 'noaa'
 
@@ -94,8 +93,8 @@ paramDict = {'prepass': 0,
              'maxiter': 5,
              'angularity_threshold': 1.6,
              'spurgully_threshold': None,
-             'spur_threshold': 100,
-             'gully_threshold': 100,
+             'spur_threshold': 10,
+             'gully_threshold': 10,
              'aspect_threshold': 0.5,
              'size_threshold': 5,
              'aggregation_threshold': 40,
@@ -138,7 +137,7 @@ projectObject.build_graph2()
 
 startTime = datetime.now()
 
-# projectObject.start_routine_new(paramDict, statistics=False)
+projectObject.start_routine_new(paramDict, statistics=False)
 
 endTime = datetime.now()
 print('elapsed time: ', endTime - startTime)
@@ -149,7 +148,7 @@ print('elapsed time: ', endTime - startTime)
 
 projectObject.classify_peaks_pits(minPeak=100, minPit=100)
 # projectObject.make_network_graph()
-projectObject.make_multilayer_graph(interactive=True)
+# projectObject.make_multilayer_graph(interactive=True)
 
 ###############################
 # Exporting shapefiles
@@ -163,6 +162,7 @@ projectObject.make_multilayer_graph(interactive=True)
 # projectObject.export_all_edge_triangles()
 # projectObject.export_shapefile('output')
 # projectObject.export_statistics()
+projectObject.export_shapefile('outupdates')
 
 # projectObject.rasterize(resolution=5.0)
 

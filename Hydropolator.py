@@ -696,15 +696,17 @@ class Hydropolator:
             wp.field('depth', 'F', decimal=4)
             wp.field('id', 'N')
             wp.field('diff', 'F', decimal=4)
+            wp.field('updates', 'N')
             # for point in self.triangulation.all_vertices()[1:]:
             for i, point in enumerate(self.vertices[1:]):  # remove the infinite vertex in startTIN
                 actualZ = self.get_z(point, idOnly=False)
+                nrUpdates = self.get_updates(point, idOnly=False)
                 wp.point(point[0], point[1])
-                wp.record(point[2], i, point[2]-actualZ)
+                wp.record(point[2], i, point[2]-actualZ, nrUpdates)
             self.msg('> points written to shapefile', 'info')
 
         if self.epsg:
-            prjFile = pointshpFile[:-4] + '.prj'
+            prjFile = pointShpFile[:-4] + '.prj'
             with open(prjFile, 'wb') as pf:
                 pf.write(self.srsString)
 
@@ -1274,6 +1276,14 @@ class Hydropolator:
         else:
             parsedVertex = self.triangulation.get_point(vertex)
             return self.vertexDict.get_z(parsedVertex)
+
+    def get_updates(self, vertex, idOnly=False):
+        # return self.vertexDict[tuple(vertex)]['z']
+        if not idOnly:
+            return self.vertexDict.get_updates(vertex)
+        else:
+            parsedVertex = self.triangulation.get_point(vertex)
+            return self.vertexDict.get_updates(parsedVertex)
 
     def get_original_z(self, vertex, idOnly=False):
         # return self.vertexDict[tuple(vertex)]['z']
@@ -4424,8 +4434,8 @@ class Hydropolator:
 
         return updatedVertices
 
-        self.vertexDict.update_values_from_queue()
-        self.update_region_graph(updatedVertices)
+        # self.vertexDict.update_values_from_queue()
+        # self.update_region_graph(updatedVertices)
 
         # print(adjacentVertex, leftPseudoTriangle, rightPseudoTriangle)
 
@@ -4804,6 +4814,11 @@ class Hydropolator:
                   # len(self.graph['nodes'][nodeId]['edges']))
             if len(self.get_triangles(nodeId)) == 0 and len(self.graph['nodes'][nodeId]['edges']) == 0:
                 self.msg('poppednode will be deleted {}'.format(nodeId), 'warning')
+                self.remove_node_and_all_contents(nodeId)
+            elif len(self.get_triangles(nodeId)) == 0:
+                self.msg('poppednode also deleted  {}, '.format(nodeId), 'warning')
+                for edgeId in self.graph['nodes'][nodeId]['edges']:
+                    self.delete_edge(self.graph['edges'][edgeId]['edge'])
                 self.remove_node_and_all_contents(nodeId)
 
         return len(changedVertices)
@@ -5433,7 +5448,7 @@ class Hydropolator:
             isoSegBins.append([breakpoints[i - 1], breakpoints[i]])
         isoSegBins.append([breakpoints[-1], 10000])
 
-        print(isoSegBins)
+        # print(isoSegBins)
 
         self.isoSegBins = isoSegBins
 
