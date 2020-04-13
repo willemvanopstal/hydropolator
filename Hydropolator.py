@@ -2,8 +2,8 @@
 # @Date:   17-Jan-2020
 # @Email:  willemvanopstal home nl
 # @Project: Hydropolator
-# @Last modified by:   Bonny
-# @Last modified time: 08-Apr-2020
+# @Last modified by:   Willem
+# @Last modified time: 13-Apr-2020
 
 
 from ElevationDict import ElevationDict
@@ -18,7 +18,6 @@ import networkx as nx
 from matplotlib import cm, colors, path
 import matplotlib.pyplot as plt
 import numpy as np
-# from PointInTriangle import point_in_triangle
 import os
 from datetime import datetime
 import shapefile
@@ -27,11 +26,8 @@ import pickle
 from tabulate import tabulate
 from random import uniform
 import subprocess
-# from shapely import geometry, ops
 import colorama
 colorama.init()
-
-# from TriangleRegionGraph import TriangleRegionGraph
 
 
 class Hydropolator:

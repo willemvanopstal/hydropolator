@@ -120,14 +120,11 @@ paramDict = {'prepass': 0,
 paramDict['process'] = [['spurs', 0], ['gullys', 0], ['angularity', 0]]
 # paramDict['process'] = [['aggregation', 1], ['spurs', 0], ['gullys', 0], ['angularity', 0]]
 
-# paramDict['densification_process'] = [['angularity', 'r', 1],
-#                                       ['aspect-edges', 'r', 0],
-#                                       ['size-edges', 'r', 0]
-#                                       ]
 paramDict['densification_process'] = [['angularity', 'r', 0],
                                       ['aspect-edges', 'r', 0],
                                       ['size-edges', 'r', 0]
                                       ]
+
 
 ###############################
 # Process

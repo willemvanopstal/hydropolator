@@ -1,3 +1,123 @@
+Hydropolator is a program to interact with hydrographic survey data with the main purpose of generating and generalizing depth contours for different chart scales. Great attention is given to the fact these contours should be legible, safe, morphological and topological correct.
+
+This conceptual implementation is a proof of concept for my MSc. Thesis in Geomatics: *Automatic isobath generalisation for navigational charts*. The report is available [here](https://repository.tudelft.nl).
+
+#### Very simple example
+```python
+from Hydropolator import Hydropolator
+
+# Project properties
+projectName = 'newyork'
+surveyData = '../Data/NOAA/newyork_5m_30k.csv'
+x, y, z = 'x', 'y', 'depth'
+epsg = '26918'
+flipDepth = True
+
+# Project initialisation
+hpl = Hydropolator()
+hpl.init_project(projectName)
+hpl.load_pointfile(surveyData, 'csv', ' ', x, y, z, flip=flipDepth)
+hpl.set_crs(epsg)
+
+# Generalisation parameters
+paramDict = {'prepass': 1,
+             'densification': 1,
+             'process': [],
+             'densification_process': [],
+             'maxiter': 10,
+             'angularity_threshold': 1.6,
+             'spurgully_threshold': None,
+             'spur_threshold': 100,
+             'gully_threshold': 100,
+             'aspect_threshold': 0.5,
+             'size_threshold': 5,
+             'aggregation_threshold': 40,
+             'min_ring': 1,
+             'max_ring': 4
+             }
+
+paramDict['process'] = [['spurs', 0], ['gullys', 0], ['angularity', 0]]
+paramDict['densification_process'] = [['angularity', 'r', 0],
+                                      ['aspect-edges', 'r', 0],
+                                      ['size-edges', 'r', 0]
+                                      ]
+
+# Process
+hpl.generate_regions()
+hpl.build_graph2()
+hpl.start_routine_new(paramDict)
+
+# Export
+hpl.export_all_isobaths()
+hpl.export_depth_areas()
+hpl.rasterize(resolution=5.0)
+```
+#### TOC
+- [Input](#input)
+- [Output](#output)
+- [Dependencies](#dependencies)
+- [Expected File Structure](#expected-file-structure)
+- [Implementation](#hydropolator)
+    - [Methods](#methods)
+    - [Arguments](#arguments)
+    - [Variables](#variables)
+    - [Attributes](#attributes)
+- [Examples](#examples)
+
+
+# Input
+Main input is a simple xyz file of depth measurements or soundings. The data should be projected with meter units.
+
+
+# Output
+
+# Dependencies
+
+Hydropolator is implemented in Python 3. For some metrics use is made of the non-Python library [*triangle*](https://www.cs.cmu.edu/~quake/triangle.html). This program should be downloaded separately en placed in the same directory. However, the main program will run without this extension, but some features will not work. It does rely on the following Python packages:
+
+- [StarTIN](https://github.com/hugoledoux/startin_python)
+- matplotlib
+- networkx
+- numpy
+- shapefile / pyshp
+- pickle
+- tabulate
+- subprocess
+- colorama
+- shapely (only for Aggregator.py)
+
+# Expected file structure
+```
+Hydropolator
+├── Hydropolator.py                # Main class file
+├── ElevationDict.py               # handles the elevations at each vertex/point/sounding
+├── Aggregator.py                  # needs Triangle
+├── BendDetector.py                # needs Triangle
+├── hydrolauncher.py               # CLI (experimental)
+├── hydroshortcut.py               # simple interaction examples
+├── triangle                       # triangle file must be downloaded from its own website first
+├── projects
+│   ├── [projectName]              # each project has its own directory with saved data and output.  
+│   │   ├── metafile
+│   │   ├── triangulationTracker
+│   │   ├── triangleRegionGrap
+│   │   ├── triangulationVertices
+│   │   ├── vertexElevations
+│   │   └── [all output files]     # depends on settings  
+│   └── ...             
+├── plots                          # plotting statistics
+│   ├── stats_preparer_[..].py
+│   ├── stats_visualizer_[..].py
+│   ├── [outputs]
+│   └── [stat data]
+├── qgis_styles                    # default styles for qgis
+│   ├── qgis_style_painter.py      # PyQGIS script, can be imported in qgis
+│   └── ... .qml                   # various qgis style files
+└── ...
+```
+*project directories will be created on initializing a new project. If you want to copy a directory, make sure the included files are present in the structure.*
+
+
 # Hydropolator
 
 ## Methods
@@ -56,12 +176,12 @@ It must be a list with possible entries: `['angularity', 'r', 0], ['aspect-edges
 
 ## Variables
 
-#### `prepass
+#### `prepass`
 
 ## Attributes
 
 
-# Interaction
+# Examples
 
 ## hydroshortcut.py
  **Starting a project:**
