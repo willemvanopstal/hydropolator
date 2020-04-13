@@ -151,8 +151,8 @@ print('elapsed time: ', endTime - startTime)
 # projectObject.generate_statistics()
 
 projectObject.classify_peaks_pits(minPeak=100, minPit=100)
-projectObject.make_network_graph()
-projectObject.make_multilayer_graph()
+# projectObject.make_network_graph()
+projectObject.make_multilayer_graph(interactive=True)
 
 ###############################
 # Exporting shapefiles

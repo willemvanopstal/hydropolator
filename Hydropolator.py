@@ -202,7 +202,7 @@ class Hydropolator:
 
         fig = pymnet.draw(net, show=True, layerPadding=0.2)
 
-    def make_multilayer_graph(self):
+    def make_multilayer_graph(self, interactive=False):
         G = nx.Graph()
         for edge in self.graph['edges'].keys():
             # print(edge)
@@ -233,28 +233,78 @@ class Hydropolator:
             colorLabels.append(color)
             nodelabels[node] = label
 
-        pos = nx.kamada_kawai_layout(G)
+        # pos = nx.kamada_kawai_layout(G)
         # top = nx.bipartite.sets(G)[0]
         # pos = nx.planar_layout(G)
 
-        newPos = {}
-        existingPos = dict()
-        for node, nodeData in G.nodes(data=True):
-            print(node)
-            print(self.get_interval_from_node(node))
-            yPos = -1 * float(self.get_interval_from_node(node))
+        # newPos = {}
+        # existingPos = dict()
+        # for node, nodeData in G.nodes(data=True):
+        #     # print(node)
+        #     # print(self.get_interval_from_node(node))
+        #     yPos = -1 * float(self.get_interval_from_node(node))
+        #
+        #     if yPos in existingPos:
+        #         xPos = existingPos[yPos] + 1.0
+        #     else:
+        #         xPos = 0.0
+        #     existingPos[yPos] = xPos
+        #     newPos[node] = [xPos, yPos]
 
-            if yPos in existingPos:
-                xPos = existingPos[yPos] + 1.0
+        edgePos = {}
+        existingPos = {}
+        edges = list(G.edges())
+        # print('edges---', edges)
+
+        curNode = edges[0][0]
+        nodeQueue = [curNode]
+        xPos, yPos = 0.0, -1*float(self.get_interval_from_node(curNode))
+        existingPos[yPos] = xPos
+        edgePos[curNode] = [xPos, yPos]
+
+        while len(edges) > 0:
+
+            found = False
+            for edge in edges:
+                # print(edge, nodeQueue)
+                if edge[0] == nodeQueue[0]:
+                    curNode = edge[1]
+                    yPos = -1 * float(self.get_interval_from_node(curNode))
+                    if yPos in existingPos:
+                        xPos = existingPos[yPos] + 1.0
+                    else:
+                        xPos = 0.0
+                    existingPos[yPos] = xPos
+                    if curNode not in edgePos:
+                        edgePos[curNode] = [xPos, yPos]
+                    found = edge
+                    nodeQueue.append(curNode)
+                    break
+
+                elif edge[1] == nodeQueue[0]:
+                    curNode = edge[0]
+                    yPos = -1 * float(self.get_interval_from_node(curNode))
+                    if yPos in existingPos:
+                        xPos = existingPos[yPos] + 1.0
+                    else:
+                        xPos = 0.0
+                    existingPos[yPos] = xPos
+                    if curNode not in edgePos:
+                        edgePos[curNode] = [xPos, yPos]
+                    found = edge
+                    nodeQueue.append(curNode)
+                    break
+
+            if found is False:
+                nodeQueue = nodeQueue[1:]
             else:
-                xPos = 0.0
-            existingPos[yPos] = xPos
-            newPos[node] = [xPos, yPos]
+                edges.remove(edge)
 
-        print(pos)
-        print(newPos)
-        print(G.edges())
-        pos = newPos
+        # print(pos)
+        # print(newPos)
+        # print(G.edges())
+        # pos = newPos
+        pos = edgePos
         nx.draw(G, pos, node_color=colorLabels, edgecolors=edgeColors,
                 font_size=16, with_labels=False)
         # for p in pos:  # raise text positions
@@ -265,7 +315,49 @@ class Hydropolator:
         regionGraphName = 'regiongraph_{}.pdf'.format(self.now())
         regionGraphFile = os.path.join(os.getcwd(), 'projects', self.projectName, regionGraphName)
         # plt.savefig(regionGraphFile)
-        plt.show()
+
+        if interactive:
+
+            yChanges = []
+
+            accepted = False
+            print("type 'y' if accepted")
+            while not accepted:
+                plt.cla()
+                nx.draw(G, pos, node_color=colorLabels, edgecolors=edgeColors,
+                        font_size=16, with_labels=False)
+                nx.draw_networkx_labels(G, pos, nodelabels, font_size=6)
+
+                plt.ion()
+                plt.show()
+
+                yChange = input('nodeId, yChange: ')
+
+                if yChange == 'y':
+                    accepted = True
+                    break
+                else:
+                    # yChanges.append(yChange)
+                    try:
+                        if len(yChange.split(',')) == 2:
+                            selNode, nodeChange = yChange.split(',')
+                            pos[selNode] = [pos[selNode][0]+float(nodeChange), pos[selNode][1]]
+                        else:
+                            nodeChange = yChange.split(',')[-1]
+                            for selNode in yChange.split(',')[:-1]:
+                                pos[selNode] = [pos[selNode][0]+float(nodeChange), pos[selNode][1]]
+                    except:
+                        print('wrong input')
+                        continue
+
+            plt.cla()
+            nx.draw(G, pos, node_color=colorLabels, edgecolors=edgeColors,
+                    font_size=16, with_labels=False)
+            nx.draw_networkx_labels(G, pos, nodelabels, font_size=6)
+            plt.savefig(regionGraphFile)
+
+            # for yChange in yChanges:
+            #     print(yChange.split(','))
 
     def make_network_graph(self):
         G = nx.Graph()
