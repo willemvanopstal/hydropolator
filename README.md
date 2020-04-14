@@ -37,9 +37,8 @@ This conceptual implementation is a proof of concept for my MSc. Thesis in Geoma
     - [Attributes](#attributes)
 - [Examples](#examples)
 - [License](#license)
-- [Acknowledgements](#Acknowledgements)
-
-
+- [Acknowledgements](#acknowledgements)
+<a> </a>
 - [Concepts](#concepts)
     - [Triangle region graph](#triangle-region-graph)
     - [Metrics](#metrics)
