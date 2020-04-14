@@ -4,6 +4,26 @@ This conceptual implementation is a proof of concept for my MSc. Thesis in Geoma
 
 *While the code is fully functional, it is not an optimal implementation of the proposed methodology. Be aware of long processing times, especially if variation in the survey data is large.*
 
+# Very short methodology
+
+1. Hydropolator creates a 2.5D Delaunay triangulation of the input points.
+1. This triangulation is structured in a novel *Triangle Region Graph*.
+1. With this structure, the location of isobaths is directly linked to the triangulation.
+1. And because of the triangulation is linked to the input points, the isobaths are linked to the survey data.
+1. We establish some constraints for the output of the isobaths.
+1. Like smoothness, minimum distance between lines, minimum distance between peaks etc.
+1. We check the data for conflicts in these constraints.
+1. We isolate the conflicts and possibly extend them with some region.
+1. We smooth the conflicting points using the Laplace interpolant.
+1. Interpolation is easy, because the data is already structured in a Delaunay triangulation.
+1. If the newly interpolated value of a point is shallower than its original, we update it.
+1. By doing so, we obtain an always safe surface.
+1. If we are happy with the results, or if no conflicts are found anymore, we stop the process.
+1. And finally we can extract isobaths, being legible, safe, and geometrically correct.
+1. We can also easily extract depth areas, because the Triangle Region Graph structure.
+
+
+
 # TOC
 - [Very simple example](#very-simple-example)
 - [Input](#input)
@@ -18,6 +38,10 @@ This conceptual implementation is a proof of concept for my MSc. Thesis in Geoma
 - [Examples](#examples)
 - [License](#license)
 - [Acknowledgements](#Acknowledgements)
+
+- [Concepts](#concepts)
+    - [Triangle region graph](#triangle-region-graph)
+    - [Metric](#metrics)
 
 
 # Very simple example
@@ -84,8 +108,6 @@ While the goal is to generate isobaths *automatically*, this is not yet fully ac
 - Points (shapefile)
 - Depth areas (shapefile)  
 - Depth (geotif)
-
-
 - Triangulation faces/triangles (shapefile)
 - TRG Node Triangles (shapefile)
 - TRG Edge Triangles (shapefile)
@@ -265,6 +287,15 @@ paramDict['densification_process'] = [['angularity', 'r', 0],
                                       ]
 ```
 
+# Statistics
+
+## Morphology
+
+## Depth change
+
+## Smoothness
+
+## Smoothing process
 
 
 # License
@@ -282,6 +313,41 @@ The voronoi surface based approach for generating isobaths was first examined by
 This implementation builds and relies on the [**StarTIN**](https://github.com/hugoledoux/startin_python) triangulation library from Hugo Ledoux. Only because of his simple but versatile implementation of a Delaunay triangulation, hydropolator could function in its current use.
 
 For the more advanced metrics, the [**triangle**](https://www.cs.cmu.edu/~quake/triangle.html) triangulation library is used. It supports a great constrained Delaunay triangulation with lots of controls.
+
+# Concepts
+
+## Region graph
+
+The triangle region graph is an adaptation of the region graph, but now ported to be used for triangulations. A region graph establishes adjacency information between equal-level areas/regions. See literature.
+
+We first need to define the isobath levels needed for our chart. The standard IHO levels are for example 2,5,8,10,20m etc. NOAA uses another variant based on the conversion of feet: 1.8, 3.6, 5.4m etc.
+
+A region is now defined as the vertical span between two consecutive isobath values. E.g. `1.8m - 3.6m` is one region. `-inf - 1.8m` another.
+
+Regions are reflected as nodes in the region graph.
+
+Two or more regions can be adjacent to each other. In that case, an isobath is always in between. Therefore, an edge represents a particular isobath. Its value is defined as the overlapping value between two regions/nodes. In the example of node `-inf - 1.8m` being adjacent to node `1.8m - 3.6m`, the edge or isobath in between has value `1.8m`.
+
+![Triangle Region Graph](img/region_graph.png)
+
+## Triangle region graph
+
+Hydropolator relies on a similar structure being the triangle region graph. In the triangle region graph, regions are not defined polygons, but as sets of triangles or faces in the triangulation.
+
+A 2.5D triangle will have a certain vertical span, based on its minimum and maximum values. Take for example a triangle with its vertices having `2.8, 4.5 and 3.1m` as z-values. It thus spans the vertical between `2.8m` and `4.5m`.
+
+Related to the already defined isobath values, this particular triangle falls in the regions `1.8m - 3.6m` and the region `3.6m - 5.4m`.
+
+By computing this for every triangle in the triangulation we can establish a triangle region graph. Nodes are in this case represented by sets of triangles.
+
+Triangles can be part of multiple nodes, such as the example given.
+
+Edges in this case not directly an isobath, but also a collection of triangles. Specifically, the set of triangles overlapping two different, but adjacent nodes.
+
+An isobath (line) will always run across this set of triangles. Take for example the triangle described above. We already now that the 3.6m isobath will run across this triangle.
+
+![Isobath edges](img/isobath_edge.png)
+
 
 ===
 
