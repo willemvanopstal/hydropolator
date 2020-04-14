@@ -39,9 +39,10 @@ This conceptual implementation is a proof of concept for my MSc. Thesis in Geoma
 - [License](#license)
 - [Acknowledgements](#Acknowledgements)
 
+
 - [Concepts](#concepts)
     - [Triangle region graph](#triangle-region-graph)
-    - [Metric](#metrics)
+    - [Metrics](#metrics)
 
 
 # Very simple example
@@ -108,6 +109,8 @@ While the goal is to generate isobaths *automatically*, this is not yet fully ac
 - Points (shapefile)
 - Depth areas (shapefile)  
 - Depth (geotif)
+
+
 - Triangulation faces/triangles (shapefile)
 - TRG Node Triangles (shapefile)
 - TRG Edge Triangles (shapefile)
