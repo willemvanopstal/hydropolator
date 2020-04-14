@@ -3,7 +3,7 @@
 
 # Ignore folders
 __pycache__
-projects
+projects/*
 pymnet
 plots_old
 
@@ -38,3 +38,4 @@ triangle
 # add some example data, although it is .txt
 !simulated_surface_points.txt
 !img/*.pdf
+!projects/placeholder
