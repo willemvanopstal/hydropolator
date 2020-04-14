@@ -5,12 +5,14 @@
 __pycache__
 projects
 pymnet
+plots_old
 
 # Ignore test files
 experiments_startin.py
 experiments.py
 PointInTriangle.py
 TriangleRegionGraph.py
+csv_loader.py
 
 # Ignore file types
 *.txt
@@ -21,6 +23,10 @@ TriangleRegionGraph.py
 *.prj
 *.qpj
 *.qgz
+*.csv
+*.pdf
+
+# Ignore sources
 triangle
 
 # Ignore files related to API keys
@@ -29,5 +35,6 @@ triangle
 # Ignore SASS config files
 .sass-cache
 
-# add some example data
+# add some example data, although it is .txt
 !simulated_surface_points.txt
+!img/*.pdf

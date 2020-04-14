@@ -27,16 +27,17 @@ def msg(string, type):
 # Input
 ###############################
 
-# surveyData = '../Data/operatorimplications/simulated_surface_points.txt'
-# xField, yField, dField, delimiter = 'x', 'y', 'depth', ' '
-# flipDepth = True
-# epsg = "28992"
-
-surveyData = '../Data/NOAA_tifs/newyork_5m_30k.csv'
-xField, yField, dField, delimiter = 'X', 'Y', 'depth', ','
+surveyData = '../Data/operatorimplications/simulated_surface_points.txt'
+xField, yField, dField, delimiter = 'x', 'y', 'depth', ' '
 flipDepth = True
-epsg = "26918"  # (UTM new york)
-projectName = 'networktest2'
+epsg = "28992"
+
+# surveyData = '../Data/NOAA_tifs/newyork_5m_30k.csv'
+# xField, yField, dField, delimiter = 'X', 'Y', 'depth', ','
+# flipDepth = True
+# epsg = "26918"  # (UTM new york)
+
+projectName = 'regiongraphinteractive'
 projectObject = Hydropolator()
 projectObject.isoType = 'noaa'
 
@@ -139,7 +140,7 @@ projectObject.build_graph2()
 
 startTime = datetime.now()
 
-projectObject.start_routine_new(paramDict, statistics=False)
+# projectObject.start_routine_new(paramDict, statistics=False)
 
 endTime = datetime.now()
 print('elapsed time: ', endTime - startTime)
@@ -150,7 +151,7 @@ print('elapsed time: ', endTime - startTime)
 
 projectObject.classify_peaks_pits(minPeak=100, minPit=100)
 # projectObject.make_network_graph()
-# projectObject.make_multilayer_graph(interactive=True)
+projectObject.make_multilayer_graph(interactive=True)
 
 ###############################
 # Exporting shapefiles
@@ -164,7 +165,7 @@ projectObject.classify_peaks_pits(minPeak=100, minPit=100)
 # projectObject.export_all_edge_triangles()
 # projectObject.export_shapefile('output')
 # projectObject.export_statistics()
-projectObject.export_shapefile('outupdates')
+# projectObject.export_shapefile('outupdates')
 
 # projectObject.rasterize(resolution=5.0)
 
