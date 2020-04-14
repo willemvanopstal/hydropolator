@@ -114,10 +114,10 @@ Hydropolator is implemented in Python 3.  It does rely on the following Python p
 - colorama
 - shapely (only for Aggregator.py)
 
-###### Triangle
+##### Triangle
 For some metrics use is made of the non-Python library [*triangle*](https://www.cs.cmu.edu/~quake/triangle.html). This program should be downloaded separately and placed in the same directory. However, the main program will run without this extension, but some features will not work.
 
-###### GDAL
+##### GDAL
 Most geographic files will be output as Shapefiles or GeoTiffs. If you specify a project crs (`hpl.set_crs()`), make sure to have GDAL binaries installed and added to your path. Some GDAL programs will be called from Python. If GDAL is not installed, you can still export shapefiles, but these will not be geo-referenced to a crs. Output in the form of a raster is not possible without GDAL.
 
 # Expected file structure
@@ -167,7 +167,7 @@ hpl = Hydropolator()
 
 ## Methods
 
-##### Project management
+#### Project management
 `self.init_project(projectName)`  
 Initializes a new (empty) project
 
@@ -180,12 +180,12 @@ Prints a basic summary of the project, number of points, isobaths etcetera.
 `self.set_crs(epsgCode)`  
 Sets the crs to the given EPSG. This is only used for export functions. Be aware it will only work if you have GDAL installed and added to your path. Otherwise the export functions will raise an error.
 
-##### Points
+#### Points
 
 `self.load_pointfile(pointfile, fileType, delimiter, xName, yName, dName, flip)`  
 This loads a .xyz pointfile, filters on snapping tolerance and triangulates the points for further use.
 
-##### Shutting down
+#### Shutting down
 `self.write_metafile()`  
 Saves some basic data to be able to open the same object again on loading an existing project.
 
@@ -195,7 +195,7 @@ Saves the triangulation object for loading an existing project later.
 `self.save_trGraph()`  
 Saves the triangulation region graph for loading again.
 
-##### Exporting
+#### Exporting
 
 `self.export_all_isobaths()`  
 Exports all isobaths in the project to shapefiles.
@@ -215,11 +215,11 @@ Exports basic triangles and vertices in two separate shapefiles with some inform
 `self.rasterize(resolution)`  
 Rasterizes the data and exports it to a GeoTiff. Make sure to have GDAL binaries installed and that you have set a crs with `self.set_crs()`. Interpolation is now done using LaPlace interpolant on a grid of pixels.
 
-##### Miscellaneous
+#### Miscellaneous
 `self.print_errors()`  
 Some errors in the process are captured and can be printed through this method. Be aware not all errors are yet printed!
 
-##### Statistics
+#### Statistics
 Some basic statistics are supported. However we need to set certain bins for visualization of these statistics.
 
 `self.set_sharp_points_bins(sharpPointsBreakpoints)`  
