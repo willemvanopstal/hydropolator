@@ -341,7 +341,7 @@ Two or more regions can be adjacent to each other. In that case, an isobath is a
 
 ## Triangle region graph
 
-Hydropolator relies on a similar structure being the triangle region graph. In the triangle region graph, regions are not defined polygons, but as sets of triangles or faces in the triangulation.
+Hydropolator relies on a similar structure being the triangle region graph. In the triangle region graph, regions are not defined as polygons, but as sets of triangles or faces in the triangulation.
 
 A 2.5D triangle will have a certain vertical span, based on its minimum and maximum values. Take for example a triangle with its vertices having `2.8, 4.5 and 3.1m` as z-values. It thus spans the vertical between `2.8m` and `4.5m`.
 
