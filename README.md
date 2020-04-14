@@ -25,6 +25,7 @@ This conceptual implementation is a proof of concept for my MSc. Thesis in Geoma
 
 
 # TOC
+- [Installation](#installation)
 - [Very simple example](#very-simple-example)
 - [Input](#input)
 - [Output](#output)
@@ -38,12 +39,19 @@ This conceptual implementation is a proof of concept for my MSc. Thesis in Geoma
 - [Examples](#examples)
 - [License](#license)
 - [Acknowledgements](#Acknowledgements)
-
-
 - [Concepts](#concepts)
     - [Triangle region graph](#triangle-region-graph)
     - [Metrics](#metrics)
 
+# Installation
+
+- Download/clone this repository.
+- Install GDAL on your computer, add it to your path so you can run the programs from terminal or cmd. Test it, e.g. with `gdal --version`.
+- Install/compile [triangle](https://www.cs.cmu.edu/~quake/triangle.html) by following the instructions on its website.
+- Place the *triangle* program in the hydropolator directory. See the [expected file structure](#expected-file-structure).
+- Download and install all [dependencies](#dependencies), e.g. using pip.
+- Load the [very simple example](#very-simple-example), change the path to your survey data (`surveyData`), check the headers in your data and adapt the example to it (`x, y, z`), and run the example.
+- See the [implementation details](#hydropolator) for more options.
 
 # Very simple example
 ```python
@@ -109,8 +117,6 @@ While the goal is to generate isobaths *automatically*, this is not yet fully ac
 - Points (shapefile)
 - Depth areas (shapefile)  
 - Depth (geotif)
-
-
 - Triangulation faces/triangles (shapefile)
 - TRG Node Triangles (shapefile)
 - TRG Edge Triangles (shapefile)
