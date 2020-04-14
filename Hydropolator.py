@@ -1,9 +1,23 @@
-# @Author: Willem van Opstal <willemvanopstal>
-# @Date:   17-Jan-2020
-# @Email:  willemvanopstal home nl
-# @Project: Hydropolator
-# @Last modified by:   Willem
-# @Last modified time: 13-Apr-2020
+#    Copyright (C) 2020  Willem van Opstal
+#    willemvanopstal@home.nl
+#
+#    This file is part of Hydropolator
+#    'Safe depth contour generalisation for navigational charts'
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+#    Last modified: april 14th 2020
 
 
 from ElevationDict import ElevationDict
@@ -96,6 +110,7 @@ class Hydropolator:
     errors = []
 
     def __init__(self):
+        self.license_header()
         return
 
     # ====================================== #
@@ -117,6 +132,22 @@ class Hydropolator:
         self.srsString = subprocess.check_output(
             'gdalsrsinfo -o wkt "EPSG:{}"'.format(self.epsg), shell=True)
 
+    def license_header(self):
+
+        self.msg('''
+Hydropolator: 'Safe depth contour generalisation for navigational charts'
+Copyright (C) 2020  Willem van Opstal    <willemvanopstal-a-home.nl>
+
+This program comes with ABSOLUTELY NO WARRANTY.
+This is free software, and you are welcome to redistribute it under
+certain conditions; see the LICENSE file for details.\n''', 'misc')
+
+    # def warranty(self):
+    #     print()
+    #
+    # def conditions(self):
+    #     print()
+
     # ====================================== #
     #
     #   Messaging / Notifications
@@ -136,6 +167,8 @@ class Hydropolator:
             colColor = colorama.Fore.YELLOW + colorama.Style.BRIGHT
         elif type == 'header':
             colColor = colorama.Fore.GREEN
+        elif type == 'misc':
+            colColor = colorama.Fore.BLUE
 
         print(colColor + string + colorama.Style.RESET_ALL)
 

@@ -15,11 +15,13 @@ def msg(string, type):
         colColor = colorama.Fore.YELLOW + colorama.Style.BRIGHT
     elif type == 'header':
         colColor = colorama.Fore.GREEN
+    elif type == 'misc':
+        colColor = colorama.Fore.BLUE
 
     print(colColor + string + colorama.Style.RESET_ALL)
 
 
-print('\n\n')
+# print('\n\n')
 
 ###############################
 # Input
@@ -90,7 +92,7 @@ paramDict = {'prepass': 0,
              'densification': 0,
              'process': [],
              'densification_process': [],
-             'maxiter': 5,
+             'maxiter': 0,
              'angularity_threshold': 1.6,
              'spurgully_threshold': None,
              'spur_threshold': 10,
