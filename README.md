@@ -1,8 +1,15 @@
 **Hydropolator** is a program to interact with hydrographic survey data with the main purpose of generating and generalizing depth contours for different chart scales. Great attention is given to the fact these contours should be legible, safe, morphological and topological correct.
 
-This conceptual implementation is a proof of concept for my MSc. Thesis in Geomatics: *Automatic isobath generalisation for navigational charts*. The report is available [here](https://repository.tudelft.nl).
+### MSc thesis
 
-*While the code is fully functional, it is not an optimal implementation of the proposed methodology. Be aware of long processing times, especially if variation in the survey data is large.*
+This conceptual implementation is a proof of concept for my MSc thesis in Geomatics: *Automatic isobath generalisation for navigational charts*. The report is available [here](https://repository.tudelft.nl).
+
+An abstract is included in this repository [here](ABSTRACT.md).
+
+![Layered TRG nodes with isobaths](img/trg_isobaths.png "Layered TRG nodes with isobaths")
+
+
+
 
 # Very short methodology
 
@@ -22,6 +29,7 @@ This conceptual implementation is a proof of concept for my MSc. Thesis in Geoma
 1. And finally we can extract isobaths, being legible, safe, and geometrically correct.
 1. We can also easily extract depth areas, because the Triangle Region Graph structure.
 
+*While the code is fully functional, it is not an optimal implementation of the proposed methodology. Be aware of long processing times, especially if variation in the survey data is large.*
 
 
 # TOC
