@@ -2,7 +2,7 @@
 
 ### MSc thesis
 
-This conceptual implementation is a proof of concept for my MSc thesis in Geomatics: *Automatic isobath generalisation for navigational charts*. The report is available [here](https://repository.tudelft.nl).
+This conceptual implementation is a proof of concept for my MSc thesis in Geomatics: *Automatic isobath generalisation for navigational charts*. The report is available [here](http://resolver.tudelft.nl/uuid:2e95de28-c9ce-4d07-8131-ae3c4c5b9d86).
 
 An abstract is included in this repository [here](ABSTRACT.md).
 
